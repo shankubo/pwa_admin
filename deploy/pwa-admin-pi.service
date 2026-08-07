@@ -1,0 +1,27 @@
+[Unit]
+Description=Pi Admin PWA - Raspberry Pi administration tool
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+# Set User/Group to your existing low-privilege admin account (must already be
+# in the `docker` group for Docker socket access, and in `adm` if your nginx
+# logs are group-owned by adm, as is common on Debian). Do NOT run as root —
+# elevated operations (nginx/apt/fail2ban) go through the scoped sudoers.d
+# rules in this directory instead.
+User=shan
+Group=shan
+WorkingDirectory=/home/shan/pwa_admin_pi
+EnvironmentFile=/home/shan/pwa_admin_pi/.env
+ExecStart=/usr/bin/node apps/api/dist/server.js
+Restart=on-failure
+RestartSec=5
+# NOTE: NoNewPrivileges is intentionally NOT set here — the app's whole
+# privilege model relies on shelling out through `sudo` for the specific
+# nginx/apt/fail2ban/ss commands scoped in sudoers.d/pwa-admin-pi (never
+# running the Node process itself as root). NoNewPrivileges=true blocks sudo
+# from elevating at all, which breaks every privileged action in the app.
+
+[Install]
+WantedBy=multi-user.target

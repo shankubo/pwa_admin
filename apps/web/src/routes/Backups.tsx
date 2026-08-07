@@ -1,0 +1,665 @@
+import { useEffect, useMemo, useState } from "react";
+import type {
+  BackupJob,
+  BackupHistoryEntry,
+  BackupRunStatus,
+  BackupSourceType,
+  BackupTarget,
+  DetectedDatabase,
+  DetectedBindMount,
+  VolumeSummary,
+} from "@pwa-admin-pi/shared";
+import { apiJson } from "@/lib/api";
+import { Card, CardTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { formatBytes } from "./Docker";
+import { Play, Trash2, Database, HardDrive, Cloud, CheckCircle2, XCircle } from "lucide-react";
+
+const STATUS_FILTERS: { key: "all" | BackupRunStatus; label: string }[] = [
+  { key: "all", label: "Tous" },
+  { key: "success", label: "Succès" },
+  { key: "failed", label: "Échec" },
+  { key: "running", label: "En cours" },
+];
+
+export function Backups() {
+  const [jobs, setJobs] = useState<BackupJob[] | null>(null);
+  const [history, setHistory] = useState<BackupHistoryEntry[] | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"all" | BackupRunStatus>("all");
+  const [storage, setStorage] = useState<{ localUsedBytes: number } | null>(null);
+  const [detected, setDetected] = useState<DetectedDatabase[] | null>(null);
+  const [selectedRun, setSelectedRun] = useState<BackupHistoryEntry | null>(null);
+  const [showNewJob, setShowNewJob] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [gdriveAuthorized, setGdriveAuthorized] = useState(false);
+
+  async function loadJobs() {
+    setJobs(await apiJson<BackupJob[]>("/backups/jobs"));
+  }
+  async function loadHistory() {
+    setHistory(await apiJson<BackupHistoryEntry[]>("/backups/history?limit=100&offset=0"));
+  }
+
+  useEffect(() => {
+    loadJobs().catch((err) => setError((err as Error).message));
+    loadHistory().catch((err) => setError((err as Error).message));
+    apiJson<{ localUsedBytes: number }>("/backups/storage")
+      .then(setStorage)
+      .catch(() => {});
+    apiJson<DetectedDatabase[]>("/dbbackup/detect")
+      .then(setDetected)
+      .catch(() => setDetected([]));
+    apiJson<{ authorized: boolean }>("/backups/gdrive/status")
+      .then((s) => setGdriveAuthorized(s.authorized))
+      .catch(() => setGdriveAuthorized(false));
+  }, []);
+
+  async function runJob(id: number) {
+    await apiJson(`/backups/jobs/${id}/run`, { method: "POST" });
+    await loadHistory();
+  }
+
+  async function deleteJob(id: number) {
+    await apiJson(`/backups/jobs/${id}`, { method: "DELETE" });
+    await loadJobs();
+  }
+
+  async function dumpDb(location: "docker" | "native", ref: string) {
+    const targets: BackupTarget[] = gdriveAuthorized ? ["local", "gdrive"] : ["local"];
+    await apiJson(`/dbbackup/${location}/${encodeURIComponent(ref)}/dump`, {
+      method: "POST",
+      body: JSON.stringify({ targets }),
+    });
+    await loadHistory();
+  }
+
+  async function restore(run: BackupHistoryEntry, targetVolume?: string) {
+    if (run.sourceType === "db") {
+      await apiJson("/dbbackup/restore-by-run", {
+        method: "POST",
+        body: JSON.stringify({ runId: run.runId, confirm: true }),
+      });
+    } else {
+      await apiJson("/backups/restore", {
+        method: "POST",
+        body: JSON.stringify({ runId: run.runId, targetVolume, confirm: true }),
+      });
+    }
+    await loadHistory();
+  }
+
+  const filteredHistory = useMemo(() => {
+    if (!history) return [];
+    if (statusFilter === "all") return history;
+    return history.filter((h) => h.status === statusFilter);
+  }, [history, statusFilter]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      {error && <Card className="text-sm text-destructive">{error}</Card>}
+
+      <Card>
+        <CardTitle className="flex items-center gap-1">
+          <HardDrive className="h-4 w-4" /> Stockage local
+        </CardTitle>
+        <p className="text-lg font-medium">{storage ? formatBytes(storage.localUsedBytes) : "…"}</p>
+      </Card>
+
+      <GDriveConnection />
+
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-muted-foreground">Jobs de sauvegarde</h2>
+          <Button size="sm" variant="outline" onClick={() => setShowNewJob((v) => !v)}>
+            {showNewJob ? "Annuler" : "Nouveau job"}
+          </Button>
+        </div>
+
+        {showNewJob && (
+          <NewJobForm
+            onCreated={() => {
+              setShowNewJob(false);
+              loadJobs();
+            }}
+          />
+        )}
+
+        <div className="flex flex-col gap-3">
+          {!jobs && <Card className="text-sm text-muted-foreground">Chargement…</Card>}
+          {jobs?.length === 0 && <Card className="text-sm text-muted-foreground">Aucun job configuré.</Card>}
+          {jobs?.map((job) => (
+            <Card key={job.id}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{job.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {job.sourceType} · {job.sourceRef}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    cibles : {job.targets.join(", ")}
+                    {job.scheduleCron ? ` · cron: ${job.scheduleCron}` : ""}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <Button size="sm" variant="outline" onClick={() => runJob(job.id)}>
+                    <Play className="h-3.5 w-3.5" />
+                  </Button>
+                  <ConfirmDialog
+                    trigger={
+                      <Button size="sm" variant="destructive">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    }
+                    title={`Supprimer le job ${job.name} ?`}
+                    confirmLabel="Supprimer"
+                    onConfirm={() => deleteJob(job.id)}
+                  />
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      <Card>
+        <CardTitle className="flex items-center gap-1">
+          <Database className="h-4 w-4" /> Bases de données détectées
+        </CardTitle>
+        {detected && detected.length > 0 ? (
+          <div className="flex flex-col gap-3">
+            {detected.map((d) => (
+              <div key={`${d.location}:${d.ref}`} className="flex flex-col gap-1">
+                <div className="flex items-center justify-between text-sm">
+                  <span>
+                    {d.displayName}{" "}
+                    <span className="text-xs text-muted-foreground">
+                      ({d.engine} · {d.location === "docker" ? "conteneur" : "hôte"})
+                    </span>
+                  </span>
+                  <Button size="sm" variant="outline" onClick={() => dumpDb(d.location, d.ref)}>
+                    Dump maintenant
+                  </Button>
+                </div>
+                {d.databases && d.databases.length > 0 && (
+                  <p className="text-xs text-muted-foreground">Bases : {d.databases.join(", ")}</p>
+                )}
+                {d.databases && d.databases.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Aucune base applicative (hors bases système)</p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Aucune base détectée.</p>
+        )}
+      </Card>
+
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-muted-foreground">Historique</h2>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as "all" | BackupRunStatus)}
+            className="rounded-md border border-border bg-background px-2 py-1 text-xs outline-none"
+          >
+            {STATUS_FILTERS.map((f) => (
+              <option key={f.key} value={f.key}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {filteredHistory.length === 0 && (
+            <Card className="text-sm text-muted-foreground">Aucun historique.</Card>
+          )}
+          {filteredHistory.map((h) => (
+            <Card key={h.runId} className="cursor-pointer" onClick={() => setSelectedRun(h)}>
+              <div className="flex items-center justify-between text-sm">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">
+                    {h.type} · {h.sourceType}:{h.sourceRef}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {h.target}
+                    {h.driveFileId ? " + gdrive" : ""} · {new Date(h.startedAt).toLocaleString()}
+                    {h.durationMs != null ? ` · ${(h.durationMs / 1000).toFixed(1)}s` : ""}
+                  </p>
+                </div>
+                <span
+                  className={
+                    "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium " +
+                    (h.status === "success"
+                      ? "bg-primary/15 text-primary"
+                      : h.status === "failed"
+                        ? "bg-destructive/15 text-destructive"
+                        : "bg-warning/15 text-warning")
+                  }
+                >
+                  {h.status}
+                </span>
+              </div>
+              {h.sizeBytes != null && (
+                <p className="mt-1 text-xs text-muted-foreground">{formatBytes(h.sizeBytes)}</p>
+              )}
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {selectedRun && (
+        <RunDetailPanel run={selectedRun} onClose={() => setSelectedRun(null)} onRestore={restore} />
+      )}
+    </div>
+  );
+}
+
+function RunDetailPanel({
+  run,
+  onClose,
+  onRestore,
+}: {
+  run: BackupHistoryEntry;
+  onClose: () => void;
+  onRestore: (run: BackupHistoryEntry, targetVolume?: string) => Promise<void>;
+}) {
+  const [targetVolume, setTargetVolume] = useState(run.sourceType === "volume" ? run.sourceRef : "");
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between">
+        <CardTitle>Détail du run {run.runId}</CardTitle>
+        <Button size="sm" variant="ghost" onClick={onClose}>
+          Fermer
+        </Button>
+      </div>
+      <div className="flex flex-col gap-1 text-sm">
+        <p>Type : {run.type}</p>
+        <p>Source : {run.sourceType}:{run.sourceRef}</p>
+        <p>Cible : {run.target}{run.driveFileId ? " + gdrive" : ""}</p>
+        <p>Statut : {run.status}</p>
+        {run.driveFileId && (
+          <a
+            href={`https://drive.google.com/file/d/${run.driveFileId}/view`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-primary underline"
+          >
+            Ouvrir sur Google Drive
+          </a>
+        )}
+        {run.checksumSha256 && <p className="truncate text-xs text-muted-foreground">SHA256 : {run.checksumSha256}</p>}
+        {run.error && <p className="text-xs text-destructive">{run.error}</p>}
+      </div>
+
+      {run.status === "success" && (
+        <div className="mt-3 flex flex-col gap-2">
+          {run.sourceType === "volume" && (
+            <input
+              type="text"
+              placeholder="Volume cible"
+              value={targetVolume}
+              onChange={(e) => setTargetVolume(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+            />
+          )}
+          <ConfirmDialog
+            trigger={
+              <Button size="sm" variant="destructive">
+                Restaurer
+              </Button>
+            }
+            title="Restaurer cette sauvegarde ?"
+            description="Cette opération va écraser les données existantes de la cible. Action irréversible."
+            requireTypedConfirmation="RESTORE"
+            confirmLabel="Restaurer"
+            onConfirm={() => onRestore(run, targetVolume || undefined)}
+          />
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function NewJobForm({ onCreated }: { onCreated: () => void }) {
+  const [name, setName] = useState("");
+  const [sourceType, setSourceType] = useState<BackupSourceType>("volume");
+  const [sourceRef, setSourceRef] = useState("");
+  const [targets, setTargets] = useState<BackupTarget[]>(["local"]);
+  const [cron, setCron] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [volumes, setVolumes] = useState<VolumeSummary[] | null>(null);
+  const [detectedDbs, setDetectedDbs] = useState<DetectedDatabase[] | null>(null);
+  const [bindMounts, setBindMounts] = useState<DetectedBindMount[] | null>(null);
+  const [refsLoading, setRefsLoading] = useState(false);
+  const [manualEntry, setManualEntry] = useState(false);
+
+  useEffect(() => {
+    setSourceRef("");
+    setManualEntry(false);
+    setRefsLoading(true);
+
+    if (sourceType === "volume") {
+      apiJson<VolumeSummary[]>("/docker/volumes")
+        .then(setVolumes)
+        .catch(() => setError("Impossible de charger la liste des volumes"))
+        .finally(() => setRefsLoading(false));
+    } else if (sourceType === "db") {
+      apiJson<DetectedDatabase[]>("/dbbackup/detect")
+        .then(setDetectedDbs)
+        .catch(() => setError("Impossible de charger la liste des bases de données"))
+        .finally(() => setRefsLoading(false));
+    } else if (sourceType === "path") {
+      apiJson<DetectedBindMount[]>("/backups/bind-mounts")
+        .then(setBindMounts)
+        .catch(() => setError("Impossible de charger la liste des dossiers montés"))
+        .finally(() => setRefsLoading(false));
+    }
+  }, [sourceType]);
+
+  const refOptions: { value: string; label: string }[] =
+    sourceType === "volume"
+      ? (volumes ?? []).map((v) => ({ value: v.name, label: v.name }))
+      : sourceType === "db"
+        ? (detectedDbs ?? []).map((d) => ({
+            value: `${d.location}:${d.ref}`,
+            label: `${d.displayName} (${d.engine})`,
+          }))
+        : sourceType === "path"
+          ? (bindMounts ?? []).map((m) => ({
+              value: m.hostPath,
+              label: `${m.hostPath} (${m.containerName})`,
+            }))
+        : [];
+
+  function toggleTarget(t: BackupTarget) {
+    setTargets((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!name.trim() || !sourceRef.trim() || targets.length === 0) {
+      setError("Nom, référence et au moins une cible sont requis");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await apiJson("/backups/jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          name: name.trim(),
+          sourceType,
+          sourceRef: sourceRef.trim(),
+          targets,
+          scheduleCron: cron.trim() || undefined,
+        }),
+      });
+      onCreated();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Card className="mb-3">
+      <form onSubmit={submit} className="flex flex-col gap-2">
+        <input
+          type="text"
+          placeholder="Nom du job"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+        />
+        <select
+          value={sourceType}
+          onChange={(e) => setSourceType(e.target.value as BackupSourceType)}
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
+        >
+          <option value="volume">volume Docker</option>
+          <option value="path">dossier (bind mount)</option>
+          <option value="db">base de données</option>
+        </select>
+        {manualEntry || refOptions.length === 0 ? (
+          <div className="flex flex-col gap-1">
+            <input
+              type="text"
+              placeholder={
+                refsLoading
+                  ? "Chargement…"
+                  : sourceType === "volume"
+                    ? "Référence source (nom du volume)"
+                    : sourceType === "path"
+                      ? "Chemin absolu (ex: /home/shan/docker-data/pwa-asso)"
+                      : "Référence source (location:ref, ex: native:mariadb)"
+              }
+              value={sourceRef}
+              onChange={(e) => setSourceRef(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+            />
+            {refOptions.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setManualEntry(false)}
+                className="self-start text-xs text-primary underline"
+              >
+                Choisir dans la liste
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            <select
+              value={sourceRef}
+              onChange={(e) => setSourceRef(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
+            >
+              <option value="">
+                {sourceType === "volume"
+                  ? "Sélectionner un volume…"
+                  : sourceType === "path"
+                    ? "Sélectionner un dossier monté…"
+                    : "Sélectionner une base de données…"}
+              </option>
+              {refOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setManualEntry(true)}
+              className="self-start text-xs text-primary underline"
+            >
+              Saisir manuellement
+            </button>
+          </div>
+        )}
+        <div className="flex gap-3 text-sm">
+          <label className="flex items-center gap-1">
+            <input type="checkbox" checked={targets.includes("local")} onChange={() => toggleTarget("local")} />
+            local
+          </label>
+          <label className="flex items-center gap-1">
+            <input type="checkbox" checked={targets.includes("gdrive")} onChange={() => toggleTarget("gdrive")} />
+            gdrive
+          </label>
+        </div>
+        <input
+          type="text"
+          placeholder="Expression cron (optionnel)"
+          value={cron}
+          onChange={(e) => setCron(e.target.value)}
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+        />
+        {error && <p className="text-xs text-destructive">{error}</p>}
+        <Button type="submit" size="sm" disabled={submitting}>
+          {submitting ? "Création…" : "Créer"}
+        </Button>
+      </form>
+    </Card>
+  );
+}
+
+interface GDriveStatus {
+  enabled: boolean;
+  configured: boolean;
+  authorized: boolean;
+  rootFolderId: string | null;
+}
+
+function GDriveConnection() {
+  const [status, setStatus] = useState<GDriveStatus | null>(null);
+  const [authUrl, setAuthUrl] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+
+  function loadStatus() {
+    apiJson<GDriveStatus>("/backups/gdrive/status")
+      .then(setStatus)
+      .catch(() => setStatus(null));
+  }
+
+  useEffect(loadStatus, []);
+
+  async function startAuth() {
+    setMessage(null);
+    try {
+      const { url } = await apiJson<{ url: string }>("/backups/gdrive/auth-url");
+      setAuthUrl(url);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setMessage({ type: "error", text: (err as Error).message });
+    }
+  }
+
+  async function submitCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (!code.trim()) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await apiJson("/backups/gdrive/authorize", {
+        method: "POST",
+        body: JSON.stringify({ code: code.trim() }),
+      });
+      setCode("");
+      setAuthUrl(null);
+      setMessage({ type: "ok", text: "Connecté à Google Drive avec succès." });
+      loadStatus();
+    } catch (err) {
+      setMessage({ type: "error", text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function testUpload() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await apiJson("/backups/gdrive/test-upload", { method: "POST" });
+      setMessage({ type: "ok", text: "Fichier de test envoyé avec succès sur Google Drive." });
+    } catch (err) {
+      setMessage({ type: "error", text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function disconnect() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await apiJson("/backups/gdrive/revoke", { method: "POST" });
+      setMessage({ type: "ok", text: "Déconnecté de Google Drive." });
+      loadStatus();
+    } catch (err) {
+      setMessage({ type: "error", text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardTitle className="flex items-center gap-1">
+        <Cloud className="h-4 w-4" /> Google Drive
+      </CardTitle>
+
+      {!status ? (
+        <p className="text-sm text-muted-foreground">Chargement…</p>
+      ) : !status.enabled ? (
+        <p className="text-sm text-muted-foreground">
+          Désactivé (GDRIVE_ENABLED=false côté serveur).
+        </p>
+      ) : !status.configured ? (
+        <p className="text-sm text-muted-foreground">
+          Identifiants OAuth manquants (GDRIVE_OAUTH_CLIENT_ID / GDRIVE_OAUTH_CLIENT_SECRET).
+        </p>
+      ) : status.authorized ? (
+        <div className="flex flex-col gap-2">
+          <p className="flex items-center gap-1 text-sm text-primary">
+            <CheckCircle2 className="h-4 w-4" /> Connecté
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={testUpload} disabled={busy}>
+              Tester la connexion
+            </Button>
+            <ConfirmDialog
+              trigger={
+                <Button size="sm" variant="destructive" disabled={busy}>
+                  Déconnecter
+                </Button>
+              }
+              title="Déconnecter Google Drive ?"
+              description="Les jobs ciblant « gdrive » échoueront jusqu'à une nouvelle autorisation."
+              confirmLabel="Déconnecter"
+              onConfirm={disconnect}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <p className="flex items-center gap-1 text-sm text-warning">
+            <XCircle className="h-4 w-4" /> Non connecté
+          </p>
+          <Button size="sm" variant="outline" onClick={startAuth}>
+            Autoriser l'accès à Google Drive
+          </Button>
+          {authUrl && (
+            <form onSubmit={submitCode} className="flex flex-col gap-2">
+              <p className="text-xs text-muted-foreground">
+                Une fenêtre Google s'est ouverte. Connectez-vous, autorisez l'accès, puis collez le code affiché ci-dessous.
+              </p>
+              <input
+                type="text"
+                placeholder="Code d'autorisation"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+              />
+              <Button type="submit" size="sm" disabled={busy || !code.trim()}>
+                {busy ? "Validation…" : "Valider le code"}
+              </Button>
+            </form>
+          )}
+        </div>
+      )}
+
+      {message && (
+        <p className={`mt-2 text-xs ${message.type === "ok" ? "text-primary" : "text-destructive"}`}>
+          {message.text}
+        </p>
+      )}
+    </Card>
+  );
+}

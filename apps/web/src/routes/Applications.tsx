@@ -1,0 +1,754 @@
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import type {
+  Application,
+  AppBackupRun,
+  AppBackupRunKind,
+  BackupTarget,
+  DetectedDatabase,
+  DetectedBindMount,
+  ContainerSummary,
+} from "@pwa-admin-pi/shared";
+import { apiJson } from "@/lib/api";
+import { Card, CardTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { formatBytes } from "./Docker";
+import { Boxes, Trash2, Database, Cloud, HardDrive, Info, ChevronDown, ChevronUp, Loader2, CheckCircle2, XCircle } from "lucide-react";
+
+interface CronPreset {
+  label: string;
+  value: string;
+  hint: string;
+}
+
+const CRON_PRESETS: CronPreset[] = [
+  { label: "Toutes les heures", value: "0 * * * *", hint: "à chaque heure pile" },
+  { label: "Toutes les 6 heures", value: "0 */6 * * *", hint: "00h, 06h, 12h, 18h" },
+  { label: "Quotidien à 2h", value: "0 2 * * *", hint: "chaque jour à 2h00 du matin" },
+  { label: "Quotidien à 3h", value: "0 3 * * *", hint: "chaque jour à 3h00 du matin" },
+  { label: "Toutes les 12h", value: "0 */12 * * *", hint: "00h et 12h" },
+  { label: "Hebdomadaire (dimanche 3h)", value: "0 3 * * 0", hint: "chaque dimanche à 3h00" },
+  { label: "Hebdomadaire (lundi 3h)", value: "0 3 * * 1", hint: "chaque lundi à 3h00" },
+  { label: "Mensuel (1er du mois, 3h)", value: "0 3 1 * *", hint: "le 1er de chaque mois à 3h00" },
+];
+
+/** Cron frequency picker: dropdown of common presets + a "Personnalisé" mode
+ * that reveals a raw cron expression input, so admins who know cron syntax
+ * aren't limited to the presets. */
+function CronPicker({
+  value,
+  onChange,
+  label,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  label: string;
+}) {
+  const matchedPreset = CRON_PRESETS.find((p) => p.value === value);
+  const [mode, setMode] = useState<"none" | "preset" | "custom">(
+    value ? (matchedPreset ? "preset" : "custom") : "none"
+  );
+
+  function handleModeChange(newMode: "none" | "preset" | "custom") {
+    setMode(newMode);
+    if (newMode === "none") onChange("");
+    else if (newMode === "preset") onChange(CRON_PRESETS[0].value);
+    else if (newMode === "custom" && !value) onChange("");
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <select
+        value={mode}
+        onChange={(e) => handleModeChange(e.target.value as "none" | "preset" | "custom")}
+        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
+      >
+        <option value="none">Désactivé</option>
+        <option value="preset">Fréquence prédéfinie</option>
+        <option value="custom">Expression cron personnalisée</option>
+      </select>
+
+      {mode === "preset" && (
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
+        >
+          {CRON_PRESETS.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {mode === "custom" && (
+        <>
+          <input
+            type="text"
+            placeholder="ex: 0 3 * * * (minute heure jour mois jour-semaine)"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-primary"
+          />
+          <p className="text-xs text-muted-foreground">
+            Format : minute (0-59) heure (0-23) jour-du-mois (1-31) mois (1-12) jour-semaine (0-6, 0=dimanche). Ex :{" "}
+            <code className="rounded bg-muted px-1">0 3 * * *</code> = tous les jours à 3h00.
+          </p>
+        </>
+      )}
+
+      {mode === "preset" && matchedPreset && (
+        <p className="text-xs text-muted-foreground">{matchedPreset.hint}</p>
+      )}
+    </div>
+  );
+}
+
+function HelpPanel() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Card>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-2 text-left"
+      >
+        <span className="flex items-center gap-1.5 text-sm font-medium">
+          <Info className="h-4 w-4 shrink-0 text-primary" />
+          Comment fonctionne ce système de sauvegarde ?
+        </span>
+        {open ? (
+          <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+        )}
+      </button>
+
+      {open && (
+        <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3 text-sm">
+          <div>
+            <p className="font-medium">Qu'est-ce qu'une « Application » ?</p>
+            <p className="mt-1 text-muted-foreground">
+              Un regroupement logique de tout ce qui appartient à un même site/service que vous gérez sur le Pi :
+              son ou ses conteneurs Docker, les dossiers qui contiennent ses vraies données (photos, uploads,
+              fichiers de config — ce qu'on appelle des « bind mounts »), et éventuellement sa base de données.
+              Sans ce regroupement, il faudrait sauvegarder chaque dossier et chaque base séparément et se souvenir
+              lesquels vont ensemble.
+            </p>
+          </div>
+
+          <div>
+            <p className="font-medium">Backup complet vs backup partiel</p>
+            <ul className="mt-1 list-disc space-y-1 pl-4 text-muted-foreground">
+              <li>
+                <span className="font-medium text-foreground">Complet</span> : capture l'état entier des dossiers à
+                cet instant, comme un point de sauvegarde autonome.
+              </li>
+              <li>
+                <span className="font-medium text-foreground">Partiel</span> : ne copie physiquement que les
+                fichiers nouveaux ou modifiés depuis le dernier backup (complet ou partiel). Les fichiers
+                inchangés ne sont pas dupliqués — ils sont liés au backup précédent, donc chaque backup partiel
+                reste consultable comme un instantané complet, sans consommer d'espace disque supplémentaire pour
+                ce qui n'a pas changé.
+              </li>
+            </ul>
+            <p className="mt-1 text-muted-foreground">
+              La base de données, elle, est toujours sauvegardée intégralement à chaque backup (complet ou
+              partiel) — les dumps de base de données sont rapides, il n'y a pas besoin de version « partielle ».
+            </p>
+          </div>
+
+          <div>
+            <p className="font-medium">Planification automatique</p>
+            <p className="mt-1 text-muted-foreground">
+              Une bonne pratique courante : backup partiel tous les jours (rapide, capture les changements
+              récents) et backup complet une fois par semaine (point de repère solide et indépendant). Les deux
+              plannings sont indépendants et optionnels — vous pouvez aussi tout déclencher manuellement avec les
+              boutons « Backup complet » / « Backup partiel » sur chaque application.
+            </p>
+          </div>
+
+          <div>
+            <p className="font-medium">Restauration</p>
+            <p className="mt-1 text-muted-foreground">
+              Dépliez une application pour voir son historique de backups, puis choisissez un point dans le temps
+              à restaurer. La restauration écrase les fichiers actuels par ceux du backup choisi — une confirmation
+              explicite (taper « RESTORE ») est demandée avant toute action, et un backup de sécurité de l'état
+              actuel est automatiquement pris juste avant, au cas où.
+            </p>
+          </div>
+
+          <div>
+            <p className="font-medium">Stockage local et Google Drive</p>
+            <p className="mt-1 text-muted-foreground">
+              Les backups sont toujours écrits localement sur le Pi. Vous pouvez en plus cocher « gdrive » pour
+              qu'une copie soit envoyée automatiquement sur Google Drive (nécessite d'être connecté depuis l'écran
+              Backups) — utile pour survivre à une panne du Pi lui-même, pas seulement à une erreur applicative.
+            </p>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+export function Applications() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const prefillContainer = searchParams.get("container");
+  const [apps, setApps] = useState<Application[] | null>(null);
+  const [showNewApp, setShowNewApp] = useState(!!prefillContainer);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  async function loadApps() {
+    setApps(await apiJson<Application[]>("/applications"));
+  }
+
+  useEffect(() => {
+    loadApps().catch((err) => setError((err as Error).message));
+  }, []);
+
+  async function runBackup(id: number, kind: AppBackupRunKind) {
+    setError(null);
+    try {
+      await apiJson(`/applications/${id}/backup`, {
+        method: "POST",
+        body: JSON.stringify({ kind }),
+      });
+      if (expandedId === id) {
+        // trigger a refresh of the run list by toggling
+        setExpandedId(null);
+        setTimeout(() => setExpandedId(id), 0);
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function deleteApp(id: number) {
+    await apiJson(`/applications/${id}`, { method: "DELETE" });
+    await loadApps();
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <HelpPanel />
+
+      {error && <Card className="text-sm text-destructive">{error}</Card>}
+
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-muted-foreground">Applications</h2>
+          <Button size="sm" variant="outline" onClick={() => setShowNewApp((v) => !v)}>
+            {showNewApp ? "Annuler" : "Nouvelle application"}
+          </Button>
+        </div>
+
+        {showNewApp && (
+          <NewAppForm
+            prefillContainer={prefillContainer}
+            onCreated={() => {
+              setShowNewApp(false);
+              setSearchParams({});
+              loadApps();
+            }}
+          />
+        )}
+
+        <div className="flex flex-col gap-3">
+          {!apps && <Card className="text-sm text-muted-foreground">Chargement…</Card>}
+          {apps?.length === 0 && (
+            <Card className="text-sm text-muted-foreground">Aucune application configurée.</Card>
+          )}
+          {apps?.map((app) => (
+            <AppCard
+              key={app.id}
+              app={app}
+              expanded={expandedId === app.id}
+              onToggleExpand={() => setExpandedId((prev) => (prev === app.id ? null : app.id))}
+              onBackup={(kind) => runBackup(app.id, kind)}
+              onDelete={() => deleteApp(app.id)}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AppCard({
+  app,
+  expanded,
+  onToggleExpand,
+  onBackup,
+  onDelete,
+}: {
+  app: Application;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  onBackup: (kind: AppBackupRunKind) => void;
+  onDelete: () => void;
+}) {
+  return (
+    <Card>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 cursor-pointer" onClick={onToggleExpand}>
+          <p className="flex items-center gap-1 truncate font-medium">
+            <Boxes className="h-4 w-4 shrink-0" /> {app.name}
+          </p>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {app.containerNames.map((c) => (
+              <span key={c} className="rounded-full bg-muted px-2 py-0.5 text-xs">
+                {c}
+              </span>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {app.paths.length} chemin{app.paths.length > 1 ? "s" : ""}
+            {app.dbRef && (
+              <>
+                {" · "}
+                <span className="inline-flex items-center gap-0.5">
+                  <Database className="h-3 w-3" /> {app.dbRef}
+                </span>
+              </>
+            )}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            cibles : {app.targets.join(", ")}
+            {app.scheduleFullCron ? ` · full: ${app.scheduleFullCron}` : ""}
+            {app.schedulePartialCron ? ` · partial: ${app.schedulePartialCron}` : ""}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col gap-2">
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => onBackup("full")}>
+              Backup complet
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onBackup("partial")}>
+              Backup partiel
+            </Button>
+            <ConfirmDialog
+              trigger={
+                <Button size="sm" variant="destructive">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              }
+              title={`Supprimer l'application ${app.name} ?`}
+              confirmLabel="Supprimer"
+              onConfirm={onDelete}
+            />
+          </div>
+        </div>
+      </div>
+
+      {expanded && <AppRunHistory appId={app.id} />}
+    </Card>
+  );
+}
+
+/** Shows real Drive upload progress for a run's file snapshot (separate from
+ * the DB dump's own dbDriveFileId, which uploads synchronously since dumps are
+ * small — this tracks the potentially multi-GB, asynchronous file upload). */
+function DriveUploadIndicator({ run }: { run: AppBackupRun }) {
+  switch (run.driveUploadStatus) {
+    case "none":
+      return null;
+    case "pending":
+      return (
+        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+          <Cloud className="h-3.5 w-3.5" /> En attente d'envoi vers Google Drive…
+        </p>
+      );
+    case "compressing":
+      return (
+        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          Préparation de l'archive avant envoi… (peut prendre plusieurs minutes pour de gros dossiers)
+        </p>
+      );
+    case "uploading":
+      return (
+        <div className="mt-1 flex flex-col gap-1">
+          <p className="flex items-center gap-1 text-xs text-warning">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Envoi vers Google Drive… {run.driveUploadProgressPct ?? 0}%
+          </p>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-warning transition-all"
+              style={{ width: `${run.driveUploadProgressPct ?? 0}%` }}
+            />
+          </div>
+        </div>
+      );
+    case "success":
+      return (
+        <p className="mt-1 flex items-center gap-1 text-xs text-primary">
+          <CheckCircle2 className="h-3.5 w-3.5" /> Envoyé sur Google Drive ({run.driveFileIds?.length ?? 0}{" "}
+          fichier{(run.driveFileIds?.length ?? 0) > 1 ? "s" : ""})
+        </p>
+      );
+    case "failed":
+      return (
+        <p className="mt-1 flex items-center gap-1 text-xs text-destructive">
+          <XCircle className="h-3.5 w-3.5" /> Échec de l'envoi vers Google Drive
+          {run.driveUploadError ? ` : ${run.driveUploadError}` : ""}
+        </p>
+      );
+    default:
+      return null;
+  }
+}
+
+function AppRunHistory({ appId }: { appId: number }) {
+  const [runs, setRuns] = useState<AppBackupRun[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedRun, setSelectedRun] = useState<AppBackupRun | null>(null);
+
+  function loadRuns() {
+    return apiJson<AppBackupRun[]>(`/applications/${appId}/runs`)
+      .then(setRuns)
+      .catch((err) => setError((err as Error).message));
+  }
+
+  useEffect(() => {
+    loadRuns();
+  }, [appId]);
+
+  // Poll while any run has an upload still in flight, so the progress bar
+  // actually advances instead of requiring a manual refresh to see updates.
+  useEffect(() => {
+    const hasActiveUpload = runs?.some(
+      (r) => r.driveUploadStatus === "uploading" || r.driveUploadStatus === "pending"
+    );
+    if (!hasActiveUpload) return;
+    const interval = setInterval(loadRuns, 2000);
+    return () => clearInterval(interval);
+  }, [runs, appId]);
+
+  async function restore(run: AppBackupRun) {
+    await apiJson(`/applications/${appId}/restore`, {
+      method: "POST",
+      body: JSON.stringify({ runId: run.runId, confirm: true }),
+    });
+  }
+
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <p className="mb-2 text-xs font-semibold text-muted-foreground">Historique des runs</p>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      {!runs && !error && <p className="text-xs text-muted-foreground">Chargement…</p>}
+      {runs?.length === 0 && <p className="text-xs text-muted-foreground">Aucun run pour cette application.</p>}
+      <div className="flex flex-col gap-2">
+        {runs?.map((run) => (
+          <div
+            key={run.runId}
+            className="cursor-pointer rounded-md border border-border p-2 text-sm hover:bg-muted"
+            onClick={() => setSelectedRun(run)}
+          >
+            <div className="flex items-center justify-between">
+              <span
+                className={
+                  "rounded-full px-2 py-0.5 text-xs font-medium " +
+                  (run.kind === "full" ? "bg-primary/15 text-primary" : "bg-warning/15 text-warning")
+                }
+              >
+                {run.kind === "full" ? "Backup complet" : "Backup partiel"}
+              </span>
+              <span
+                className={
+                  "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium " +
+                  (run.status === "success"
+                    ? "bg-primary/15 text-primary"
+                    : run.status === "failed"
+                      ? "bg-destructive/15 text-destructive"
+                      : "bg-warning/15 text-warning")
+                }
+              >
+                {run.status}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {new Date(run.startedAt).toLocaleString()}
+              {run.finishedAt && run.startedAt
+                ? ` · ${((new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000).toFixed(1)}s`
+                : ""}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {run.filesChanged != null ? `${run.filesChanged} fichiers modifiés` : ""}
+              {run.sizeBytes != null ? ` · ${formatBytes(run.sizeBytes)}` : ""}
+            </p>
+            <DriveUploadIndicator run={run} />
+            {run.error && <p className="mt-1 text-xs text-destructive">{run.error}</p>}
+          </div>
+        ))}
+      </div>
+
+      {selectedRun && (
+        <div className="mt-3 flex flex-col gap-2 rounded-md border border-border p-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">Détail du run {selectedRun.runId}</p>
+            <Button size="sm" variant="ghost" onClick={() => setSelectedRun(null)}>
+              Fermer
+            </Button>
+          </div>
+          {selectedRun.status === "success" && (
+            <ConfirmDialog
+              trigger={
+                <Button size="sm" variant="destructive">
+                  Restaurer
+                </Button>
+              }
+              title="Restaurer cette sauvegarde ?"
+              description="Cette opération va écraser les données existantes de l'application. Action irréversible."
+              requireTypedConfirmation="RESTORE"
+              confirmLabel="Restaurer"
+              onConfirm={() => restore(selectedRun)}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NewAppForm({
+  onCreated,
+  prefillContainer,
+}: {
+  onCreated: () => void;
+  prefillContainer?: string | null;
+}) {
+  const [name, setName] = useState(prefillContainer ?? "");
+  const [containers, setContainers] = useState<ContainerSummary[] | null>(null);
+  const [selectedContainers, setSelectedContainers] = useState<string[]>(
+    prefillContainer ? [prefillContainer] : []
+  );
+  const [bindMounts, setBindMounts] = useState<DetectedBindMount[] | null>(null);
+  const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+  const [detectedDbs, setDetectedDbs] = useState<DetectedDatabase[] | null>(null);
+  const [dbValue, setDbValue] = useState("");
+  const [targets, setTargets] = useState<BackupTarget[]>(["local"]);
+  const [gdriveAuthorized, setGdriveAuthorized] = useState(false);
+  const [scheduleFullCron, setScheduleFullCron] = useState("");
+  const [schedulePartialCron, setSchedulePartialCron] = useState("");
+  const [retentionDays, setRetentionDays] = useState("");
+  const [retentionMinCopies, setRetentionMinCopies] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiJson<ContainerSummary[]>("/docker/containers")
+      .then(setContainers)
+      .catch(() => setError("Impossible de charger la liste des conteneurs"));
+    apiJson<DetectedBindMount[]>("/backups/bind-mounts")
+      .then(setBindMounts)
+      .catch(() => setError("Impossible de charger la liste des dossiers montés"));
+    apiJson<DetectedDatabase[]>("/dbbackup/detect")
+      .then(setDetectedDbs)
+      .catch(() => setDetectedDbs([]));
+    apiJson<{ authorized: boolean }>("/backups/gdrive/status")
+      .then((s) => setGdriveAuthorized(s.authorized))
+      .catch(() => setGdriveAuthorized(false));
+  }, []);
+
+  function toggleContainer(name: string) {
+    setSelectedContainers((prev) => (prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]));
+  }
+
+  function togglePath(path: string) {
+    setSelectedPaths((prev) => (prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path]));
+  }
+
+  function toggleTarget(t: BackupTarget) {
+    setTargets((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+  }
+
+  const visibleMounts = useMemo(() => {
+    if (!bindMounts) return [];
+    if (selectedContainers.length === 0) return bindMounts;
+    return bindMounts.filter((m) => selectedContainers.includes(m.containerName));
+  }, [bindMounts, selectedContainers]);
+
+  // Drop path selections that fall out of scope when the container selection changes.
+  useEffect(() => {
+    if (selectedContainers.length === 0) return;
+    setSelectedPaths((prev) => prev.filter((p) => visibleMounts.some((m) => m.hostPath === p)));
+  }, [visibleMounts, selectedContainers.length]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!name.trim() || (selectedPaths.length === 0 && !dbValue) || targets.length === 0) {
+      setError("Nom, au moins une cible, et au moins un chemin ou une base de données sont requis");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const [dbLocation, dbRef] = dbValue ? dbValue.split(":") : [undefined, undefined];
+      await apiJson("/applications", {
+        method: "POST",
+        body: JSON.stringify({
+          name: name.trim(),
+          containerNames: selectedContainers,
+          paths: selectedPaths,
+          dbLocation: dbLocation || undefined,
+          dbRef: dbRef || undefined,
+          targets,
+          scheduleFullCron: scheduleFullCron.trim() || undefined,
+          schedulePartialCron: schedulePartialCron.trim() || undefined,
+          retentionDays: retentionDays.trim() ? Number(retentionDays) : undefined,
+          retentionMinCopies: retentionMinCopies.trim() ? Number(retentionMinCopies) : undefined,
+        }),
+      });
+      onCreated();
+    } catch (err) {
+      const message = (err as Error).message;
+      if (message === "paths_not_detected_bind_mounts") {
+        setError(
+          "Un ou plusieurs chemins sélectionnés ne correspondent plus à un dossier monté détecté. Rafraîchissez la liste et réessayez."
+        );
+      } else {
+        setError(message);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Card className="mb-3">
+      <form onSubmit={submit} className="flex flex-col gap-3">
+        <input
+          type="text"
+          placeholder="Nom de l'application"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+        />
+
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Conteneurs</p>
+          <div className="flex flex-col gap-1 rounded-md border border-border p-2">
+            {!containers && <p className="text-xs text-muted-foreground">Chargement…</p>}
+            {containers?.length === 0 && <p className="text-xs text-muted-foreground">Aucun conteneur détecté.</p>}
+            {containers?.map((c) => (
+              <label key={c.id} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={selectedContainers.includes(c.name)}
+                  onChange={() => toggleContainer(c.name)}
+                />
+                {c.name}
+                <span className="text-xs text-muted-foreground">({c.state})</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">
+            Chemins (dossiers montés)
+            {selectedContainers.length > 0 ? " · filtrés par conteneur(s) sélectionné(s)" : ""}
+          </p>
+          <div className="flex flex-col gap-1 rounded-md border border-border p-2">
+            {!bindMounts && <p className="text-xs text-muted-foreground">Chargement…</p>}
+            {bindMounts && visibleMounts.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                Aucun dossier monté détecté pour cette sélection (conteneur sans données persistées sur disque — ok
+                si une base de données est sélectionnée ci-dessous).
+              </p>
+            )}
+            {visibleMounts.map((m) => (
+              <label key={`${m.containerName}:${m.hostPath}`} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={selectedPaths.includes(m.hostPath)}
+                  onChange={() => togglePath(m.hostPath)}
+                />
+                <span className="truncate">
+                  {m.hostPath} <span className="text-xs text-muted-foreground">({m.containerName})</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Base de données (optionnel)</p>
+          <select
+            value={dbValue}
+            onChange={(e) => setDbValue(e.target.value)}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
+          >
+            <option value="">Aucune</option>
+            {detectedDbs?.map((d) => (
+              <option key={`${d.location}:${d.ref}`} value={`${d.location}:${d.ref}`}>
+                {d.displayName} ({d.engine})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex gap-3 text-sm">
+          <label className="flex items-center gap-1">
+            <input type="checkbox" checked={targets.includes("local")} onChange={() => toggleTarget("local")} />
+            <HardDrive className="h-3.5 w-3.5" /> local
+          </label>
+          <label className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={targets.includes("gdrive")}
+              onChange={() => toggleTarget("gdrive")}
+              disabled={!gdriveAuthorized}
+            />
+            <Cloud className="h-3.5 w-3.5" /> gdrive
+            {!gdriveAuthorized && <span className="text-xs text-muted-foreground">(non connecté)</span>}
+          </label>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Le backup complet prend un instantané complet ; le backup partiel ne copie que les fichiers modifiés depuis
+          le dernier instantané (liens durs pour le reste). Exemple : partiel quotidien, complet hebdomadaire.
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <CronPicker label="Planification backup complet" value={scheduleFullCron} onChange={setScheduleFullCron} />
+          <CronPicker
+            label="Planification backup partiel"
+            value={schedulePartialCron}
+            onChange={setSchedulePartialCron}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <input
+            type="number"
+            min={0}
+            placeholder="Rétention (jours, optionnel)"
+            value={retentionDays}
+            onChange={(e) => setRetentionDays(e.target.value)}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+          />
+          <input
+            type="number"
+            min={0}
+            placeholder="Copies minimum à conserver (optionnel)"
+            value={retentionMinCopies}
+            onChange={(e) => setRetentionMinCopies(e.target.value)}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+
+        {error && <p className="text-xs text-destructive">{error}</p>}
+        <Button type="submit" size="sm" disabled={submitting}>
+          {submitting ? "Création…" : "Créer"}
+        </Button>
+      </form>
+    </Card>
+  );
+}
