@@ -8,13 +8,25 @@ import type {
   DetectedDatabase,
   DetectedBindMount,
   VolumeSummary,
+  GDriveComparisonResult,
 } from "@pwa-admin-pi/shared";
 import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatBytes } from "./Docker";
-import { Play, Trash2, Database, HardDrive, Cloud, CheckCircle2, XCircle } from "lucide-react";
+import {
+  Play,
+  Trash2,
+  Database,
+  HardDrive,
+  Cloud,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Search,
+  Loader2,
+} from "lucide-react";
 
 const STATUS_FILTERS: { key: "all" | BackupRunStatus; label: string }[] = [
   { key: "all", label: "Tous" },
@@ -33,6 +45,26 @@ export function Backups() {
   const [showNewJob, setShowNewJob] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gdriveAuthorized, setGdriveAuthorized] = useState(false);
+  const [comparison, setComparison] = useState<GDriveComparisonResult | null>(null);
+  const [comparing, setComparing] = useState(false);
+
+  async function runComparison() {
+    setComparing(true);
+    setError(null);
+    try {
+      setComparison(await apiJson<GDriveComparisonResult>("/backups/gdrive/compare"));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setComparing(false);
+    }
+  }
+
+  const driveStatusByRunId = useMemo(() => {
+    const map = new Map<string, GDriveComparisonResult["verifications"][number]["status"]>();
+    comparison?.verifications.forEach((v) => map.set(v.runId, v.status));
+    return map;
+  }, [comparison]);
 
   async function loadJobs() {
     setJobs(await apiJson<BackupJob[]>("/backups/jobs"));
@@ -106,7 +138,12 @@ export function Backups() {
         <p className="text-lg font-medium">{storage ? formatBytes(storage.localUsedBytes) : "…"}</p>
       </Card>
 
-      <GDriveConnection />
+      <GDriveConnection
+        comparison={comparison}
+        comparing={comparing}
+        onCompare={runComparison}
+        onDeletedFile={runComparison}
+      />
 
       <div>
         <div className="mb-2 flex items-center justify-between">
@@ -215,7 +252,9 @@ export function Backups() {
           {filteredHistory.length === 0 && (
             <Card className="text-sm text-muted-foreground">Aucun historique.</Card>
           )}
-          {filteredHistory.map((h) => (
+          {filteredHistory.map((h) => {
+            const driveStatus = driveStatusByRunId.get(h.runId);
+            return (
             <Card key={h.runId} className="cursor-pointer" onClick={() => setSelectedRun(h)}>
               <div className="flex items-center justify-between text-sm">
                 <div className="min-w-0">
@@ -241,11 +280,15 @@ export function Backups() {
                   {h.status}
                 </span>
               </div>
-              {h.sizeBytes != null && (
-                <p className="mt-1 text-xs text-muted-foreground">{formatBytes(h.sizeBytes)}</p>
-              )}
+              <div className="mt-1 flex items-center justify-between">
+                {h.sizeBytes != null && (
+                  <p className="text-xs text-muted-foreground">{formatBytes(h.sizeBytes)}</p>
+                )}
+                {driveStatus && <DriveStatusBadge status={driveStatus} />}
+              </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -508,6 +551,137 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
   );
 }
 
+function DriveStatusBadge({ status }: { status: "verified" | "missing" | "size-mismatch" | "not-uploaded" }) {
+  const config = {
+    verified: { label: "vérifié sur Drive", cls: "bg-primary/15 text-primary", icon: CheckCircle2 },
+    "size-mismatch": { label: "taille différente sur Drive", cls: "bg-warning/15 text-warning", icon: AlertTriangle },
+    missing: { label: "absent de Drive", cls: "bg-destructive/15 text-destructive", icon: XCircle },
+    "not-uploaded": { label: "jamais envoyé sur Drive", cls: "bg-destructive/15 text-destructive", icon: XCircle },
+  }[status];
+  const Icon = config.icon;
+  return (
+    <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${config.cls}`}>
+      <Icon className="h-3 w-3" /> {config.label}
+    </span>
+  );
+}
+
+function GDriveCompareSummary({
+  comparison,
+  comparing,
+  onCompare,
+  onDeletedFile,
+}: {
+  comparison: GDriveComparisonResult | null;
+  comparing: boolean;
+  onCompare: () => void;
+  onDeletedFile: () => void;
+}) {
+  return (
+    <div className="mt-2 border-t border-border pt-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-muted-foreground">Comparaison local ↔ Google Drive</p>
+        <Button size="sm" variant="outline" onClick={onCompare} disabled={comparing}>
+          {comparing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+          {comparing ? "Vérification…" : "Vérifier Google Drive"}
+        </Button>
+      </div>
+
+      {comparison && (
+        <div className="mt-3 flex flex-col gap-2">
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="rounded-md border border-border p-2">
+              <p className="text-muted-foreground">Vérifiées sur Drive</p>
+              <p className="text-sm font-medium text-primary">{comparison.totalVerified}</p>
+            </div>
+            <div className="rounded-md border border-border p-2">
+              <p className="text-muted-foreground">Manquantes sur Drive</p>
+              <p className={`text-sm font-medium ${comparison.totalMissing > 0 ? "text-destructive" : ""}`}>
+                {comparison.totalMissing}
+              </p>
+            </div>
+            <div className="rounded-md border border-border p-2">
+              <p className="text-muted-foreground">Fichiers Drive orphelins</p>
+              <p className={`text-sm font-medium ${comparison.totalOrphans > 0 ? "text-warning" : ""}`}>
+                {comparison.totalOrphans}
+              </p>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Vérifié le {new Date(comparison.checkedAt).toLocaleString()} — le statut de chaque sauvegarde est
+            affiché directement dans l'historique ci-dessous.
+          </p>
+
+          {comparison.orphanGroups.length > 0 && (
+            <div className="mt-1 flex flex-col gap-2">
+              <p className="flex items-center gap-1 text-xs font-medium text-warning">
+                <AlertTriangle className="h-3.5 w-3.5" /> Présents sur Drive uniquement (pas de sauvegarde locale
+                correspondante)
+              </p>
+              {comparison.orphanGroups.map((group) => (
+                <OrphanGroupCard key={`${group.category}/${group.sourceRef}`} group={group} onDeleted={onDeletedFile} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OrphanGroupCard({
+  group,
+  onDeleted,
+}: {
+  group: GDriveComparisonResult["orphanGroups"][number];
+  onDeleted: () => void;
+}) {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function deleteFile(fileId: string) {
+    setDeletingId(fileId);
+    try {
+      await apiJson(`/backups/gdrive/files/${fileId}`, { method: "DELETE" });
+      onDeleted();
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <div className="rounded-md border border-border p-2">
+      <p className="text-xs font-medium">
+        {group.category}/{group.sourceRef}
+        <span className="ml-1 text-muted-foreground">({group.files.length} fichier(s))</span>
+      </p>
+      <div className="mt-1 flex flex-col gap-1">
+        {group.files.map((f) => (
+          <div key={f.fileId} className="flex items-center justify-between text-xs">
+            <div className="min-w-0">
+              <p className="truncate">{f.fileName}</p>
+              <p className="text-muted-foreground">
+                {formatBytes(f.sizeBytes)} · {new Date(f.modifiedAt).toLocaleDateString()}
+              </p>
+            </div>
+            <ConfirmDialog
+              trigger={
+                <Button size="sm" variant="destructive" disabled={deletingId === f.fileId}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              }
+              title="Supprimer ce fichier sur Google Drive ?"
+              description="Le fichier sera définitivement supprimé de Google Drive (aucune copie locale n'existe)."
+              confirmLabel="Supprimer"
+              onConfirm={() => deleteFile(f.fileId)}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 interface GDriveStatus {
   enabled: boolean;
   configured: boolean;
@@ -515,7 +689,17 @@ interface GDriveStatus {
   rootFolderId: string | null;
 }
 
-function GDriveConnection() {
+function GDriveConnection({
+  comparison,
+  comparing,
+  onCompare,
+  onDeletedFile,
+}: {
+  comparison: GDriveComparisonResult | null;
+  comparing: boolean;
+  onCompare: () => void;
+  onDeletedFile: () => void;
+}) {
   const [status, setStatus] = useState<GDriveStatus | null>(null);
   const [authUrl, setAuthUrl] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -610,7 +794,7 @@ function GDriveConnection() {
           <p className="flex items-center gap-1 text-sm text-primary">
             <CheckCircle2 className="h-4 w-4" /> Connecté
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={testUpload} disabled={busy}>
               Tester la connexion
             </Button>
@@ -626,6 +810,12 @@ function GDriveConnection() {
               onConfirm={disconnect}
             />
           </div>
+          <GDriveCompareSummary
+            comparison={comparison}
+            comparing={comparing}
+            onCompare={onCompare}
+            onDeletedFile={onDeletedFile}
+          />
         </div>
       ) : (
         <div className="flex flex-col gap-2">

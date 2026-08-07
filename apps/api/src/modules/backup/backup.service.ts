@@ -7,7 +7,14 @@ import { env } from "../../config/env.js";
 import { BackupHistoryModel, BackupJobModel } from "../../db/models/backup.js";
 import { GDriveService } from "../../services/gdrive.client.js";
 import { runCommand } from "../../utils/exec.js";
-import type { BackupSourceType, BackupTarget, DetectedBindMount } from "@pwa-admin-pi/shared";
+import type {
+  BackupSourceType,
+  BackupTarget,
+  DetectedBindMount,
+  GDriveComparisonResult,
+  OrphanDriveFile,
+  DriveVerificationEntry,
+} from "@pwa-admin-pi/shared";
 
 function timestampSlug(): string {
   return new Date().toISOString().replace(/:/g, "-");
@@ -253,6 +260,68 @@ export const BackupService = {
       return total;
     }
     return { localUsedBytes: await dirSize(env.BACKUP_LOCAL_ROOT) };
+  },
+
+  /**
+   * Verifies each backup_history run's claimed Drive upload against what's
+   * actually on Drive (by fileId, not by guessing from a file path — the
+   * authoritative link), and separately surfaces any Drive file under the
+   * category/sourceRef layout that isn't accounted for by any history run
+   * (grouped by folder) so it can be reviewed/deleted from the UI.
+   */
+  async compareWithGDrive(): Promise<GDriveComparisonResult> {
+    const driveFiles = GDriveService.isEnabled() ? await GDriveService.listAllBackupFiles() : [];
+    const driveById = new Map(driveFiles.map((f) => [f.fileId, f]));
+    const claimedFileIds = new Set<string>();
+
+    const historyRows = BackupHistoryModel.list(1000, 0).filter((r) => r.status === "success");
+    const verifications: DriveVerificationEntry[] = historyRows
+      .filter((r) => r.drive_file_id)
+      .map((r) => {
+        claimedFileIds.add(r.drive_file_id!);
+        const driveFile = driveById.get(r.drive_file_id!);
+        let status: DriveVerificationEntry["status"];
+        if (!driveFile) status = "missing";
+        else if (r.size_bytes != null && r.size_bytes !== driveFile.sizeBytes) status = "size-mismatch";
+        else status = "verified";
+        return { runId: r.run_id, status };
+      });
+
+    // Runs targeting gdrive but with no driveFileId recorded never actually
+    // reached Drive (e.g. the sync upload path failed silently before the
+    // fileId was persisted) — surface those as "not-uploaded" too.
+    for (const r of historyRows) {
+      if (!r.drive_file_id && r.target === "gdrive") {
+        verifications.push({ runId: r.run_id, status: "not-uploaded" });
+      }
+    }
+
+    const orphanFiles = driveFiles.filter((f) => !claimedFileIds.has(f.fileId));
+    const groupMap = new Map<string, OrphanDriveFile[]>();
+    for (const f of orphanFiles) {
+      const key = `${f.category}/${f.sourceRef}`;
+      if (!groupMap.has(key)) groupMap.set(key, []);
+      groupMap.get(key)!.push({ fileId: f.fileId, fileName: f.fileName, sizeBytes: f.sizeBytes, modifiedAt: f.modifiedAt });
+    }
+    const orphanGroups = [...groupMap.entries()]
+      .map(([key, files]) => {
+        const [category, sourceRef] = key.split("/");
+        return { category, sourceRef, files: files.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt)) };
+      })
+      .sort((a, b) => (a.category + a.sourceRef).localeCompare(b.category + b.sourceRef));
+
+    return {
+      checkedAt: new Date().toISOString(),
+      verifications,
+      orphanGroups,
+      totalVerified: verifications.filter((v) => v.status === "verified").length,
+      totalMissing: verifications.filter((v) => v.status === "missing" || v.status === "not-uploaded").length,
+      totalOrphans: orphanFiles.length,
+    };
+  },
+
+  async deleteGDriveFile(fileId: string): Promise<void> {
+    await GDriveService.deleteFile(fileId);
   },
 };
 

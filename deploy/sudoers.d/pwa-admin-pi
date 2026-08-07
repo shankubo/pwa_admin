@@ -39,6 +39,12 @@ shan ALL=(root) NOPASSWD: /usr/bin/fail2ban-client set * banip *
 shan ALL=(root) NOPASSWD: /usr/bin/fail2ban-client set * unbanip *
 shan ALL=(root) NOPASSWD: /usr/sbin/ss -tulpn
 
+# --- Security overview module: UFW, unattended-upgrades ---
+# systemctl is-active on a timer is a public read, no sudo needed.
+shan ALL=(root) NOPASSWD: /usr/sbin/ufw status verbose
+shan ALL=(root) NOPASSWD: /usr/bin/cat /etc/apt/apt.conf.d/50unattended-upgrades
+shan ALL=(root) NOPASSWD: /usr/bin/tail -n * /var/log/unattended-upgrades/unattended-upgrades.log
+
 # --- Backups module: native (host OS) database dump/restore ---
 # Debian's default MariaDB/MySQL setup trusts root via unix_socket auth, and
 # postgres uses OS peer auth for the `postgres` user — sudo is how the service
@@ -71,4 +77,8 @@ shan ALL=(root) NOPASSWD: /usr/bin/rm -rf /home/shan/pwa_admin_pi/data/backups/a
 shan ALL=(root) NOPASSWD: /usr/bin/tar czf /home/shan/pwa_admin_pi/data/backups/_tmp-drive-upload/*.tar.gz -C * .
 shan ALL=(root) NOPASSWD: /usr/bin/chown shan /home/shan/pwa_admin_pi/data/backups/_tmp-drive-upload/*.tar.gz
 
-Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/bin/systemctl,/usr/bin/fail2ban-client,/usr/sbin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat !requiretty
+# The system-wide sudoers `Defaults` sets `use_pty`, which makes sudo require
+# an allocated pseudo-terminal — fine for interactive SSH use, but the
+# pwa-admin-pi service invokes sudo via execFile with no TTY at all, so every
+# scoped command here needs both `!requiretty` and `!use_pty` to run non-interactively.
+Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/bin/systemctl,/usr/bin/fail2ban-client,/usr/sbin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat,/usr/sbin/ufw,/usr/bin/tail !requiretty,!use_pty

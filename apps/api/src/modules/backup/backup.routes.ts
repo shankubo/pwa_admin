@@ -214,6 +214,28 @@ export default async function backupRoutes(app: FastifyInstance) {
     reply.send(await BackupService.storageUsage());
   });
 
+  app.get("/backups/gdrive/compare", auth, async (_req, reply) => {
+    try {
+      reply.send(await BackupService.compareWithGDrive());
+    } catch (err) {
+      reply.code(400).send({ error: (err as Error).message });
+    }
+  });
+
+  app.delete(
+    "/backups/gdrive/files/:fileId",
+    { preHandler: [(app as any).requireAuth, withAudit("backup.gdrive.file.delete", (r) => (r.params as any).fileId)] },
+    async (req, reply) => {
+      const { fileId } = req.params as { fileId: string };
+      try {
+        await BackupService.deleteGDriveFile(fileId);
+        reply.send({ ok: true });
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      }
+    }
+  );
+
   // --- Google Drive OAuth2 authorization (one-time setup) ---
 
   app.get("/backups/gdrive/status", auth, async (_req, reply) => {

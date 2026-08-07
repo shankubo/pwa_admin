@@ -13,6 +13,7 @@ import {
   Hexagon,
   HelpCircle,
   Info,
+  ShieldCheck,
 } from "lucide-react";
 
 export interface NavItem {
@@ -30,6 +31,7 @@ export const navItems: NavItem[] = [
   { to: "/os", label: "OS / Paquets", icon: Package, group: "management" },
   { to: "/pm2", label: "Node.js (PM2)", icon: Hexagon, group: "management" },
   { to: "/network", label: "Réseau & Sécurité", icon: Network, group: "management" },
+  { to: "/security", label: "Sécurité serveur", icon: ShieldCheck, group: "management" },
   { to: "/applications", label: "Applications", icon: Boxes, group: "ops" },
   { to: "/backups", label: "Backups", icon: DatabaseBackup, group: "ops" },
   { to: "/system", label: "System", icon: Activity, group: "ops" },

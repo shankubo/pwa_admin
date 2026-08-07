@@ -8,3 +8,4 @@ export * from "./types/network.js";
 export * from "./types/os.js";
 export * from "./types/pm2.js";
 export * from "./types/hardware.js";
+export * from "./types/security.js";

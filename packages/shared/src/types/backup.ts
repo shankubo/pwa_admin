@@ -34,6 +34,40 @@ export interface BackupHistoryEntry {
   finishedAt: string | null;
 }
 
+export type DriveVerificationStatus = "verified" | "missing" | "size-mismatch" | "not-uploaded";
+
+/** Per-history-run Drive verification, keyed by runId — lets the existing
+ * history list show a status badge without a separate raw file listing. */
+export interface DriveVerificationEntry {
+  runId: string;
+  status: DriveVerificationStatus;
+}
+
+/** A Drive file under BACKUP_LOCAL_ROOT's category/sourceRef layout that
+ * doesn't correspond to any known backup_history run — either uploaded
+ * outside a tracked run, or its local copy/history row was since deleted. */
+export interface OrphanDriveFile {
+  fileId: string;
+  fileName: string;
+  sizeBytes: number;
+  modifiedAt: string;
+}
+
+export interface OrphanDriveGroup {
+  category: string;
+  sourceRef: string;
+  files: OrphanDriveFile[];
+}
+
+export interface GDriveComparisonResult {
+  checkedAt: string;
+  verifications: DriveVerificationEntry[];
+  orphanGroups: OrphanDriveGroup[];
+  totalVerified: number;
+  totalMissing: number;
+  totalOrphans: number;
+}
+
 export type DbEngine = "postgres" | "mysql" | "mariadb" | "mongo" | "redis";
 
 export interface DetectedDatabase {

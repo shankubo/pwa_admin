@@ -9,6 +9,7 @@ import { Sites } from "@/routes/Sites";
 import { OsSystem } from "@/routes/OsSystem";
 import { Pm2 } from "@/routes/Pm2";
 import { NetworkSecurity } from "@/routes/NetworkSecurity";
+import { Security } from "@/routes/Security";
 import { Backups } from "@/routes/Backups";
 import { Applications } from "@/routes/Applications";
 import { System } from "@/routes/System";
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/os" element={<OsSystem />} />
           <Route path="/pm2" element={<Pm2 />} />
           <Route path="/network" element={<NetworkSecurity />} />
+          <Route path="/security" element={<Security />} />
           <Route path="/applications" element={<Applications />} />
           <Route path="/backups" element={<Backups />} />
           <Route path="/system" element={<System />} />
