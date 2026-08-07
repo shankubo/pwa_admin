@@ -17,6 +17,7 @@ export interface NginxVhostSummary {
   proxyPassTarget: string | null;
   root: string | null;
   documentRootExists: boolean | null;
+  maintenanceMode: boolean;
 }
 
 export interface NginxVhostDetail extends NginxVhostSummary {

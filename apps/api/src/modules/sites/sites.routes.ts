@@ -35,6 +35,34 @@ export default async function sitesRoutes(app: FastifyInstance) {
     }
   );
 
+  app.post(
+    "/sites/:name/maintenance/enable",
+    { preHandler: [(app as any).requireAuth, withAudit("sites.maintenance.enable", (r) => (r.params as any).name)] },
+    async (req, reply) => {
+      const { name } = req.params as { name: string };
+      try {
+        await NginxService.enableMaintenance(name);
+        reply.send({ ok: true });
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      }
+    }
+  );
+
+  app.post(
+    "/sites/:name/maintenance/disable",
+    { preHandler: [(app as any).requireAuth, withAudit("sites.maintenance.disable", (r) => (r.params as any).name)] },
+    async (req, reply) => {
+      const { name } = req.params as { name: string };
+      try {
+        await NginxService.disableMaintenance(name);
+        reply.send({ ok: true });
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      }
+    }
+  );
+
   app.get("/sites/:name/logs", auth, async (req, reply) => {
     const { name } = req.params as { name: string };
     const { type, tail } = req.query as { type?: "access" | "error"; tail?: string };

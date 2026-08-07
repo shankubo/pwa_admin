@@ -168,6 +168,19 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    id: 5,
+    name: "vhost_maintenance",
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS vhost_maintenance (
+          vhost_name TEXT PRIMARY KEY,
+          snapshot_id INTEGER NOT NULL REFERENCES nginx_config_history(id),
+          enabled_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

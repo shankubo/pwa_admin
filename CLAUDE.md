@@ -23,7 +23,7 @@ Chaque module suit le pattern `*.routes.ts` (endpoints Fastify) + `*.service.ts`
 - **auth** — login, 2FA (TOTP via otplib), JWT access+refresh, rate limiting sur login
 - **system** — snapshot CPU/RAM/disque/température, stream WS `sys.stats`/`sys.alerts`
 - **docker** — containers/images/volumes/networks, logs/stats live (WS `docker.logs`/`docker.stats`), export/import d'images (.tar), backup one-off de volumes
-- **nginx** — vhosts (liste/détail/enable/disable), édition config validée (`nginx -t` avant application, historique de versions), reload/restart, logs (WS `nginx.logs`), statut certificat SSL, test d'accessibilité HTTP réel, sauvegarde de la config complète
+- **nginx** — vhosts (liste/détail/enable/disable), édition config validée (`nginx -t` avant application, historique de versions), reload/restart, logs (WS `nginx.logs`), statut certificat SSL, test d'accessibilité HTTP réel, sauvegarde de la config complète, mode maintenance par site (bascule `location` vers une page statique `/var/www/pi-admin-maintenance`, cf. `applyMaintenanceMode` dans `nginx.parser.ts`)
 - **sites** — vue agrégée Nginx + Docker par site
 - **network** — ports ouverts (`ss -tulpn`), analytics de trafic (top pages/visiteurs depuis les logs Nginx), fail2ban (statut/ban/unban)
 - **os** — info système, paquets installés/upgradables, jobs async update/upgrade avec suivi live (WS `os.upgrade`), paquets held
@@ -79,6 +79,9 @@ Types TS purs, un fichier par domaine dans `src/types/`, tous ré-exportés depu
 - `NoNewPrivileges=true` dans le unit systemd bloque **tout** sudo, y compris les règles scoped légitimes — ne jamais l'activer sur ce service.
 - Le scope OAuth Google Drive doit être `https://www.googleapis.com/auth/drive` (pas `drive.file`) car `GDRIVE_ROOT_FOLDER_ID` pointe vers un dossier créé manuellement par l'admin dans son Drive, pas par l'app — `drive.file` ne donne accès qu'aux fichiers que l'app crée elle-même et empêcherait de lister ce dossier racine.
 - Une commande `sudo` qui échoue avec "a terminal is required" en prod alors qu'elle marche en SSH interactif = oubli de `!use_pty` dans l'override sudoers, pas un problème de règle manquante.
+- `sites-enabled/<name>` n'est pas toujours un symlink vers `sites-available/<name>` — certains vhosts pré-existants sont des fichiers indépendants divergents dans `sites-enabled` (contenu réellement chargé par nginx différent de `sites-available`). Toujours vérifier avec `readlink` avant d'éditer par nom de vhost ; `resolveActiveVhostPath()` dans `nginx.service.ts` gère ce cas pour le mode maintenance.
+- Le mode maintenance doit explicitement ajouter `auth_basic off;` dans son bloc `location` si le `server{}` a un `auth_basic` — sinon cette directive est héritée et bloque l'accès à la page de maintenance elle-même (401 au lieu de la page).
+- Un fichier vhost combinant plusieurs `server_name` distincts (ex. plusieurs sous-domaines dans un seul fichier) fait que toute action par-site (maintenance, enable/disable) s'applique à tous les domaines du fichier — séparer un fichier par site si une gestion indépendante est nécessaire.
 
 ## Commandes utiles
 

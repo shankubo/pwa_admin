@@ -5,7 +5,7 @@ import { apiFetch, apiJson } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth.store";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { ShieldCheck, LogOut } from "lucide-react";
+import { ShieldCheck, ShieldOff, LogOut } from "lucide-react";
 
 // No shared type exists for audit log rows — these are raw sqlite columns (snake_case).
 interface AuditLogRow {
@@ -56,6 +56,10 @@ export function Settings() {
 
       {user && !user.twoFactorEnabled && (
         <TwoFactorEnrollCard onEnrolled={() => setUser({ ...user, twoFactorEnabled: true })} />
+      )}
+
+      {user && user.twoFactorEnabled && (
+        <TwoFactorDisableCard onDisabled={() => setUser({ ...user, twoFactorEnabled: false })} />
       )}
 
       <AuditLogCard />
@@ -134,6 +138,72 @@ function TwoFactorEnrollCard({ onEnrolled }: { onEnrolled: () => void }) {
           {error && <p className="text-xs text-destructive">{error}</p>}
           <Button type="submit" size="sm" disabled={submitting} className="w-full">
             {submitting ? "Vérification…" : "Confirmer"}
+          </Button>
+        </form>
+      )}
+    </Card>
+  );
+}
+
+function TwoFactorDisableCard({ onDisabled }: { onDisabled: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function confirm(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await apiJson("/auth/2fa/disable", {
+        method: "POST",
+        body: JSON.stringify({ password, code }),
+      });
+      onDisabled();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardTitle className="flex items-center gap-1">
+        <ShieldOff className="h-4 w-4" /> Désactiver la 2FA
+      </CardTitle>
+
+      {!expanded ? (
+        <Button size="sm" variant="destructive" onClick={() => setExpanded(true)}>
+          Désactiver
+        </Button>
+      ) : (
+        <form onSubmit={confirm} className="flex flex-col gap-3">
+          <p className="text-xs text-muted-foreground">
+            Confirmez votre mot de passe et un code de votre application d'authentification.
+          </p>
+          <input
+            type="password"
+            placeholder="Mot de passe"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+          />
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="123456"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            maxLength={6}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-center text-lg tracking-widest outline-none focus:ring-2 focus:ring-primary"
+          />
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <Button type="submit" size="sm" variant="destructive" disabled={submitting} className="w-full">
+            {submitting ? "Vérification…" : "Confirmer la désactivation"}
           </Button>
         </form>
       )}

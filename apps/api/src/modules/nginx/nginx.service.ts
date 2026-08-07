@@ -8,7 +8,7 @@ import { db } from "../../db/index.js";
 import { env } from "../../config/env.js";
 import { runCommand, ExecError } from "../../utils/exec.js";
 import { GDriveService } from "../../services/gdrive.client.js";
-import { parseVhostSummary } from "./nginx.parser.js";
+import { parseVhostSummary, applyMaintenanceMode } from "./nginx.parser.js";
 import type {
   NginxStatus,
   NginxVhostSummary,
@@ -55,6 +55,23 @@ function resolveVhostPath(root: string, name: string): string {
   return full;
 }
 
+/**
+ * Most vhosts in sites-enabled are symlinks back to sites-available (the
+ * assumption enableVhost/disableVhost rely on), but some pre-date this app
+ * and are independent regular files whose content has since diverged —
+ * nginx always loads sites-enabled, so THAT'S the file that must be edited
+ * for the change to have any real effect. Falls back to sites-available
+ * when sites-enabled has no entry (vhost is currently disabled).
+ */
+async function resolveActiveVhostPath(name: string): Promise<string> {
+  const enabledPath = resolveVhostPath(env.NGINX_SITES_ENABLED, name);
+  if (existsSync(enabledPath)) {
+    const stats = await lstat(enabledPath);
+    if (!stats.isSymbolicLink()) return enabledPath;
+  }
+  return resolveVhostPath(env.NGINX_SITES_AVAILABLE, name);
+}
+
 export const NginxService = {
   async getStatus(): Promise<NginxStatus> {
     let active = false;
@@ -99,7 +116,7 @@ export const NginxService = {
       if (!VHOST_NAME_RE.test(name)) continue;
       const path = resolveVhostPath(env.NGINX_SITES_AVAILABLE, name);
       const raw = await readFile(path, "utf8").catch(() => "");
-      results.push(parseVhostSummary(name, raw, enabledFiles.has(name)));
+      results.push(parseVhostSummary(name, raw, enabledFiles.has(name), this.isInMaintenance(name)));
     }
     return results;
   },
@@ -113,7 +130,7 @@ export const NginxService = {
     } catch {
       enabled = false;
     }
-    const summary = parseVhostSummary(name, raw, enabled);
+    const summary = parseVhostSummary(name, raw, enabled, this.isInMaintenance(name));
     return { ...summary, rawConfig: raw };
   },
 
@@ -149,6 +166,88 @@ export const NginxService = {
     await this.reload();
   },
 
+  isInMaintenance(name: string): boolean {
+    const row = db.prepare("SELECT 1 FROM vhost_maintenance WHERE vhost_name = ?").get(name);
+    return !!row;
+  },
+
+  /**
+   * Swaps every `location` block in the vhost's HTTPS server blocks for a
+   * static maintenance page, keeping `listen`/`server_name`/`ssl_*` intact so
+   * the site's own certificate keeps terminating TLS. The pre-maintenance
+   * snapshot id is tracked so disableMaintenance() restores exactly that,
+   * not just "the most recent snapshot" (which writeVhostConfig also creates).
+   *
+   * Edits sites-enabled directly rather than sites-available: some vhosts
+   * predate this app and have an independent (diverged) file in
+   * sites-enabled instead of a symlink — nginx only ever loads that one, so
+   * editing sites-available for those would silently do nothing.
+   */
+  async enableMaintenance(name: string): Promise<void> {
+    if (this.isInMaintenance(name)) return;
+    const path = await resolveActiveVhostPath(name);
+    if (!existsSync(path)) throw new Error("vhost_not_found");
+
+    await mkdir(env.NGINX_CONFIG_BACKUP_DIR, { recursive: true });
+    const snapshotName = `${name}.${Date.now()}.bak`;
+    const snapshotPath = join(env.NGINX_CONFIG_BACKUP_DIR, snapshotName);
+    await copyFile(path, snapshotPath);
+    const snapshotResult = db
+      .prepare("INSERT INTO nginx_config_history (vhost_name, snapshot_path) VALUES (?, ?)")
+      .run(name, snapshotPath);
+    const snapshotId = Number(snapshotResult.lastInsertRowid);
+
+    const original = await readFile(path, "utf8");
+    const maintenanceConfig = applyMaintenanceMode(original, env.NGINX_MAINTENANCE_ROOT);
+
+    await mkdir(env.NGINX_CONFIG_BACKUP_DIR, { recursive: true });
+    const tmpPath = join(env.NGINX_CONFIG_BACKUP_DIR, `${name}.maintenance-${Date.now()}`);
+    await writeFile(tmpPath, maintenanceConfig, "utf8");
+    await runCommand("sudo", ["cp", tmpPath, path], { timeoutMs: 5000 });
+    await rm(tmpPath, { force: true });
+
+    const test = await this.testConfig();
+    if (!test.ok) {
+      const revertTmp = join(env.NGINX_CONFIG_BACKUP_DIR, `${name}.revert-${Date.now()}`);
+      await writeFile(revertTmp, original, "utf8");
+      await runCommand("sudo", ["cp", revertTmp, path], { timeoutMs: 5000 });
+      await rm(revertTmp, { force: true });
+      throw new Error(`nginx_test_failed: ${test.output}`);
+    }
+
+    db.prepare(
+      "INSERT INTO vhost_maintenance (vhost_name, snapshot_id) VALUES (?, ?) ON CONFLICT(vhost_name) DO UPDATE SET snapshot_id = excluded.snapshot_id, enabled_at = datetime('now')"
+    ).run(name, snapshotId);
+
+    await this.reload();
+  },
+
+  async disableMaintenance(name: string): Promise<void> {
+    const row = db
+      .prepare("SELECT snapshot_id as snapshotId FROM vhost_maintenance WHERE vhost_name = ?")
+      .get(name) as { snapshotId: number } | undefined;
+    if (!row) throw new Error("vhost_not_in_maintenance");
+
+    const snapshot = db
+      .prepare("SELECT snapshot_path as snapshotPath FROM nginx_config_history WHERE id = ?")
+      .get(row.snapshotId) as { snapshotPath: string } | undefined;
+    if (!snapshot) throw new Error("snapshot_not_found");
+
+    const original = await readFile(snapshot.snapshotPath, "utf8");
+    const path = await resolveActiveVhostPath(name);
+
+    const tmpPath = join(env.NGINX_CONFIG_BACKUP_DIR, `${name}.restore-${Date.now()}`);
+    await writeFile(tmpPath, original, "utf8");
+    await runCommand("sudo", ["cp", tmpPath, path], { timeoutMs: 5000 });
+    await rm(tmpPath, { force: true });
+
+    const test = await this.testConfig();
+    if (!test.ok) throw new Error(`nginx_test_failed: ${test.output}`);
+
+    db.prepare("DELETE FROM vhost_maintenance WHERE vhost_name = ?").run(name);
+    await this.reload();
+  },
+
   async writeVhostConfig(name: string, content: string): Promise<void> {
     const path = resolveVhostPath(env.NGINX_SITES_AVAILABLE, name);
     if (!existsSync(path)) throw new Error("vhost_not_found");
@@ -178,17 +277,17 @@ export const NginxService = {
     await this.reload();
   },
 
-  async snapshotVhost(name: string): Promise<void> {
+  async snapshotVhost(name: string): Promise<number | null> {
     const path = resolveVhostPath(env.NGINX_SITES_AVAILABLE, name);
-    if (!existsSync(path)) return;
+    if (!existsSync(path)) return null;
     await mkdir(env.NGINX_CONFIG_BACKUP_DIR, { recursive: true });
     const snapshotName = `${name}.${Date.now()}.bak`;
     const snapshotPath = join(env.NGINX_CONFIG_BACKUP_DIR, snapshotName);
     await copyFile(path, snapshotPath);
-    db.prepare("INSERT INTO nginx_config_history (vhost_name, snapshot_path) VALUES (?, ?)").run(
-      name,
-      snapshotPath
-    );
+    const result = db
+      .prepare("INSERT INTO nginx_config_history (vhost_name, snapshot_path) VALUES (?, ?)")
+      .run(name, snapshotPath);
+    return Number(result.lastInsertRowid);
   },
 
   async listVhostHistory(name: string): Promise<NginxConfigSnapshot[]> {

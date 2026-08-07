@@ -12,7 +12,10 @@ export function TopBar({ onMenuClick, alertCount = 0 }: TopBarProps) {
   const current = navItems.find((i) => (i.to === "/" ? location.pathname === "/" : location.pathname.startsWith(i.to)));
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card/95 px-3 backdrop-blur">
+    <header
+      className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card/95 px-3 backdrop-blur"
+      style={{ paddingTop: "env(safe-area-inset-top)", height: "calc(3.5rem + env(safe-area-inset-top))" }}
+    >
       <button
         type="button"
         onClick={onMenuClick}

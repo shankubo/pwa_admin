@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { randomBytes } from "node:crypto";
 import { AuthService, UserModel } from "./auth.service.js";
 import { env } from "../../config/env.js";
+import { withAudit } from "../../middleware/auditLog.js";
 
 const tempTokens = new Map<string, { userId: number; expiresAt: number }>();
 
@@ -152,6 +153,40 @@ export default async function authRoutes(app: FastifyInstance) {
 
       UserModel.enableTotp(payload.sub);
       return reply.send({ enabled: true });
+    }
+  );
+
+  app.post(
+    "/auth/2fa/disable",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("auth.2fa.disable")],
+      schema: {
+        body: {
+          type: "object",
+          required: ["password", "code"],
+          properties: {
+            password: { type: "string", minLength: 1, maxLength: 200 },
+            code: { type: "string", minLength: 6, maxLength: 6 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const payload = request.user as { sub: number };
+      const { password, code } = request.body as { password: string; code: string };
+      const user = UserModel.findById(payload.sub);
+      if (!user?.totp_enabled || !user.totp_secret) {
+        return reply.code(400).send({ error: "totp_not_enabled" });
+      }
+
+      const validPassword = await AuthService.verifyPassword(password, user.password_hash);
+      if (!validPassword) return reply.code(401).send({ error: "invalid_credentials" });
+
+      const validCode = AuthService.verifyTotpCode(user.totp_secret, code);
+      if (!validCode) return reply.code(401).send({ error: "invalid_code" });
+
+      UserModel.disableTotp(payload.sub);
+      return reply.send({ enabled: false });
     }
   );
 

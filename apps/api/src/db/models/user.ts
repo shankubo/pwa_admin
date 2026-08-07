@@ -39,4 +39,10 @@ export const UserModel = {
   enableTotp(userId: number): void {
     db.prepare("UPDATE users SET totp_enabled = 1 WHERE id = ?").run(userId);
   },
+
+  disableTotp(userId: number): void {
+    db.prepare(
+      "UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE id = ?"
+    ).run(userId);
+  },
 };

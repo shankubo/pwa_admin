@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LiveLogPanel } from "@/components/LiveLogPanel";
-import { ChevronDown, ChevronUp, Globe } from "lucide-react";
+import { ChevronDown, ChevronUp, Globe, ExternalLink } from "lucide-react";
 
 interface LinkedContainer {
   id: string;
@@ -21,6 +21,13 @@ interface SiteDetail {
   vhost: NginxVhostDetail;
   cert: NginxCertStatus;
   linkedContainer: LinkedContainer | null;
+}
+
+function siteUrl(s: SiteSummary): string | null {
+  const host = s.serverNames.find((n) => n !== "_");
+  if (!host) return null;
+  const scheme = s.listenPorts.includes(443) ? "https" : "http";
+  return `${scheme}://${host}/`;
 }
 
 function certBadgeClass(daysRemaining: number | null) {
@@ -52,6 +59,11 @@ export function Sites() {
     await load();
   }
 
+  async function toggleMaintenance(name: string, maintenanceMode: boolean) {
+    await apiJson(`/sites/${name}/maintenance/${maintenanceMode ? "disable" : "enable"}`, { method: "POST" });
+    await load();
+  }
+
   if (error) return <Card className="text-sm text-destructive">{error}</Card>;
   if (!sites) return <Card className="text-sm text-muted-foreground">Chargement…</Card>;
   if (sites.length === 0) return <Card className="text-sm text-muted-foreground">Aucun site.</Card>;
@@ -68,6 +80,18 @@ export function Sites() {
               <div className="flex items-center gap-2">
                 <Globe className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="truncate font-medium">{s.name}</span>
+                {s.enabled && siteUrl(s) && (
+                  <a
+                    href={siteUrl(s)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={`Ouvrir ${s.name} dans un nouvel onglet`}
+                    className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                )}
               </div>
               <p className="truncate text-xs text-muted-foreground">{s.serverNames.join(", ") || "—"}</p>
               {s.linkedContainer && (
@@ -77,6 +101,11 @@ export function Sites() {
               )}
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              {s.maintenanceMode && (
+                <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
+                  maintenance
+                </span>
+              )}
               <span
                 className={
                   "rounded-full px-2 py-0.5 text-xs font-medium " +
@@ -110,6 +139,26 @@ export function Sites() {
               <Button size="sm" variant="outline" onClick={() => toggle(s.name, s.enabled)}>
                 Activer
               </Button>
+            )}
+
+            {s.enabled && (
+              s.maintenanceMode ? (
+                <Button size="sm" variant="outline" onClick={() => toggleMaintenance(s.name, s.maintenanceMode)}>
+                  Quitter maintenance
+                </Button>
+              ) : (
+                <ConfirmDialog
+                  trigger={
+                    <Button size="sm" variant="outline">
+                      Maintenance
+                    </Button>
+                  }
+                  title={`Passer ${s.name} en maintenance ?`}
+                  description="Les visiteurs verront une page « en construction » à la place du site."
+                  confirmLabel="Activer la maintenance"
+                  onConfirm={() => toggleMaintenance(s.name, s.maintenanceMode)}
+                />
+              )
             )}
           </div>
 

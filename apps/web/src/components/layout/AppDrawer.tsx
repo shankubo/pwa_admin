@@ -43,6 +43,7 @@ export function AppDrawer({ open, onOpenChange }: AppDrawerProps) {
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50 data-[state=open]:animate-in data-[state=open]:fade-in" />
         <Dialog.Content
           className="fixed inset-y-0 left-0 z-50 flex w-[85vw] max-w-xs flex-col gap-6 overflow-y-auto bg-card p-4 shadow-xl outline-none"
+          style={{ paddingTop: "calc(1rem + env(safe-area-inset-top))" }}
           aria-describedby={undefined}
         >
           <div className="flex items-center justify-between">
