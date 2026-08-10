@@ -93,6 +93,14 @@ SchedulerService.start();
 const webDist = join(__dirname, "..", "..", "web", "dist");
 await app.register(fastifyStatic, {
   root: webDist,
+  // sw.js/registerSW.js must always be revalidated — a stale cached service
+  // worker keeps serving an old JS bundle indefinitely, silently hiding
+  // every deployed fix until the browser is forced to refetch it.
+  setHeaders: (res, path) => {
+    if (path.endsWith("/sw.js") || path.endsWith("/registerSW.js")) {
+      res.setHeader("Cache-Control", "no-cache");
+    }
+  },
 });
 
 app.setNotFoundHandler((request, reply) => {
