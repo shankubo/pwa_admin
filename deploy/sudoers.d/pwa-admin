@@ -86,6 +86,13 @@ shan ALL=(root) NOPASSWD: /usr/bin/apt-get install --only-upgrade -y docker-ce d
 shan ALL=(root) NOPASSWD: /bin/systemctl restart docker
 shan ALL=(root) NOPASSWD: /bin/systemctl is-active docker
 
+# --- Auto-update: deliberate, narrow exception to "never self-restart" ---
+# deploy/auto-update.sh (cron-polled, pulls+rebuilds+restarts on new commits)
+# is the one human-approved automated path allowed to restart pwa-admin
+# without an interactive password. Every OTHER restart of this service must
+# stay password-gated — do not broaden this rule beyond this exact command.
+shan ALL=(root) NOPASSWD: /bin/systemctl restart pwa-admin
+
 # The system-wide sudoers `Defaults` sets `use_pty`, which makes sudo require
 # an allocated pseudo-terminal — fine for interactive SSH use, but the
 # pwa-admin service invokes sudo via execFile with no TTY at all, so every
