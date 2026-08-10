@@ -238,6 +238,10 @@ export const DbBackupService = {
       await new Promise<void>((resolve, reject) => {
         container.modem.demuxStream(stream, gzip as any, gzip as any);
         gzip.pipe(out);
+        // demuxStream only forwards data chunks, never end() — without this,
+        // gzip/out never finish and the run hangs as "running" forever once
+        // the container's dump process closes its stdout.
+        stream.on("end", () => gzip.end());
         out.on("finish", resolve);
         out.on("error", reject);
         stream.on("error", reject);
