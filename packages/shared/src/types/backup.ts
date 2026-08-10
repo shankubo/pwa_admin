@@ -102,6 +102,25 @@ export interface UsbBackupArchive {
   modifiedAt: string;
 }
 
+/** The category the admin declares when uploading a backup archive from their
+ * PC — determines which restore endpoint (generic volume/path vs. db) the
+ * resulting backup_history row is restorable through. */
+export type BackupUploadSourceKind = "volume" | "path" | "db";
+
+export interface BackupUploadResult {
+  runId: string;
+  fileName: string;
+  sizeBytes: number;
+}
+
+/** Computed client-side in the Restore wizard's Step 1 from the existing
+ * per-source status calls, to drive which source tiles are selectable. */
+export interface RestoreSourceAvailability {
+  local: boolean;
+  usb: boolean;
+  gdrive: boolean;
+}
+
 export type DbEngine = "postgres" | "mysql" | "mariadb" | "mongo" | "redis";
 
 export interface DetectedDatabase {

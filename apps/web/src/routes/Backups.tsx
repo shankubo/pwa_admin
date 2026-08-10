@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import type {
   BackupJob,
   BackupHistoryEntry,
@@ -29,6 +30,8 @@ import {
   Search,
   Loader2,
   Usb,
+  Download,
+  ArrowRight,
 } from "lucide-react";
 
 const STATUS_FILTERS: { key: "all" | BackupRunStatus; label: string }[] = [
@@ -38,19 +41,40 @@ const STATUS_FILTERS: { key: "all" | BackupRunStatus; label: string }[] = [
   { key: "running", label: "En cours" },
 ];
 
+async function triggerDownload(runId: string) {
+  const { token } = await apiJson<{ token: string }>(`/backups/history/${runId}/download-token`, {
+    method: "POST",
+  });
+  window.location.href = `/api/backups/history/${runId}/download?token=${encodeURIComponent(token)}`;
+}
+
+/** Polls a run until it leaves running/pending, then optionally triggers a
+ * browser download — shared by the generic Backups flow. */
+async function pollThenMaybeDownload(runId: string, download: boolean) {
+  for (;;) {
+    const entry = await apiJson<BackupHistoryEntry>(`/backups/history/${runId}`);
+    if (entry.status !== "running") {
+      if (download && entry.status === "success") await triggerDownload(runId);
+      return entry;
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+}
+
 export function Backups() {
   const [jobs, setJobs] = useState<BackupJob[] | null>(null);
   const [history, setHistory] = useState<BackupHistoryEntry[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | BackupRunStatus>("all");
   const [storage, setStorage] = useState<{ localUsedBytes: number } | null>(null);
   const [detected, setDetected] = useState<DetectedDatabase[] | null>(null);
-  const [selectedRun, setSelectedRun] = useState<BackupHistoryEntry | null>(null);
   const [showNewJob, setShowNewJob] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gdriveAuthorized, setGdriveAuthorized] = useState(false);
   const [comparison, setComparison] = useState<GDriveComparisonResult | null>(null);
   const [comparing, setComparing] = useState(false);
   const [usbAvailable, setUsbAvailable] = useState(false);
+  const [dumpingRef, setDumpingRef] = useState<string | null>(null);
+  const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
 
   async function runComparison() {
     setComparing(true);
@@ -104,30 +128,37 @@ export function Backups() {
     await loadJobs();
   }
 
-  async function dumpDb(location: "docker" | "native", ref: string) {
-    const targets: BackupTarget[] = ["local"];
-    if (gdriveAuthorized) targets.push("gdrive");
-    if (usbAvailable) targets.push("usb");
-    await apiJson(`/dbbackup/${location}/${encodeURIComponent(ref)}/dump`, {
-      method: "POST",
-      body: JSON.stringify({ targets }),
-    });
-    await loadHistory();
+  async function dumpDb(location: "docker" | "native", ref: string, download: boolean) {
+    setDumpingRef(ref);
+    setError(null);
+    try {
+      const targets: BackupTarget[] = ["local"];
+      if (gdriveAuthorized) targets.push("gdrive");
+      if (usbAvailable) targets.push("usb");
+      const { runId } = await apiJson<{ runId: string }>(
+        `/dbbackup/${location}/${encodeURIComponent(ref)}/dump`,
+        { method: "POST", body: JSON.stringify({ targets }) }
+      );
+      await loadHistory();
+      await pollThenMaybeDownload(runId, download);
+      await loadHistory();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDumpingRef(null);
+    }
   }
 
-  async function restore(run: BackupHistoryEntry, targetVolume?: string) {
-    if (run.sourceType === "db") {
-      await apiJson("/dbbackup/restore-by-run", {
-        method: "POST",
-        body: JSON.stringify({ runId: run.runId, confirm: true }),
-      });
-    } else {
-      await apiJson("/backups/restore", {
-        method: "POST",
-        body: JSON.stringify({ runId: run.runId, targetVolume, confirm: true }),
-      });
+  async function deleteRun(runId: string) {
+    setDeletingRunId(runId);
+    try {
+      await apiJson(`/backups/history/${runId}`, { method: "DELETE" });
+      await loadHistory();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setDeletingRunId(null);
     }
-    await loadHistory();
   }
 
   const filteredHistory = useMemo(() => {
@@ -158,7 +189,7 @@ export function Backups() {
 
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-muted-foreground">Jobs de sauvegarde</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground">Nouvelle sauvegarde</h2>
           <Button size="sm" variant="outline" onClick={() => setShowNewJob((v) => !v)}>
             {showNewJob ? "Annuler" : "Nouveau job"}
           </Button>
@@ -212,10 +243,14 @@ export function Backups() {
 
       <Card>
         <CardTitle className="flex items-center gap-1">
-          <Database className="h-4 w-4" /> Bases de données détectées
+          <Database className="h-4 w-4" /> Sauvegarde partielle — bases de données détectées
         </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Un dump de base de données est rapide et se comporte comme une sauvegarde « partielle » — à la
+          différence d'un instantané complet de volume/dossier.
+        </p>
         {detected && detected.length > 0 ? (
-          <div className="flex flex-col gap-3">
+          <div className="mt-2 flex flex-col gap-3">
             {detected.map((d) => (
               <div key={`${d.location}:${d.ref}`} className="flex flex-col gap-1">
                 <div className="flex items-center justify-between text-sm">
@@ -225,9 +260,25 @@ export function Backups() {
                       ({d.engine} · {d.location === "docker" ? "conteneur" : "hôte"})
                     </span>
                   </span>
-                  <Button size="sm" variant="outline" onClick={() => dumpDb(d.location, d.ref)}>
-                    Dump maintenant
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={dumpingRef === d.ref}
+                      onClick={() => dumpDb(d.location, d.ref, false)}
+                    >
+                      {dumpingRef === d.ref ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Dump"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={dumpingRef === d.ref}
+                      onClick={() => dumpDb(d.location, d.ref, true)}
+                      title="Dump puis télécharger"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
                 {d.databases && d.databases.length > 0 && (
                   <p className="text-xs text-muted-foreground">Bases : {d.databases.join(", ")}</p>
@@ -239,7 +290,7 @@ export function Backups() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Aucune base détectée.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Aucune base détectée.</p>
         )}
       </Card>
 
@@ -259,6 +310,13 @@ export function Backups() {
           </select>
         </div>
 
+        <p className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
+          Pour restaurer une sauvegarde, rendez-vous sur{" "}
+          <Link to="/restore" className="inline-flex items-center gap-0.5 text-primary underline">
+            Restore <ArrowRight className="h-3 w-3" />
+          </Link>
+        </p>
+
         <div className="flex flex-col gap-2">
           {filteredHistory.length === 0 && (
             <Card className="text-sm text-muted-foreground">Aucun historique.</Card>
@@ -266,124 +324,75 @@ export function Backups() {
           {filteredHistory.map((h) => {
             const driveStatus = driveStatusByRunId.get(h.runId);
             return (
-            <Card key={h.runId} className="cursor-pointer" onClick={() => setSelectedRun(h)}>
-              <div className="flex items-center justify-between text-sm">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">
-                    {h.type} · {h.sourceType}:{h.sourceRef}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {h.target}
-                    {h.driveFileId ? " + gdrive" : ""}
-                    {h.usbPath ? " + usb" : ""} · {new Date(h.startedAt).toLocaleString()}
-                    {h.durationMs != null ? ` · ${(h.durationMs / 1000).toFixed(1)}s` : ""}
-                  </p>
+              <Card key={h.runId}>
+                <div className="flex items-center justify-between text-sm">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">
+                      {h.type} · {h.sourceType}:{h.sourceRef}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {h.target}
+                      {h.driveFileId ? " + gdrive" : ""}
+                      {h.usbPath ? " + usb" : ""} · {new Date(h.startedAt).toLocaleString()}
+                      {h.durationMs != null ? ` · ${(h.durationMs / 1000).toFixed(1)}s` : ""}
+                    </p>
+                  </div>
+                  <span
+                    className={
+                      "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium " +
+                      (h.status === "success"
+                        ? "bg-primary/15 text-primary"
+                        : h.status === "failed"
+                          ? "bg-destructive/15 text-destructive"
+                          : "bg-warning/15 text-warning")
+                    }
+                  >
+                    {h.status}
+                  </span>
                 </div>
-                <span
-                  className={
-                    "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium " +
-                    (h.status === "success"
-                      ? "bg-primary/15 text-primary"
-                      : h.status === "failed"
-                        ? "bg-destructive/15 text-destructive"
-                        : "bg-warning/15 text-warning")
-                  }
-                >
-                  {h.status}
-                </span>
-              </div>
-              <div className="mt-1 flex items-center justify-between">
-                {h.sizeBytes != null && (
-                  <p className="text-xs text-muted-foreground">{formatBytes(h.sizeBytes)}</p>
-                )}
-                {driveStatus && <DriveStatusBadge status={driveStatus} />}
-              </div>
-            </Card>
+                <div className="mt-1 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {h.sizeBytes != null && (
+                      <p className="text-xs text-muted-foreground">{formatBytes(h.sizeBytes)}</p>
+                    )}
+                    {driveStatus && <DriveStatusBadge status={driveStatus} />}
+                  </div>
+                  <div className="flex gap-1">
+                    {h.status === "success" && h.target === "local" && (
+                      <Button size="sm" variant="outline" onClick={() => triggerDownload(h.runId)} title="Télécharger">
+                        <Download className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    <ConfirmDialog
+                      trigger={
+                        <Button size="sm" variant="destructive" disabled={deletingRunId === h.runId}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      }
+                      title="Supprimer cette sauvegarde ?"
+                      description="Le fichier local sera supprimé (les copies USB/Drive existantes ne sont pas touchées). Action irréversible."
+                      confirmLabel="Supprimer"
+                      onConfirm={() => deleteRun(h.runId)}
+                    />
+                  </div>
+                </div>
+              </Card>
             );
           })}
         </div>
       </div>
-
-      {selectedRun && (
-        <RunDetailPanel run={selectedRun} onClose={() => setSelectedRun(null)} onRestore={restore} />
-      )}
     </div>
   );
 }
 
-function RunDetailPanel({
-  run,
-  onClose,
-  onRestore,
-}: {
-  run: BackupHistoryEntry;
-  onClose: () => void;
-  onRestore: (run: BackupHistoryEntry, targetVolume?: string) => Promise<void>;
-}) {
-  const [targetVolume, setTargetVolume] = useState(run.sourceType === "volume" ? run.sourceRef : "");
-
-  return (
-    <Card>
-      <div className="flex items-center justify-between">
-        <CardTitle>Détail du run {run.runId}</CardTitle>
-        <Button size="sm" variant="ghost" onClick={onClose}>
-          Fermer
-        </Button>
-      </div>
-      <div className="flex flex-col gap-1 text-sm">
-        <p>Type : {run.type}</p>
-        <p>Source : {run.sourceType}:{run.sourceRef}</p>
-        <p>Cible : {run.target}{run.driveFileId ? " + gdrive" : ""}{run.usbPath ? " + usb" : ""}</p>
-        <p>Statut : {run.status}</p>
-        {run.driveFileId && (
-          <a
-            href={`https://drive.google.com/file/d/${run.driveFileId}/view`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-primary underline"
-          >
-            Ouvrir sur Google Drive
-          </a>
-        )}
-        {run.usbPath && <p className="truncate text-xs text-muted-foreground">USB : {run.usbPath}</p>}
-        {run.checksumSha256 && <p className="truncate text-xs text-muted-foreground">SHA256 : {run.checksumSha256}</p>}
-        {run.error && <p className="text-xs text-destructive">{run.error}</p>}
-      </div>
-
-      {run.status === "success" && (
-        <div className="mt-3 flex flex-col gap-2">
-          {run.sourceType === "volume" && (
-            <input
-              type="text"
-              placeholder="Volume cible"
-              value={targetVolume}
-              onChange={(e) => setTargetVolume(e.target.value)}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-            />
-          )}
-          <ConfirmDialog
-            trigger={
-              <Button size="sm" variant="destructive">
-                Restaurer
-              </Button>
-            }
-            title="Restaurer cette sauvegarde ?"
-            description="Cette opération va écraser les données existantes de la cible. Action irréversible."
-            requireTypedConfirmation="RESTORE"
-            confirmLabel="Restaurer"
-            onConfirm={() => onRestore(run, targetVolume || undefined)}
-          />
-        </div>
-      )}
-    </Card>
-  );
-}
-
 function NewJobForm({ onCreated }: { onCreated: () => void }) {
+  const [step, setStep] = useState<1 | 2>(1);
+  const [kind, setKind] = useState<"complet" | "partiel">("complet");
   const [name, setName] = useState("");
   const [sourceType, setSourceType] = useState<BackupSourceType>("volume");
   const [sourceRef, setSourceRef] = useState("");
   const [targets, setTargets] = useState<BackupTarget[]>(["local"]);
+  const [downloadAfter, setDownloadAfter] = useState(false);
   const [cron, setCron] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -391,8 +400,27 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
   const [volumes, setVolumes] = useState<VolumeSummary[] | null>(null);
   const [detectedDbs, setDetectedDbs] = useState<DetectedDatabase[] | null>(null);
   const [bindMounts, setBindMounts] = useState<DetectedBindMount[] | null>(null);
+  const [gdriveAuthorized, setGdriveAuthorized] = useState(false);
+  const [usbAvailable, setUsbAvailable] = useState(false);
   const [refsLoading, setRefsLoading] = useState(false);
   const [manualEntry, setManualEntry] = useState(false);
+
+  useEffect(() => {
+    apiJson<{ authorized: boolean }>("/backups/gdrive/status")
+      .then((s) => setGdriveAuthorized(s.authorized))
+      .catch(() => setGdriveAuthorized(false));
+    apiJson<UsbStatus>("/backups/usb/status")
+      .then((s) => setUsbAvailable(s.available))
+      .catch(() => setUsbAvailable(false));
+  }, []);
+
+  useEffect(() => {
+    if (kind === "partiel") {
+      setSourceType("db");
+      return;
+    }
+    setSourceType((prev) => (prev === "db" ? "volume" : prev));
+  }, [kind]);
 
   useEffect(() => {
     setSourceRef("");
@@ -430,7 +458,7 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
               value: m.hostPath,
               label: `${m.hostPath} (${m.containerName})`,
             }))
-        : [];
+          : [];
 
   function toggleTarget(t: BackupTarget) {
     setTargets((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
@@ -445,7 +473,7 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
     }
     setSubmitting(true);
     try {
-      await apiJson("/backups/jobs", {
+      const job = await apiJson<{ id: number }>("/backups/jobs", {
         method: "POST",
         body: JSON.stringify({
           name: name.trim(),
@@ -455,6 +483,10 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
           scheduleCron: cron.trim() || undefined,
         }),
       });
+      if (downloadAfter) {
+        const { runId } = await apiJson<{ runId: string }>(`/backups/jobs/${job.id}/run`, { method: "POST" });
+        pollThenMaybeDownload(runId, true).catch(() => {});
+      }
       onCreated();
     } catch (err) {
       setError((err as Error).message);
@@ -465,93 +497,196 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
 
   return (
     <Card className="mb-3">
-      <form onSubmit={submit} className="flex flex-col gap-2">
-        <input
-          type="text"
-          placeholder="Nom du job"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-        />
-        <select
-          value={sourceType}
-          onChange={(e) => setSourceType(e.target.value as BackupSourceType)}
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
-        >
-          <option value="volume">volume Docker</option>
-          <option value="path">dossier (bind mount)</option>
-          <option value="db">base de données</option>
-        </select>
-        {manualEntry || refOptions.length === 0 ? (
-          <div className="flex flex-col gap-1">
-            <input
-              type="text"
-              placeholder={
-                refsLoading
-                  ? "Chargement…"
-                  : sourceType === "volume"
-                    ? "Référence source (nom du volume)"
-                    : sourceType === "path"
-                      ? "Chemin absolu (ex: /home/shan/docker-data/pwa-asso)"
-                      : "Référence source (location:ref, ex: native:mariadb)"
-              }
-              value={sourceRef}
-              onChange={(e) => setSourceRef(e.target.value)}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-            />
-            {refOptions.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setManualEntry(false)}
-                className="self-start text-xs text-primary underline"
-              >
-                Choisir dans la liste
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1">
-            <select
-              value={sourceRef}
-              onChange={(e) => setSourceRef(e.target.value)}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
-            >
-              <option value="">
-                {sourceType === "volume"
-                  ? "Sélectionner un volume…"
-                  : sourceType === "path"
-                    ? "Sélectionner un dossier monté…"
-                    : "Sélectionner une base de données…"}
-              </option>
-              {refOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+      <form onSubmit={submit} className="flex flex-col gap-3">
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Étape 1 — Type</p>
+          <div className="flex overflow-hidden rounded-md border border-border text-sm">
             <button
               type="button"
-              onClick={() => setManualEntry(true)}
-              className="self-start text-xs text-primary underline"
+              onClick={() => {
+                setKind("complet");
+                setStep(1);
+              }}
+              className={`flex-1 px-3 py-2 ${kind === "complet" ? "bg-primary text-primary-foreground" : "bg-background"}`}
             >
-              Saisir manuellement
+              Complet
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setKind("partiel");
+                setStep(1);
+              }}
+              className={`flex-1 px-3 py-2 ${kind === "partiel" ? "bg-primary text-primary-foreground" : "bg-background"}`}
+            >
+              Partiel (base de données)
             </button>
           </div>
-        )}
-        <div className="flex gap-3 text-sm">
-          <label className="flex items-center gap-1">
-            <input type="checkbox" checked={targets.includes("local")} onChange={() => toggleTarget("local")} />
-            local
-          </label>
-          <label className="flex items-center gap-1">
-            <input type="checkbox" checked={targets.includes("gdrive")} onChange={() => toggleTarget("gdrive")} />
-            gdrive
-          </label>
-          <label className="flex items-center gap-1">
-            <input type="checkbox" checked={targets.includes("usb")} onChange={() => toggleTarget("usb")} />
-            usb
-          </label>
         </div>
+
+        {kind === "complet" ? (
+          <>
+            <select
+              value={sourceType}
+              onChange={(e) => setSourceType(e.target.value as BackupSourceType)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
+            >
+              <option value="volume">volume Docker</option>
+              <option value="path">dossier (bind mount)</option>
+            </select>
+            <input
+              type="text"
+              placeholder="Nom du job"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+            />
+            {manualEntry || refOptions.length === 0 ? (
+              <div className="flex flex-col gap-1">
+                <input
+                  type="text"
+                  placeholder={
+                    refsLoading
+                      ? "Chargement…"
+                      : sourceType === "volume"
+                        ? "Référence source (nom du volume)"
+                        : "Chemin absolu (ex: /home/shan/docker-data/pwa-asso)"
+                  }
+                  value={sourceRef}
+                  onChange={(e) => setSourceRef(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                />
+                {refOptions.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setManualEntry(false)}
+                    className="self-start text-xs text-primary underline"
+                  >
+                    Choisir dans la liste
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <select
+                  value={sourceRef}
+                  onChange={(e) => setSourceRef(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
+                >
+                  <option value="">
+                    {sourceType === "volume" ? "Sélectionner un volume…" : "Sélectionner un dossier monté…"}
+                  </option>
+                  {refOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setManualEntry(true)}
+                  className="self-start text-xs text-primary underline"
+                >
+                  Saisir manuellement
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Pour un dump ponctuel, utilisez le bouton « Dump » dans la carte « Bases de données détectées »
+            ci-dessous. Ce formulaire crée un job planifiable — la source est une base de données détectée.
+          </p>
+        )}
+
+        {kind === "partiel" && (
+          <>
+            <input
+              type="text"
+              placeholder="Nom du job"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+            />
+            {manualEntry || refOptions.length === 0 ? (
+              <div className="flex flex-col gap-1">
+                <input
+                  type="text"
+                  placeholder={refsLoading ? "Chargement…" : "Référence source (location:ref, ex: native:mariadb)"}
+                  value={sourceRef}
+                  onChange={(e) => setSourceRef(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                />
+                {refOptions.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setManualEntry(false)}
+                    className="self-start text-xs text-primary underline"
+                  >
+                    Choisir dans la liste
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <select
+                  value={sourceRef}
+                  onChange={(e) => setSourceRef(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
+                >
+                  <option value="">Sélectionner une base de données…</option>
+                  {refOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setManualEntry(true)}
+                  className="self-start text-xs text-primary underline"
+                >
+                  Saisir manuellement
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Étape 2 — Destination</p>
+          <div className="flex flex-wrap gap-3 text-sm">
+            <label className="flex items-center gap-1">
+              <input type="checkbox" checked={targets.includes("local")} onChange={() => toggleTarget("local")} />
+              local
+            </label>
+            <label className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={targets.includes("gdrive")}
+                onChange={() => toggleTarget("gdrive")}
+                disabled={!gdriveAuthorized}
+              />
+              gdrive
+              {!gdriveAuthorized && <span className="text-xs text-muted-foreground">(non connecté)</span>}
+            </label>
+            <label className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={targets.includes("usb")}
+                onChange={() => toggleTarget("usb")}
+                disabled={!usbAvailable}
+              />
+              usb
+              {!usbAvailable && <span className="text-xs text-muted-foreground">(non détecté)</span>}
+            </label>
+            <label className="flex items-center gap-1">
+              <input type="checkbox" checked={downloadAfter} onChange={() => setDownloadAfter((v) => !v)} />
+              télécharger après la sauvegarde
+            </label>
+          </div>
+        </div>
+
         <input
           type="text"
           placeholder="Expression cron (optionnel)"

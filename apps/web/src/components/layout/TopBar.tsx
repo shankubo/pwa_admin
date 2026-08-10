@@ -1,6 +1,7 @@
 import { Menu, Bell } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { navItems } from "./navItems";
+import { ServerSwitcher } from "./ServerSwitcher";
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -25,18 +26,21 @@ export function TopBar({ onMenuClick, alertCount = 0 }: TopBarProps) {
         <Menu className="h-6 w-6" />
       </button>
       <h1 className="text-base font-semibold">{current?.label ?? "Server Admin"}</h1>
-      <button
-        type="button"
-        aria-label="Alertes"
-        className="relative rounded-md p-2 hover:bg-muted"
-      >
-        <Bell className="h-5 w-5" />
-        {alertCount > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
-            {alertCount}
-          </span>
-        )}
-      </button>
+      <div className="flex items-center gap-1">
+        <ServerSwitcher />
+        <button
+          type="button"
+          aria-label="Alertes"
+          className="relative rounded-md p-2 hover:bg-muted"
+        >
+          <Bell className="h-5 w-5" />
+          {alertCount > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+              {alertCount}
+            </span>
+          )}
+        </button>
+      </div>
     </header>
   );
 }

@@ -6,7 +6,11 @@ export default async function pm2Routes(app: FastifyInstance) {
   const auth = { preHandler: (app as any).requireAuth };
 
   app.get("/pm2/processes", auth, async (_req, reply) => {
-    reply.send(await Pm2Service.list());
+    try {
+      reply.send(await Pm2Service.list());
+    } catch {
+      reply.code(503).send({ error: "pm2_not_installed" });
+    }
   });
 
   app.post(

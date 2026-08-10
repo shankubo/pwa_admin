@@ -6,7 +6,11 @@ export default async function networkRoutes(app: FastifyInstance) {
   const auth = { preHandler: (app as any).requireAuth };
 
   app.get("/network/ports", auth, async (_req, reply) => {
-    reply.send(await NetworkService.listOpenPorts());
+    try {
+      reply.send(await NetworkService.listOpenPorts());
+    } catch (err) {
+      reply.code(400).send({ error: (err as Error).message });
+    }
   });
 
   app.get("/analytics/sites/:name/top-pages", auth, async (req, reply) => {

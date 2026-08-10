@@ -1,8 +1,10 @@
-import { useState } from "react";
-import type { SystemStatsSnapshot, SystemAlert } from "@pwa-admin/shared";
+import { useEffect, useState } from "react";
+import type { SystemStatsSnapshot, SystemAlert, UsbStatus } from "@pwa-admin/shared";
+import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { useWsChannel } from "@/lib/ws";
-import { AlertTriangle, Cpu, Thermometer, HardDrive, MemoryStick } from "lucide-react";
+import { formatBytes } from "./Docker";
+import { AlertTriangle, Cpu, Thermometer, HardDrive, MemoryStick, Usb, CheckCircle2 } from "lucide-react";
 
 function GaugeCard({
   icon: Icon,
@@ -42,9 +44,16 @@ function GaugeCard({
 export function Dashboard() {
   const [stats, setStats] = useState<SystemStatsSnapshot | null>(null);
   const [alerts, setAlerts] = useState<SystemAlert[]>([]);
+  const [usb, setUsb] = useState<UsbStatus | null>(null);
 
   useWsChannel("sys.stats", (frame) => setStats(frame.data as SystemStatsSnapshot));
   useWsChannel("sys.alerts", (frame) => setAlerts(frame.data as SystemAlert[]));
+
+  useEffect(() => {
+    apiJson<UsbStatus>("/backups/usb/status")
+      .then(setUsb)
+      .catch(() => setUsb(null));
+  }, []);
 
   const alertFor = (type: string) => alerts.find((a) => a.type === type)?.severity;
   const primaryDisk = stats?.disks[0];
@@ -94,6 +103,20 @@ export function Dashboard() {
         <p className="text-lg font-medium">
           {stats ? formatUptime(stats.uptimeSeconds) : "…"}
         </p>
+      </Card>
+
+      <Card>
+        <CardTitle className="flex items-center gap-1">
+          <Usb className="h-4 w-4" /> Disque USB / SSD
+        </CardTitle>
+        {usb?.available ? (
+          <p className="flex items-center gap-1 text-sm text-primary">
+            <CheckCircle2 className="h-4 w-4" /> Connecté — {usb.drives[0].label}
+            {usb.drives[0].freeBytes != null ? ` · ${formatBytes(usb.drives[0].freeBytes)} libre` : ""}
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">Aucun disque USB connecté</p>
+        )}
       </Card>
 
       <Card>

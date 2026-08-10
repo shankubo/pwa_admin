@@ -11,8 +11,10 @@ import { Pm2 } from "@/routes/Pm2";
 import { NetworkSecurity } from "@/routes/NetworkSecurity";
 import { Security } from "@/routes/Security";
 import { Backups } from "@/routes/Backups";
+import { Restore } from "@/routes/Restore";
 import { Applications } from "@/routes/Applications";
 import { System } from "@/routes/System";
+import { Services } from "@/routes/Services";
 import { Settings } from "@/routes/Settings";
 import { About } from "@/routes/About";
 import { Help } from "@/routes/Help";
@@ -39,7 +41,9 @@ export default function App() {
           <Route path="/security" element={<Security />} />
           <Route path="/applications" element={<Applications />} />
           <Route path="/backups" element={<Backups />} />
+          <Route path="/restore" element={<Restore />} />
           <Route path="/system" element={<System />} />
+          <Route path="/services" element={<Services />} />
           <Route path="/help" element={<Help />} />
           <Route path="/about" element={<About />} />
           <Route path="/settings" element={<Settings />} />

@@ -21,7 +21,7 @@ function setCached(key: string, data: unknown) {
 
 export const NetworkService = {
   async listOpenPorts(): Promise<ListeningPort[]> {
-    const { stdout } = await runCommand("sudo", ["ss", "-tulpn"], { timeoutMs: 5000 });
+    const { stdout } = await runCommand("sudo", ["/usr/bin/ss", "-tulpn"], { timeoutMs: 5000 });
     const lines = stdout.split("\n").slice(1).filter(Boolean);
 
     let dockerPortOwners: Record<number, string> = {};

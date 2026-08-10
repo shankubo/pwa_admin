@@ -47,7 +47,14 @@ export function Pm2() {
   function loadProcesses() {
     return apiJson<Pm2Process[]>("/pm2/processes")
       .then(setProcesses)
-      .catch((err) => setError((err as Error).message));
+      .catch((err) => {
+        const message = (err as Error).message;
+        setError(
+          message === "pm2_not_installed"
+            ? "PM2 n'est pas installé sur ce serveur."
+            : message
+        );
+      });
   }
 
   useEffect(() => {

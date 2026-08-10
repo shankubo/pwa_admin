@@ -179,4 +179,8 @@ export const BackupHistoryModel = {
       )
       .all(jobId) as BackupHistoryRow[];
   },
+
+  deleteByRunId(runId: string): void {
+    db.prepare("DELETE FROM backup_history WHERE run_id = ?").run(runId);
+  },
 };

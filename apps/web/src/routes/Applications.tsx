@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import type {
   Application,
   AppBackupRun,
@@ -17,7 +17,21 @@ import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatBytes } from "./Docker";
-import { Boxes, Trash2, Database, Cloud, HardDrive, Info, ChevronDown, ChevronUp, Loader2, CheckCircle2, XCircle, Usb } from "lucide-react";
+import {
+  Boxes,
+  Trash2,
+  Database,
+  Cloud,
+  HardDrive,
+  Info,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Usb,
+  ArrowRight,
+} from "lucide-react";
 
 interface CronPreset {
   label: string;
@@ -355,7 +369,13 @@ function AppCard({
       {expanded && (
         <>
           <AppRunHistory appId={app.id} />
-          <AppImageHistory appId={app.id} containerNames={app.containerNames} />
+          <AppImageHistory containerNames={app.containerNames} />
+          <Link
+            to="/restore"
+            className="mt-3 flex items-center justify-center gap-1 border-t border-border pt-3 text-xs text-primary underline"
+          >
+            Voir dans Restore <ArrowRight className="h-3 w-3" />
+          </Link>
         </>
       )}
     </Card>
@@ -363,12 +383,12 @@ function AppCard({
 }
 
 /**
- * Lists saved container image archives (docker save) per container, with a
- * restore action per archive. Separate from AppRunHistory's own "Restaurer"
- * (which only covers paths/DB) since an app run can implicate several
- * containers' images at once — the admin picks which one to roll back.
+ * Read-only list of saved container image archives (docker save) per
+ * container. Restoring is done from the Restore page, not here — see
+ * AppRunHistory's comment for the rationale (keep create/backup pages free
+ * of destructive restore actions).
  */
-function AppImageHistory({ appId, containerNames }: { appId: number; containerNames: string[] }) {
+function AppImageHistory({ containerNames }: { containerNames: string[] }) {
   const [historyByContainer, setHistoryByContainer] = useState<Record<string, BackupHistoryEntry[]>>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -383,13 +403,6 @@ function AppImageHistory({ appId, containerNames }: { appId: number; containerNa
       .then((entries) => setHistoryByContainer(Object.fromEntries(entries)))
       .catch((err) => setError((err as Error).message));
   }, [containerNames.join(",")]);
-
-  async function restoreImage(containerName: string, run: BackupHistoryEntry) {
-    await apiJson(`/applications/${appId}/restore-image`, {
-      method: "POST",
-      body: JSON.stringify({ containerName, runId: run.runId, confirm: true }),
-    });
-  }
 
   const hasAny = Object.values(historyByContainer).some((rows) => rows.length > 0);
   if (!hasAny && !error) return null;
@@ -406,7 +419,7 @@ function AppImageHistory({ appId, containerNames }: { appId: number; containerNa
             <p className="text-xs font-medium">{name}</p>
             <div className="mt-1 flex flex-col gap-1">
               {rows.map((run) => (
-                <div key={run.runId} className="flex items-center justify-between rounded-md border border-border p-2 text-xs">
+                <div key={run.runId} className="rounded-md border border-border p-2 text-xs">
                   <div className="min-w-0">
                     <p>
                       {new Date(run.startedAt).toLocaleString()}
@@ -418,20 +431,6 @@ function AppImageHistory({ appId, containerNames }: { appId: number; containerNa
                       {run.usbPath ? " + usb" : ""}
                     </p>
                   </div>
-                  {run.status === "success" && (
-                    <ConfirmDialog
-                      trigger={
-                        <Button size="sm" variant="destructive">
-                          Restaurer
-                        </Button>
-                      }
-                      title={`Restaurer l'image de ${name} ?`}
-                      description="Le conteneur sera arrêté, supprimé et recréé depuis cette image sauvegardée. Action irréversible."
-                      requireTypedConfirmation="RESTORE"
-                      confirmLabel="Restaurer"
-                      onConfirm={() => restoreImage(name, run)}
-                    />
-                  )}
                 </div>
               ))}
             </div>
@@ -496,10 +495,12 @@ function DriveUploadIndicator({ run }: { run: AppBackupRun }) {
   }
 }
 
+/** Read-only history — restoring a run is done from the Restore page, not
+ * here, so this page stays purely about creating/managing backups and can't
+ * accidentally overwrite live data with a misclick. */
 function AppRunHistory({ appId }: { appId: number }) {
   const [runs, setRuns] = useState<AppBackupRun[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedRun, setSelectedRun] = useState<AppBackupRun | null>(null);
 
   function loadRuns() {
     return apiJson<AppBackupRun[]>(`/applications/${appId}/runs`)
@@ -522,13 +523,6 @@ function AppRunHistory({ appId }: { appId: number }) {
     return () => clearInterval(interval);
   }, [runs, appId]);
 
-  async function restore(run: AppBackupRun) {
-    await apiJson(`/applications/${appId}/restore`, {
-      method: "POST",
-      body: JSON.stringify({ runId: run.runId, confirm: true }),
-    });
-  }
-
   return (
     <div className="mt-3 border-t border-border pt-3">
       <p className="mb-2 text-xs font-semibold text-muted-foreground">Historique des runs</p>
@@ -537,11 +531,7 @@ function AppRunHistory({ appId }: { appId: number }) {
       {runs?.length === 0 && <p className="text-xs text-muted-foreground">Aucun run pour cette application.</p>}
       <div className="flex flex-col gap-2">
         {runs?.map((run) => (
-          <div
-            key={run.runId}
-            className="cursor-pointer rounded-md border border-border p-2 text-sm hover:bg-muted"
-            onClick={() => setSelectedRun(run)}
-          >
+          <div key={run.runId} className="rounded-md border border-border p-2 text-sm">
             <div className="flex items-center justify-between">
               <span
                 className={
@@ -579,31 +569,6 @@ function AppRunHistory({ appId }: { appId: number }) {
           </div>
         ))}
       </div>
-
-      {selectedRun && (
-        <div className="mt-3 flex flex-col gap-2 rounded-md border border-border p-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium">Détail du run {selectedRun.runId}</p>
-            <Button size="sm" variant="ghost" onClick={() => setSelectedRun(null)}>
-              Fermer
-            </Button>
-          </div>
-          {selectedRun.status === "success" && (
-            <ConfirmDialog
-              trigger={
-                <Button size="sm" variant="destructive">
-                  Restaurer
-                </Button>
-              }
-              title="Restaurer cette sauvegarde ?"
-              description="Cette opération va écraser les données existantes de l'application. Action irréversible."
-              requireTypedConfirmation="RESTORE"
-              confirmLabel="Restaurer"
-              onConfirm={() => restore(selectedRun)}
-            />
-          )}
-        </div>
-      )}
     </div>
   );
 }

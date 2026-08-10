@@ -20,7 +20,7 @@ interface LsblkOutput {
 
 const BACKUP_ROOT_SEGMENT = "BACKUP";
 
-function sanitizeSegment(value: string): string {
+export function sanitizeSegment(value: string): string {
   const cleaned = value.replace(/[^a-zA-Z0-9._-]/g, "_");
   if (!cleaned || cleaned === "." || cleaned === "..") throw new Error("invalid_path_segment");
   return cleaned;

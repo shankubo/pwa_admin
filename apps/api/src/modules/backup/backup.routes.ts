@@ -1,12 +1,23 @@
+import { createHash } from "node:crypto";
+import { createWriteStream } from "node:fs";
+import { mkdir, stat, unlink } from "node:fs/promises";
+import { pipeline } from "node:stream/promises";
+import { join, basename } from "node:path";
+import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { BackupService, BackupJobModel, BackupHistoryModel } from "./backup.service.js";
 import { backupJobToApiShape, backupHistoryToApiShape } from "../../db/models/backup.js";
 import { withAudit } from "../../middleware/auditLog.js";
 import { SchedulerService } from "../../services/scheduler.js";
 import { GDriveAuthService, GDriveService } from "../../services/gdrive.client.js";
-import { UsbBackupService } from "../../services/usbBackup.client.js";
+import { UsbBackupService, sanitizeSegment } from "../../services/usbBackup.client.js";
 import { env } from "../../config/env.js";
-import type { BackupSourceType, BackupTarget } from "@pwa-admin/shared";
+import type { BackupSourceType, BackupTarget, BackupUploadSourceKind } from "@pwa-admin/shared";
+
+async function sha256OfFile(path: string): Promise<string> {
+  const { readFile } = await import("node:fs/promises");
+  return createHash("sha256").update(await readFile(path)).digest("hex");
+}
 
 export default async function backupRoutes(app: FastifyInstance) {
   const auth = { preHandler: (app as any).requireAuth };
@@ -178,14 +189,62 @@ export default async function backupRoutes(app: FastifyInstance) {
     reply.send(backupHistoryToApiShape(entry));
   });
 
-  app.get("/backups/history/:runId/download", auth, async (req, reply) => {
+  // A plain <a href> download can't send an Authorization header, so a direct
+  // browser navigation needs a short-lived scoped token instead — same
+  // pattern as /docker/images/export/download-token.
+  app.post(
+    "/backups/history/:runId/download-token",
+    auth,
+    async (req, reply) => {
+      const { runId } = req.params as { runId: string };
+      const entry = BackupHistoryModel.findByRunId(runId);
+      if (!entry?.file_path) return reply.code(404).send({ error: "not_found" });
+      const token = app.jwt.sign({ downloadRunId: runId }, { expiresIn: "2m" });
+      reply.send({ token });
+    }
+  );
+
+  app.get("/backups/history/:runId/download", async (req, reply) => {
     const { runId } = req.params as { runId: string };
+    const { token } = req.query as { token?: string };
+
+    if (token) {
+      let payload: { downloadRunId?: string };
+      try {
+        payload = app.jwt.verify(token);
+      } catch {
+        return reply.code(401).send({ error: "unauthorized" });
+      }
+      if (payload.downloadRunId !== runId) return reply.code(401).send({ error: "unauthorized" });
+    } else {
+      try {
+        await (app as any).requireAuth(req, reply);
+      } catch {
+        return; // requireAuth already sent the 401 response
+      }
+    }
+
     const entry = BackupHistoryModel.findByRunId(runId);
     if (!entry?.file_path) return reply.code(404).send({ error: "not_found" });
+    reply.header("Content-Disposition", `attachment; filename="${basename(entry.file_path)}"`);
     return reply.sendFile
       ? reply.sendFile(entry.file_path)
       : reply.send((await import("node:fs")).createReadStream(entry.file_path));
   });
+
+  app.delete(
+    "/backups/history/:runId",
+    { preHandler: [(app as any).requireAuth, withAudit("backup.history.delete", (r) => (r.params as any).runId)] },
+    async (req, reply) => {
+      const { runId } = req.params as { runId: string };
+      const entry = BackupHistoryModel.findByRunId(runId);
+      if (!entry) return reply.code(404).send({ error: "not_found" });
+      if (entry.status === "running") return reply.code(409).send({ error: "run_still_in_progress" });
+      if (entry.file_path) await unlink(entry.file_path).catch(() => {});
+      BackupHistoryModel.deleteByRunId(runId);
+      reply.send({ ok: true });
+    }
+  );
 
   app.post(
     "/backups/restore",
@@ -236,6 +295,100 @@ export default async function backupRoutes(app: FastifyInstance) {
   app.get("/backups/usb/archives", auth, async (_req, reply) => {
     reply.send(await UsbBackupService.browseArchives());
   });
+
+  // Uploads an archive from the admin's PC and registers it as a real
+  // backup_history row (status "success", target "local") so it becomes
+  // restorable through the existing /backups/restore and
+  // /dbbackup/restore-by-run endpoints with zero new restore logic.
+  app.post(
+    "/backups/uploads",
+    { preHandler: [(app as any).requireAuth, withAudit("backup.upload")] },
+    async (req, reply) => {
+      const file = await (req as any).file();
+      if (!file) return reply.code(400).send({ error: "no_file_uploaded" });
+
+      const fields = file.fields as Record<string, { value?: string } | undefined>;
+      const sourceType = fields.sourceType?.value as BackupUploadSourceKind | undefined;
+      const sourceRef = fields.sourceRef?.value;
+      if (!sourceType || !["volume", "path", "db"].includes(sourceType)) {
+        return reply.code(400).send({ error: "invalid_source_type" });
+      }
+      if (!sourceRef) return reply.code(400).send({ error: "source_ref_required" });
+
+      const uploadId = randomUUID();
+      const safeFileName = sanitizeSegment(file.filename.replace(/\.[^.]*$/, "")) +
+        (file.filename.match(/\.[^.]*$/)?.[0] ?? "");
+      const destDir = join(env.BACKUP_LOCAL_ROOT, "uploads", uploadId);
+      await mkdir(destDir, { recursive: true });
+      const destPath = join(destDir, safeFileName);
+
+      try {
+        await pipeline(file.file, createWriteStream(destPath));
+        const stats = await stat(destPath);
+        const checksum = await sha256OfFile(destPath);
+
+        const runId = BackupHistoryModel.createRun({
+          jobId: null,
+          type: "backup",
+          sourceType,
+          sourceRef,
+          target: "local",
+        });
+        BackupHistoryModel.complete(runId, {
+          status: "success",
+          filePath: destPath,
+          sizeBytes: stats.size,
+          checksumSha256: checksum,
+        });
+
+        reply.send({ runId, fileName: safeFileName, sizeBytes: stats.size });
+      } catch (err) {
+        await unlink(destPath).catch(() => {});
+        reply.code(400).send({ error: (err as Error).message });
+      }
+    }
+  );
+
+  // Registers a USB-only archive (no backup_history row — e.g. found via
+  // browseArchives after a fresh install) as a restorable run, reusing the
+  // exact same restore code path unchanged.
+  app.post(
+    "/backups/usb/archives/import",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("backup.usb-archive.import")],
+      schema: {
+        body: { type: "object", required: ["fullPath"], properties: { fullPath: { type: "string" } } },
+      },
+    },
+    async (req, reply) => {
+      const { fullPath } = req.body as { fullPath: string };
+      const valid = await UsbBackupService.validateArchivePath(fullPath);
+      if (!valid) return reply.code(400).send({ error: "path_outside_usb_backup_root" });
+
+      const archives = await UsbBackupService.browseArchives();
+      const archive = archives.find((a) => a.fullPath === fullPath);
+      if (!archive) return reply.code(404).send({ error: "archive_not_found" });
+
+      const sourceType: BackupSourceType = archive.category === "volumes" ? "volume" : archive.category === "db" ? "db" : "path";
+      const stats = await stat(fullPath);
+
+      const runId = BackupHistoryModel.createRun({
+        jobId: null,
+        type: "backup",
+        sourceType,
+        sourceRef: archive.sourceRef,
+        target: "usb",
+      });
+      BackupHistoryModel.complete(runId, {
+        status: "success",
+        filePath: fullPath,
+        sizeBytes: stats.size,
+        usbPath: fullPath,
+      });
+
+      reply.send({ runId });
+    }
+  );
 
   app.get("/backups/gdrive/compare", auth, async (_req, reply) => {
     try {

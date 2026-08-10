@@ -14,6 +14,8 @@ import {
   HelpCircle,
   Info,
   ShieldCheck,
+  RotateCcw,
+  Wrench,
 } from "lucide-react";
 
 export interface NavItem {
@@ -34,7 +36,9 @@ export const navItems: NavItem[] = [
   { to: "/security", label: "Sécurité serveur", icon: ShieldCheck, group: "management" },
   { to: "/applications", label: "Applications", icon: Boxes, group: "ops" },
   { to: "/backups", label: "Backups", icon: DatabaseBackup, group: "ops" },
+  { to: "/restore", label: "Restore", icon: RotateCcw, group: "ops" },
   { to: "/system", label: "System", icon: Activity, group: "ops" },
+  { to: "/services", label: "Services", icon: Wrench, group: "ops" },
   { to: "/help", label: "Aide", icon: HelpCircle, group: "bottom" },
   { to: "/about", label: "À propos", icon: Info, group: "bottom" },
   { to: "/settings", label: "Settings", icon: Settings, group: "bottom" },
