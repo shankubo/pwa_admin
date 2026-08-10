@@ -466,6 +466,26 @@ export default async function backupRoutes(app: FastifyInstance) {
     }
   });
 
+  // Downloads a Drive-only backup (found via /backups/gdrive/compare's
+  // orphanGroups — no local file behind it) into BACKUP_LOCAL_ROOT and
+  // registers it as a restorable backup_history run, closing the gap the
+  // Restore wizard's Drive step used to warn about ("un téléchargement
+  // direct depuis Drive n'est pas encore pris en charge").
+  app.post(
+    "/backups/gdrive/files/:fileId/download",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("backup.gdrive.file.download", (r) => (r.params as any).fileId)],
+    },
+    async (req, reply) => {
+      const { fileId } = req.params as { fileId: string };
+      try {
+        reply.send(await BackupService.importGDriveFile(fileId));
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      }
+    }
+  );
+
   app.delete(
     "/backups/gdrive/files/:fileId",
     { preHandler: [(app as any).requireAuth, withAudit("backup.gdrive.file.delete", (r) => (r.params as any).fileId)] },

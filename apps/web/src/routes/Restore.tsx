@@ -7,6 +7,7 @@ import type {
   UsbBackupArchive,
   BackupUploadResult,
   BackupUploadSourceKind,
+  GDriveComparisonResult,
 } from "@pwa-admin/shared";
 import { apiJson, apiFetch } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
@@ -230,6 +231,7 @@ export function Restore() {
             setSelected(item);
             setStep(3);
           }}
+          onError={setError}
         />
       )}
 
@@ -694,34 +696,121 @@ function ArchiveGroup({
 function StepGDrive({
   history,
   onSelect,
+  onError,
 }: {
   history: BackupHistoryEntry[];
   onSelect: (item: SelectedItem) => void;
+  onError: (message: string) => void;
 }) {
+  const [comparison, setComparison] = useState<GDriveComparisonResult | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiJson<GDriveComparisonResult>("/backups/gdrive/compare")
+      .then(setComparison)
+      .catch(() => setComparison(null));
+  }, []);
+
+  // Only volumes/db/paths are downloadable here — "apps" backups restore
+  // through a separate, more involved flow (ApplicationService) not covered
+  // by the plain local-file restore path this wizard uses.
+  const downloadableGroups = (comparison?.orphanGroups ?? []).filter((g) => g.category !== "apps");
+
+  async function downloadAndSelect(fileId: string, category: string, sourceRef: string) {
+    setDownloadingId(fileId);
+    try {
+      const { runId } = await apiJson<{ runId: string }>(`/backups/gdrive/files/${fileId}/download`, {
+        method: "POST",
+      });
+      const sourceType: BackupHistoryEntry["sourceType"] =
+        category === "volumes" ? "volume" : category === "db" ? "db" : "path";
+      onSelect({
+        kind: "generic",
+        run: {
+          runId,
+          jobId: null,
+          type: "backup",
+          sourceType,
+          sourceRef,
+          target: "gdrive",
+          driveFileId: fileId,
+          usbPath: null,
+          status: "success",
+          sizeBytes: null,
+          checksumSha256: null,
+          durationMs: null,
+          error: null,
+          startedAt: new Date().toISOString(),
+          finishedAt: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      onError((err as Error).message);
+    } finally {
+      setDownloadingId(null);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm text-muted-foreground">Étape 2 — Sauvegardes envoyées sur Google Drive.</p>
-      <p className="text-xs text-muted-foreground">
-        La restauration utilise le fichier local associé à cette sauvegarde — si le fichier local n'existe plus,
-        la restauration échouera (un téléchargement direct depuis Drive n'est pas encore pris en charge).
-      </p>
-      {history.length === 0 && <p className="text-sm text-muted-foreground">Aucune sauvegarde Drive disponible.</p>}
-      {history.map((h) => (
-        <button
-          key={h.runId}
-          type="button"
-          onClick={() => onSelect({ kind: "generic", run: h })}
-          className="rounded-md border border-border p-2 text-left text-sm hover:bg-muted"
-        >
-          <p className="font-medium">
-            {h.sourceType}:{h.sourceRef}
-          </p>
+
+      {history.length === 0 && downloadableGroups.length === 0 && (
+        <p className="text-sm text-muted-foreground">Aucune sauvegarde Drive disponible.</p>
+      )}
+
+      {history.length > 0 && (
+        <>
           <p className="text-xs text-muted-foreground">
-            {new Date(h.startedAt).toLocaleString()}
-            {h.sizeBytes != null ? ` · ${formatBytes(h.sizeBytes)}` : ""}
+            Présentes localement — restauration immédiate à partir du fichier déjà sur ce serveur.
           </p>
-        </button>
-      ))}
+          {history.map((h) => (
+            <button
+              key={h.runId}
+              type="button"
+              onClick={() => onSelect({ kind: "generic", run: h })}
+              className="rounded-md border border-border p-2 text-left text-sm hover:bg-muted"
+            >
+              <p className="font-medium">
+                {h.sourceType}:{h.sourceRef}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {new Date(h.startedAt).toLocaleString()}
+                {h.sizeBytes != null ? ` · ${formatBytes(h.sizeBytes)}` : ""}
+              </p>
+            </button>
+          ))}
+        </>
+      )}
+
+      {downloadableGroups.length > 0 && (
+        <>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Présentes uniquement sur Drive — téléchargez-les sur ce serveur avant de pouvoir les restaurer.
+          </p>
+          {downloadableGroups.map((group) =>
+            group.files.map((f) => (
+              <div key={f.fileId} className="rounded-md border border-border p-2 text-sm">
+                <p className="font-medium">
+                  {group.category}:{group.sourceRef}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {f.fileName} · {formatBytes(f.sizeBytes)} · {new Date(f.modifiedAt).toLocaleString()}
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  disabled={downloadingId === f.fileId}
+                  onClick={() => downloadAndSelect(f.fileId, group.category, group.sourceRef)}
+                >
+                  {downloadingId === f.fileId ? "Téléchargement…" : "Télécharger et restaurer"}
+                </Button>
+              </div>
+            ))
+          )}
+        </>
+      )}
     </div>
   );
 }

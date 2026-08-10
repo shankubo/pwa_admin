@@ -157,6 +157,25 @@ export const GDriveService = {
     await drive.files.delete({ fileId });
   },
 
+  /** Downloads a Drive file's bytes to a local path — the counterpart to
+   * uploadBackupFile, used to pull down a backup that only exists on Drive
+   * (e.g. after wiping local data/ or on a fresh install) so it can be
+   * restored through the normal local-file restore path. */
+  async downloadFile(fileId: string, destPath: string): Promise<{ sizeBytes: number }> {
+    const auth = await getAuthorizedClient();
+    const drive = google.drive({ version: "v3", auth });
+
+    await mkdir(dirname(destPath), { recursive: true });
+    const res = await drive.files.get({ fileId, alt: "media" }, { responseType: "stream" });
+
+    const { pipeline } = await import("node:stream/promises");
+    const { createWriteStream } = await import("node:fs");
+    await pipeline(res.data, createWriteStream(destPath));
+
+    const { size } = await (await import("node:fs/promises")).stat(destPath);
+    return { sizeBytes: size };
+  },
+
   /**
    * Walks the whole backup folder tree on Drive (root/<category>/<sourceRef>/<file>,
    * matching the layout uploadBackupFile creates) and returns every file found.

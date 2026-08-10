@@ -6,7 +6,7 @@ import { docker } from "../../services/docker.client.js";
 import { env } from "../../config/env.js";
 import { BackupHistoryModel, BackupJobModel } from "../../db/models/backup.js";
 import { GDriveService } from "../../services/gdrive.client.js";
-import { UsbBackupService } from "../../services/usbBackup.client.js";
+import { UsbBackupService, sanitizeSegment } from "../../services/usbBackup.client.js";
 import { runCommand } from "../../utils/exec.js";
 import type {
   BackupSourceType,
@@ -374,6 +374,51 @@ export const BackupService = {
 
   async deleteGDriveFile(fileId: string): Promise<void> {
     await GDriveService.deleteFile(fileId);
+  },
+
+  /**
+   * Downloads a Drive-only backup (present in compareWithGDrive's orphanGroups
+   * — no local file, e.g. after wiping data/ or on a fresh install) to
+   * BACKUP_LOCAL_ROOT and registers it as a normal backup_history run, so it
+   * becomes restorable through the exact same local-file restore path as any
+   * other backup. Re-derives category/sourceRef/fileName from Drive's own
+   * listing rather than trusting client-supplied values, so a caller can't
+   * point this at an arbitrary fileId outside the app's own Drive folder tree.
+   */
+  async importGDriveFile(fileId: string): Promise<{ runId: string }> {
+    const driveFiles = await GDriveService.listAllBackupFiles();
+    const file = driveFiles.find((f) => f.fileId === fileId);
+    if (!file) throw new Error("drive_file_not_found");
+    if (file.category === "apps") throw new Error("app_backups_not_downloadable_here");
+
+    const sourceType: BackupSourceType =
+      file.category === "volumes" ? "volume" : file.category === "db" ? "db" : "path";
+
+    const destDir = join(env.BACKUP_LOCAL_ROOT, "gdrive-import", sanitizeSegment(file.sourceRef));
+    await mkdir(destDir, { recursive: true });
+    const destPath = join(destDir, sanitizeSegment(file.fileName.replace(/\.tar\.gz$/, "")) + ".tar.gz");
+
+    const { sizeBytes } = await GDriveService.downloadFile(fileId, destPath);
+    if (sizeBytes !== file.sizeBytes) {
+      await unlink(destPath).catch(() => {});
+      throw new Error("drive_download_size_mismatch");
+    }
+
+    const runId = BackupHistoryModel.createRun({
+      jobId: null,
+      type: "backup",
+      sourceType,
+      sourceRef: file.sourceRef,
+      target: "gdrive",
+    });
+    BackupHistoryModel.complete(runId, {
+      status: "success",
+      filePath: destPath,
+      sizeBytes,
+      driveFileId: fileId,
+    });
+
+    return { runId };
   },
 };
 
