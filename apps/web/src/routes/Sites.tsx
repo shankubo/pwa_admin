@@ -326,7 +326,18 @@ function SiteDuplicateSection({
   }
 
   async function startRefresh() {
-    await apiJson(`/sites/${name}/duplicate`, { method: "POST", body: JSON.stringify({}) });
+    // Reuse the DB the duplicate was originally created with — without this,
+    // a refresh silently drops the database duplication (only content/
+    // container would be recreated), since the backend only duplicates a DB
+    // when dbLocation/dbRef/dbName are all present in the request.
+    await apiJson(`/sites/${name}/duplicate`, {
+      method: "POST",
+      body: JSON.stringify({
+        dbLocation: detail.duplicate?.dbLocation ?? undefined,
+        dbRef: detail.duplicate?.dbRef ?? undefined,
+        dbName: detail.duplicate?.dbName ?? undefined,
+      }),
+    });
     onChanged();
   }
 
@@ -357,10 +368,15 @@ function SiteDuplicateSection({
           )}
           {detail.duplicate.duplicateDbName && <p>Base de données : {detail.duplicate.duplicateDbName}</p>}
           <p>Dernière synchro : {new Date(detail.duplicate.lastSyncedAt).toLocaleString()}</p>
+          <p className="mt-1">
+            Le duplicata est figé au moment de sa création — les modifications faites sur l'original depuis ne s'y
+            reflètent pas automatiquement. "Mettre à jour" refait une copie complète et à jour (fichiers + base de
+            données) à partir de l'original actuel.
+          </p>
 
           <div className="mt-2 flex gap-2">
             <Button size="sm" variant="outline" disabled={detail.failoverActive} onClick={startRefresh}>
-              Rafraîchir
+              Mettre à jour depuis l'original
             </Button>
             <ConfirmDialog
               trigger={
