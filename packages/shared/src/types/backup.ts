@@ -123,6 +123,15 @@ export interface DetectedBindMount {
   containerPath: string;
 }
 
+/** A named Docker volume mounted into a running container — as opposed to
+ * DetectedBindMount, the data lives in Docker's own volume storage, not
+ * directly at a host path the admin picked. */
+export interface DetectedVolumeMount {
+  containerName: string;
+  volumeName: string;
+  containerPath: string;
+}
+
 export type AppBackupRunKind = "full" | "partial";
 
 /**
@@ -137,6 +146,10 @@ export interface Application {
   name: string;
   containerNames: string[];
   paths: string[];
+  /** Named Docker volumes (as opposed to bind-mount paths) backing this app's
+   * containers — e.g. a container using a managed volume rather than a host
+   * directory has no entry in `paths`, only here. */
+  volumeNames: string[];
   dbLocation: "docker" | "native" | null;
   dbRef: string | null;
   targets: BackupTarget[];

@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { ApplicationService, ApplicationModel } from "./application.service.js";
 import { applicationToApiShape, appBackupRunToApiShape, AppBackupRunModel } from "../../db/models/application.js";
 import { BackupService } from "../backup/backup.service.js";
+import { DockerService } from "../docker/docker.service.js";
 import { withAudit } from "../../middleware/auditLog.js";
 import { SchedulerService } from "../../services/scheduler.js";
 import type { AppBackupRunKind, BackupTarget } from "@pwa-admin/shared";
@@ -25,6 +26,7 @@ export default async function applicationRoutes(app: FastifyInstance) {
             name: { type: "string", minLength: 1, maxLength: 100 },
             containerNames: { type: "array", items: { type: "string" } },
             paths: { type: "array", items: { type: "string" } },
+            volumeNames: { type: "array", items: { type: "string" } },
             dbLocation: { type: "string", enum: ["docker", "native"] },
             dbRef: { type: "string" },
             targets: { type: "array", items: { type: "string", enum: ["local", "gdrive", "usb"] } },
@@ -41,6 +43,7 @@ export default async function applicationRoutes(app: FastifyInstance) {
         name: string;
         containerNames: string[];
         paths: string[];
+        volumeNames?: string[];
         dbLocation?: "docker" | "native";
         dbRef?: string;
         targets: BackupTarget[];
@@ -49,9 +52,10 @@ export default async function applicationRoutes(app: FastifyInstance) {
         retentionDays?: number;
         retentionMinCopies?: number;
       };
+      const volumeNames = body.volumeNames ?? [];
 
-      if (body.paths.length === 0 && !body.dbLocation) {
-        return reply.code(400).send({ error: "at_least_one_path_or_database_required" });
+      if (body.paths.length === 0 && volumeNames.length === 0 && !body.dbLocation) {
+        return reply.code(400).send({ error: "at_least_one_path_volume_or_database_required" });
       }
 
       // Every path must be a currently-detected bind mount — never an arbitrary
@@ -61,6 +65,14 @@ export default async function applicationRoutes(app: FastifyInstance) {
       const invalid = body.paths.filter((p) => !validPaths.has(p));
       if (invalid.length > 0) {
         return reply.code(400).send({ error: "paths_not_detected_bind_mounts", invalid });
+      }
+
+      // Same guard for volumes — must match a currently-existing named Docker volume.
+      const volumes = await DockerService.listVolumes();
+      const validVolumes = new Set(volumes.map((v) => v.name));
+      const invalidVolumes = volumeNames.filter((v) => !validVolumes.has(v));
+      if (invalidVolumes.length > 0) {
+        return reply.code(400).send({ error: "volumes_not_detected", invalid: invalidVolumes });
       }
 
       let created;

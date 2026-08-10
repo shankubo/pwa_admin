@@ -7,6 +7,7 @@ import type {
   BackupTarget,
   DetectedDatabase,
   DetectedBindMount,
+  DetectedVolumeMount,
   ContainerSummary,
   UsbStatus,
 } from "@pwa-admin/shared";
@@ -310,6 +311,9 @@ function AppCard({
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             {app.paths.length} chemin{app.paths.length > 1 ? "s" : ""}
+            {app.volumeNames.length > 0 && (
+              <> · {app.volumeNames.length} volume{app.volumeNames.length > 1 ? "s" : ""}</>
+            )}
             {app.dbRef && (
               <>
                 {" · "}
@@ -532,6 +536,8 @@ function NewAppForm({
   );
   const [bindMounts, setBindMounts] = useState<DetectedBindMount[] | null>(null);
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+  const [volumeMounts, setVolumeMounts] = useState<DetectedVolumeMount[] | null>(null);
+  const [selectedVolumes, setSelectedVolumes] = useState<string[]>([]);
   const [detectedDbs, setDetectedDbs] = useState<DetectedDatabase[] | null>(null);
   const [dbValue, setDbValue] = useState("");
   const [targets, setTargets] = useState<BackupTarget[]>(["local"]);
@@ -551,6 +557,9 @@ function NewAppForm({
     apiJson<DetectedBindMount[]>("/backups/bind-mounts")
       .then(setBindMounts)
       .catch(() => setError("Impossible de charger la liste des dossiers montés"));
+    apiJson<DetectedVolumeMount[]>("/backups/volume-mounts")
+      .then(setVolumeMounts)
+      .catch(() => setError("Impossible de charger la liste des volumes Docker"));
     apiJson<DetectedDatabase[]>("/dbbackup/detect")
       .then(setDetectedDbs)
       .catch(() => setDetectedDbs([]));
@@ -570,6 +579,10 @@ function NewAppForm({
     setSelectedPaths((prev) => (prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path]));
   }
 
+  function toggleVolume(volumeName: string) {
+    setSelectedVolumes((prev) => (prev.includes(volumeName) ? prev.filter((v) => v !== volumeName) : [...prev, volumeName]));
+  }
+
   function toggleTarget(t: BackupTarget) {
     setTargets((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
   }
@@ -580,17 +593,28 @@ function NewAppForm({
     return bindMounts.filter((m) => selectedContainers.includes(m.containerName));
   }, [bindMounts, selectedContainers]);
 
+  const visibleVolumeMounts = useMemo(() => {
+    if (!volumeMounts) return [];
+    if (selectedContainers.length === 0) return volumeMounts;
+    return volumeMounts.filter((m) => selectedContainers.includes(m.containerName));
+  }, [volumeMounts, selectedContainers]);
+
   // Drop path selections that fall out of scope when the container selection changes.
   useEffect(() => {
     if (selectedContainers.length === 0) return;
     setSelectedPaths((prev) => prev.filter((p) => visibleMounts.some((m) => m.hostPath === p)));
   }, [visibleMounts, selectedContainers.length]);
 
+  useEffect(() => {
+    if (selectedContainers.length === 0) return;
+    setSelectedVolumes((prev) => prev.filter((v) => visibleVolumeMounts.some((m) => m.volumeName === v)));
+  }, [visibleVolumeMounts, selectedContainers.length]);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!name.trim() || (selectedPaths.length === 0 && !dbValue) || targets.length === 0) {
-      setError("Nom, au moins une cible, et au moins un chemin ou une base de données sont requis");
+    if (!name.trim() || (selectedPaths.length === 0 && selectedVolumes.length === 0 && !dbValue) || targets.length === 0) {
+      setError("Nom, au moins une cible, et au moins un chemin, volume ou une base de données sont requis");
       return;
     }
     setSubmitting(true);
@@ -602,6 +626,7 @@ function NewAppForm({
           name: name.trim(),
           containerNames: selectedContainers,
           paths: selectedPaths,
+          volumeNames: selectedVolumes,
           dbLocation: dbLocation || undefined,
           dbRef: dbRef || undefined,
           targets,
@@ -668,7 +693,7 @@ function NewAppForm({
             {bindMounts && visibleMounts.length === 0 && (
               <p className="text-xs text-muted-foreground">
                 Aucun dossier monté détecté pour cette sélection (conteneur sans données persistées sur disque — ok
-                si une base de données est sélectionnée ci-dessous).
+                si un volume Docker ou une base de données est sélectionné ci-dessous).
               </p>
             )}
             {visibleMounts.map((m) => (
@@ -680,6 +705,34 @@ function NewAppForm({
                 />
                 <span className="truncate">
                   {m.hostPath} <span className="text-xs text-muted-foreground">({m.containerName})</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">
+            Volumes Docker (nommés)
+            {selectedContainers.length > 0 ? " · filtrés par conteneur(s) sélectionné(s)" : ""}
+          </p>
+          <div className="flex flex-col gap-1 rounded-md border border-border p-2">
+            {!volumeMounts && <p className="text-xs text-muted-foreground">Chargement…</p>}
+            {volumeMounts && visibleVolumeMounts.length === 0 && (
+              <p className="text-xs text-muted-foreground">Aucun volume Docker nommé détecté pour cette sélection.</p>
+            )}
+            {visibleVolumeMounts.map((m) => (
+              <label key={`${m.containerName}:${m.volumeName}`} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={selectedVolumes.includes(m.volumeName)}
+                  onChange={() => toggleVolume(m.volumeName)}
+                />
+                <span className="truncate">
+                  {m.volumeName}{" "}
+                  <span className="text-xs text-muted-foreground">
+                    ({m.containerName} → {m.containerPath})
+                  </span>
                 </span>
               </label>
             ))}

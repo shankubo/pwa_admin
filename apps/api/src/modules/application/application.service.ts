@@ -46,6 +46,7 @@ export const ApplicationService = {
   async runBackup(app: ApplicationRow, kind: AppBackupRunKind): Promise<string> {
     const targets = JSON.parse(app.targets) as BackupTarget[];
     const paths = JSON.parse(app.paths) as string[];
+    const volumeNames = JSON.parse(app.volume_names ?? "[]") as string[];
     const root = appSnapshotRoot(app.name);
     await mkdir(root, { recursive: true });
 
@@ -101,7 +102,19 @@ export const ApplicationService = {
         dbSizeBytes = dbRun?.size_bytes ?? 0;
       }
 
-      const sizeBytes = (await dirSize(snapshotDir)) + dbSizeBytes;
+      // Named Docker volumes (as opposed to bind-mount paths) — each already
+      // has its own full tar/gdrive/usb pipeline via BackupService.backupVolume,
+      // same rationale as the DB dump above: run it and fold in the size,
+      // don't duplicate the tar/upload logic here.
+      let volumesSizeBytes = 0;
+      for (const volumeName of volumeNames) {
+        const volumeRunId = await BackupService.backupVolume(volumeName, targets);
+        const { BackupHistoryModel } = await import("../../db/models/backup.js");
+        const volumeRun = BackupHistoryModel.findByRunId(volumeRunId);
+        volumesSizeBytes += volumeRun?.size_bytes ?? 0;
+      }
+
+      const sizeBytes = (await dirSize(snapshotDir)) + dbSizeBytes + volumesSizeBytes;
 
       AppBackupRunModel.complete(runId, {
         status: "success",
@@ -301,6 +314,12 @@ export const ApplicationService = {
         await DbBackupService.restore(app.db_location, app.db_ref!, dbHistoryRow.run_id);
       }
     }
+
+    // Named Docker volumes are NOT restored here: unlike paths/db, this app
+    // run doesn't record which backup_history volume run(s) it triggered, so
+    // there's no reliable way to pick the matching archive automatically.
+    // Restore a volume from the Docker > Volumes screen instead, picking the
+    // archive with the closest timestamp to this app run's startedAt.
   },
 
   async applyRetention(app: ApplicationRow): Promise<void> {

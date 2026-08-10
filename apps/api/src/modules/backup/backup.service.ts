@@ -12,6 +12,7 @@ import type {
   BackupSourceType,
   BackupTarget,
   DetectedBindMount,
+  DetectedVolumeMount,
   GDriveComparisonResult,
   OrphanDriveFile,
   DriveVerificationEntry,
@@ -68,6 +69,24 @@ export const BackupService = {
       for (const m of info.Mounts ?? []) {
         if (m.Type === "bind" && m.Source !== "/var/run/docker.sock") {
           mounts.push({ containerName, hostPath: m.Source, containerPath: m.Destination });
+        }
+      }
+    }
+    return mounts;
+  },
+
+  /** Same idea as detectBindMounts, but for named Docker volumes — a
+   * container using a managed volume rather than a host directory has no
+   * entry in detectBindMounts, only here. */
+  async detectVolumeMounts(): Promise<DetectedVolumeMount[]> {
+    const containers = await docker.listContainers({ all: false });
+    const mounts: DetectedVolumeMount[] = [];
+    for (const c of containers) {
+      const containerName = c.Names[0]?.replace(/^\//, "") ?? c.Id.slice(0, 12);
+      const info = await docker.getContainer(c.Id).inspect();
+      for (const m of info.Mounts ?? []) {
+        if (m.Type === "volume" && m.Name) {
+          mounts.push({ containerName, volumeName: m.Name, containerPath: m.Destination });
         }
       }
     }

@@ -218,6 +218,15 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    id: 9,
+    name: "applications_volume_names",
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE applications ADD COLUMN volume_names TEXT NOT NULL DEFAULT '[]';
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

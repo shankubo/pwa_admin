@@ -14,6 +14,7 @@ export interface ApplicationRow {
   name: string;
   container_names: string;
   paths: string;
+  volume_names: string;
   db_location: string | null;
   db_ref: string | null;
   targets: string;
@@ -53,6 +54,7 @@ export function applicationToApiShape(row: ApplicationRow): Application {
     name: row.name,
     containerNames: JSON.parse(row.container_names),
     paths: JSON.parse(row.paths),
+    volumeNames: JSON.parse(row.volume_names),
     dbLocation: (row.db_location as "docker" | "native" | null) ?? null,
     dbRef: row.db_ref,
     targets: JSON.parse(row.targets) as BackupTarget[],
@@ -91,6 +93,7 @@ export const ApplicationModel = {
     name: string;
     containerNames: string[];
     paths: string[];
+    volumeNames?: string[];
     dbLocation?: "docker" | "native" | null;
     dbRef?: string | null;
     targets: BackupTarget[];
@@ -102,13 +105,14 @@ export const ApplicationModel = {
     const result = db
       .prepare(
         `INSERT INTO applications
-         (name, container_names, paths, db_location, db_ref, targets, schedule_full_cron, schedule_partial_cron, retention_days, retention_min_copies)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (name, container_names, paths, volume_names, db_location, db_ref, targets, schedule_full_cron, schedule_partial_cron, retention_days, retention_min_copies)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         input.name,
         JSON.stringify(input.containerNames),
         JSON.stringify(input.paths),
+        JSON.stringify(input.volumeNames ?? []),
         input.dbLocation ?? null,
         input.dbRef ?? null,
         JSON.stringify(input.targets),
@@ -134,6 +138,7 @@ export const ApplicationModel = {
       name: string;
       containerNames: string[];
       paths: string[];
+      volumeNames: string[];
       dbLocation: "docker" | "native" | null;
       dbRef: string | null;
       targets: BackupTarget[];
@@ -147,7 +152,7 @@ export const ApplicationModel = {
     if (!current) return;
     db.prepare(
       `UPDATE applications SET
-        name = ?, container_names = ?, paths = ?, db_location = ?, db_ref = ?,
+        name = ?, container_names = ?, paths = ?, volume_names = ?, db_location = ?, db_ref = ?,
         targets = ?, schedule_full_cron = ?, schedule_partial_cron = ?,
         retention_days = ?, retention_min_copies = ?, updated_at = datetime('now')
        WHERE id = ?`
@@ -155,6 +160,7 @@ export const ApplicationModel = {
       fields.name ?? current.name,
       fields.containerNames ? JSON.stringify(fields.containerNames) : current.container_names,
       fields.paths ? JSON.stringify(fields.paths) : current.paths,
+      fields.volumeNames ? JSON.stringify(fields.volumeNames) : current.volume_names,
       fields.dbLocation !== undefined ? fields.dbLocation : current.db_location,
       fields.dbRef !== undefined ? fields.dbRef : current.db_ref,
       fields.targets ? JSON.stringify(fields.targets) : current.targets,

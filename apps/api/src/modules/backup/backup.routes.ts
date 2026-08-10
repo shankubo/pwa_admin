@@ -19,6 +19,10 @@ export default async function backupRoutes(app: FastifyInstance) {
     reply.send(await BackupService.detectBindMounts());
   });
 
+  app.get("/backups/volume-mounts", auth, async (_req, reply) => {
+    reply.send(await BackupService.detectVolumeMounts());
+  });
+
   // One-off backup/restore, no persisted job needed — used by the quick
   // "Sauvegarder"/"Restaurer" buttons directly on the Docker volumes list.
   app.post(
