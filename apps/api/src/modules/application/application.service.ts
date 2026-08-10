@@ -85,18 +85,23 @@ export const ApplicationService = {
 
       let dbDumpPath: string | undefined;
       let dbDriveFileId: string | undefined;
+      let dbSizeBytes = 0;
       if (app.db_location === "docker" || app.db_location === "native") {
         // DB is always a full dump, even inside a "partial" app run — dumps are
         // cheap relative to file trees and there's no simple incremental dump
-        // path without configuring binlog replication.
+        // path without configuring binlog replication. dumpDocker/dumpNative
+        // already handle the gdrive/usb legs themselves (same `targets`), so
+        // there's no need to re-upload/re-copy the dump file below — only its
+        // size needs folding into this app run's total.
         const dbRunId = await DbBackupService.dump(app.db_location, app.db_ref!, targets);
         const { BackupHistoryModel } = await import("../../db/models/backup.js");
         const dbRun = BackupHistoryModel.findByRunId(dbRunId);
         dbDumpPath = dbRun?.file_path ?? undefined;
         dbDriveFileId = dbRun?.drive_file_id ?? undefined;
+        dbSizeBytes = dbRun?.size_bytes ?? 0;
       }
 
-      const sizeBytes = await dirSize(snapshotDir);
+      const sizeBytes = (await dirSize(snapshotDir)) + dbSizeBytes;
 
       AppBackupRunModel.complete(runId, {
         status: "success",
@@ -114,7 +119,7 @@ export const ApplicationService = {
       // blocks or misrepresents the local backup's own success. Set "pending"
       // synchronously so the UI reflects the intent to upload immediately,
       // before the (fire-and-forget) tar/upload work actually starts.
-      if (targets.includes("gdrive") && GDriveService.isEnabled()) {
+      if (paths.length > 0 && targets.includes("gdrive") && GDriveService.isEnabled()) {
         AppBackupRunModel.setDriveUploadStatus(runId, "pending");
         this.uploadSnapshotToDrive(app, runId, snapshotDir, paths).catch(() => {});
       }
@@ -208,6 +213,15 @@ export const ApplicationService = {
     snapshotDir: string,
     paths: string[]
   ): Promise<void> {
+    // No file paths to compress (a DB-only app, e.g.) — the DB dump's own USB
+    // copy (via DbBackupService.dump above) already covers this run's USB
+    // leg, so there's nothing left to do here. "none" (rather than "success"
+    // with an empty list) avoids implying a copy happened when it didn't.
+    if (paths.length === 0) {
+      AppBackupRunModel.setUsbCopyStatus(runId, "none");
+      return;
+    }
+
     if (!(await UsbBackupService.isAvailable())) {
       AppBackupRunModel.setUsbCopyStatus(runId, "none");
       return;
