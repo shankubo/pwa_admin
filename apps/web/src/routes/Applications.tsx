@@ -8,13 +8,14 @@ import type {
   DetectedDatabase,
   DetectedBindMount,
   ContainerSummary,
+  UsbStatus,
 } from "@pwa-admin/shared";
 import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatBytes } from "./Docker";
-import { Boxes, Trash2, Database, Cloud, HardDrive, Info, ChevronDown, ChevronUp, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Boxes, Trash2, Database, Cloud, HardDrive, Info, ChevronDown, ChevronUp, Loader2, CheckCircle2, XCircle, Usb } from "lucide-react";
 
 interface CronPreset {
   label: string;
@@ -535,6 +536,7 @@ function NewAppForm({
   const [dbValue, setDbValue] = useState("");
   const [targets, setTargets] = useState<BackupTarget[]>(["local"]);
   const [gdriveAuthorized, setGdriveAuthorized] = useState(false);
+  const [usbAvailable, setUsbAvailable] = useState(false);
   const [scheduleFullCron, setScheduleFullCron] = useState("");
   const [schedulePartialCron, setSchedulePartialCron] = useState("");
   const [retentionDays, setRetentionDays] = useState("");
@@ -555,6 +557,9 @@ function NewAppForm({
     apiJson<{ authorized: boolean }>("/backups/gdrive/status")
       .then((s) => setGdriveAuthorized(s.authorized))
       .catch(() => setGdriveAuthorized(false));
+    apiJson<UsbStatus>("/backups/usb/status")
+      .then((s) => setUsbAvailable(s.available))
+      .catch(() => setUsbAvailable(false));
   }, []);
 
   function toggleContainer(name: string) {
@@ -613,6 +618,8 @@ function NewAppForm({
         setError(
           "Un ou plusieurs chemins sélectionnés ne correspondent plus à un dossier monté détecté. Rafraîchissez la liste et réessayez."
         );
+      } else if (message === "application_name_already_exists") {
+        setError("Une application avec ce nom existe déjà. Choisissez un autre nom ou modifiez l'application existante.");
       } else {
         setError(message);
       }
@@ -709,6 +716,16 @@ function NewAppForm({
             />
             <Cloud className="h-3.5 w-3.5" /> gdrive
             {!gdriveAuthorized && <span className="text-xs text-muted-foreground">(non connecté)</span>}
+          </label>
+          <label className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={targets.includes("usb")}
+              onChange={() => toggleTarget("usb")}
+              disabled={!usbAvailable}
+            />
+            <Usb className="h-3.5 w-3.5" /> usb
+            {!usbAvailable && <span className="text-xs text-muted-foreground">(aucun disque détecté)</span>}
           </label>
         </div>
 

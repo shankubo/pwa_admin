@@ -63,7 +63,15 @@ export default async function applicationRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: "paths_not_detected_bind_mounts", invalid });
       }
 
-      const created = ApplicationModel.create(body);
+      let created;
+      try {
+        created = ApplicationModel.create(body);
+      } catch (err) {
+        if ((err as { code?: string }).code === "SQLITE_CONSTRAINT_UNIQUE") {
+          return reply.code(409).send({ error: "application_name_already_exists" });
+        }
+        throw err;
+      }
       if (body.scheduleFullCron) {
         SchedulerService.registerAppBackup(created.id, "full", body.scheduleFullCron);
       }
