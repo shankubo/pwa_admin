@@ -5,6 +5,7 @@ import type {
   AppBackupRun,
   AppBackupRunKind,
   BackupTarget,
+  BackupHistoryEntry,
   DetectedDatabase,
   DetectedBindMount,
   DetectedVolumeMount,
@@ -351,8 +352,93 @@ function AppCard({
         </div>
       </div>
 
-      {expanded && <AppRunHistory appId={app.id} />}
+      {expanded && (
+        <>
+          <AppRunHistory appId={app.id} />
+          <AppImageHistory appId={app.id} containerNames={app.containerNames} />
+        </>
+      )}
     </Card>
+  );
+}
+
+/**
+ * Lists saved container image archives (docker save) per container, with a
+ * restore action per archive. Separate from AppRunHistory's own "Restaurer"
+ * (which only covers paths/DB) since an app run can implicate several
+ * containers' images at once — the admin picks which one to roll back.
+ */
+function AppImageHistory({ appId, containerNames }: { appId: number; containerNames: string[] }) {
+  const [historyByContainer, setHistoryByContainer] = useState<Record<string, BackupHistoryEntry[]>>({});
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all(
+      containerNames.map((name) =>
+        apiJson<BackupHistoryEntry[]>(`/backups/images/${encodeURIComponent(name)}/history`).then(
+          (rows) => [name, rows] as const
+        )
+      )
+    )
+      .then((entries) => setHistoryByContainer(Object.fromEntries(entries)))
+      .catch((err) => setError((err as Error).message));
+  }, [containerNames.join(",")]);
+
+  async function restoreImage(containerName: string, run: BackupHistoryEntry) {
+    await apiJson(`/applications/${appId}/restore-image`, {
+      method: "POST",
+      body: JSON.stringify({ containerName, runId: run.runId, confirm: true }),
+    });
+  }
+
+  const hasAny = Object.values(historyByContainer).some((rows) => rows.length > 0);
+  if (!hasAny && !error) return null;
+
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <p className="mb-2 text-xs font-semibold text-muted-foreground">Images de conteneur sauvegardées</p>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      {containerNames.map((name) => {
+        const rows = historyByContainer[name] ?? [];
+        if (rows.length === 0) return null;
+        return (
+          <div key={name} className="mb-2">
+            <p className="text-xs font-medium">{name}</p>
+            <div className="mt-1 flex flex-col gap-1">
+              {rows.map((run) => (
+                <div key={run.runId} className="flex items-center justify-between rounded-md border border-border p-2 text-xs">
+                  <div className="min-w-0">
+                    <p>
+                      {new Date(run.startedAt).toLocaleString()}
+                      {run.sizeBytes != null ? ` · ${formatBytes(run.sizeBytes)}` : ""}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {run.status}
+                      {run.driveFileId ? " + gdrive" : ""}
+                      {run.usbPath ? " + usb" : ""}
+                    </p>
+                  </div>
+                  {run.status === "success" && (
+                    <ConfirmDialog
+                      trigger={
+                        <Button size="sm" variant="destructive">
+                          Restaurer
+                        </Button>
+                      }
+                      title={`Restaurer l'image de ${name} ?`}
+                      description="Le conteneur sera arrêté, supprimé et recréé depuis cette image sauvegardée. Action irréversible."
+                      requireTypedConfirmation="RESTORE"
+                      confirmLabel="Restaurer"
+                      onConfirm={() => restoreImage(name, run)}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

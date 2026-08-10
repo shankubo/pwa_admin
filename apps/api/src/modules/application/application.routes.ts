@@ -187,4 +187,42 @@ export default async function applicationRoutes(app: FastifyInstance) {
       reply.send({ ok: true });
     }
   );
+
+  // Distinct from /restore above: an app can have several containers, so the
+  // admin picks which one's image to restore (from that container's own
+  // backup_history "image" runs, browsed via the existing history endpoints).
+  app.post(
+    "/applications/:id/restore-image",
+    {
+      preHandler: [
+        (app as any).requireAuth,
+        withAudit("application.restore-image", (r) => (r.body as any)?.containerName),
+      ],
+      schema: {
+        body: {
+          type: "object",
+          required: ["containerName", "runId", "confirm"],
+          properties: {
+            containerName: { type: "string" },
+            runId: { type: "string" },
+            confirm: { type: "boolean", const: true },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      const { containerName, runId } = req.body as { containerName: string; runId: string };
+      const application = ApplicationModel.findById(Number(id));
+      if (!application) return reply.code(404).send({ error: "application_not_found" });
+
+      const containerNames = JSON.parse(application.container_names) as string[];
+      if (!containerNames.includes(containerName)) {
+        return reply.code(400).send({ error: "container_not_part_of_application" });
+      }
+
+      await ApplicationService.restoreContainerImage(containerName, runId);
+      reply.send({ ok: true });
+    }
+  );
 }

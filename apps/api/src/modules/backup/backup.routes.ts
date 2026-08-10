@@ -58,6 +58,14 @@ export default async function backupRoutes(app: FastifyInstance) {
     reply.send(rows.map(backupHistoryToApiShape));
   });
 
+  app.get("/backups/images/:containerName/history", auth, async (req, reply) => {
+    const { containerName } = req.params as { containerName: string };
+    const rows = BackupHistoryModel.list(500, 0).filter(
+      (r) => r.source_type === "image" && r.source_ref === containerName
+    );
+    reply.send(rows.map(backupHistoryToApiShape));
+  });
+
   app.post(
     "/backups/jobs",
     {

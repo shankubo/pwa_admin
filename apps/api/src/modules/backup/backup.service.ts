@@ -265,7 +265,8 @@ export const BackupService = {
   },
 
   async applyRetention(sourceType: BackupSourceType, sourceRef: string): Promise<void> {
-    const subDir = sourceType === "volume" ? "volumes" : sourceType === "path" ? "paths" : "db";
+    const subDir =
+      sourceType === "volume" ? "volumes" : sourceType === "path" ? "paths" : sourceType === "image" ? "images" : "db";
     const dir = join(env.BACKUP_LOCAL_ROOT, subDir, sourceRef);
 
     let files: string[];

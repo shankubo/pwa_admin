@@ -1,4 +1,4 @@
-export type BackupSourceType = "volume" | "db" | "path";
+export type BackupSourceType = "volume" | "db" | "path" | "image";
 export type BackupTarget = "local" | "gdrive" | "usb";
 export type BackupRunType = "backup" | "restore" | "pre-restore-snapshot";
 export type BackupRunStatus = "pending" | "running" | "success" | "failed";

@@ -1,7 +1,10 @@
 import { mkdir, stat, readdir, rm } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
 import { join, basename } from "node:path";
+import { createGzip } from "node:zlib";
 import { env } from "../../config/env.js";
 import { runCommand } from "../../utils/exec.js";
+import { docker } from "../../services/docker.client.js";
 import { AppBackupRunModel, ApplicationModel, type ApplicationRow } from "../../db/models/application.js";
 import { GDriveService } from "../../services/gdrive.client.js";
 import { UsbBackupService } from "../../services/usbBackup.client.js";
@@ -114,7 +117,24 @@ export const ApplicationService = {
         volumesSizeBytes += volumeRun?.size_bytes ?? 0;
       }
 
-      const sizeBytes = (await dirSize(snapshotDir)) + dbSizeBytes + volumesSizeBytes;
+      // Container images — full runs only. Unlike files/volumes, an image
+      // doesn't change incrementally between runs (it's replaced wholesale on
+      // redeploy), and a `docker save` of a multi-hundred-MB image on every
+      // partial run (e.g. daily) would be wasted disk/time for no benefit:
+      // the image is byte-identical until the next deploy.
+      let imagesSizeBytes = 0;
+      const containerNames = JSON.parse(app.container_names) as string[];
+      if (kind === "full") {
+        for (const containerName of containerNames) {
+          const imageRunId = await this.backupContainerImage(containerName, targets).catch(() => null);
+          if (!imageRunId) continue;
+          const { BackupHistoryModel } = await import("../../db/models/backup.js");
+          const imageRun = BackupHistoryModel.findByRunId(imageRunId);
+          imagesSizeBytes += imageRun?.size_bytes ?? 0;
+        }
+      }
+
+      const sizeBytes = (await dirSize(snapshotDir)) + dbSizeBytes + volumesSizeBytes + imagesSizeBytes;
 
       AppBackupRunModel.complete(runId, {
         status: "success",
@@ -151,6 +171,147 @@ export const ApplicationService = {
       AppBackupRunModel.complete(runId, { status: "failed", error: (err as Error).message });
       throw err;
     }
+  },
+
+  /**
+   * Exports a container's image (`docker save` equivalent) so the app can be
+   * fully recreated even if the source image is later lost — rebuilt from a
+   * different commit, removed by image pruning, or the box is rebuilt from
+   * scratch. Complements the volume/DB backups above, which only cover data,
+   * not the code+runtime that reads it.
+   */
+  async backupContainerImage(containerName: string, targets: BackupTarget[]): Promise<string> {
+    const container = docker.getContainer(containerName);
+    const info = await container.inspect();
+    const imageRef = info.Config.Image;
+
+    const { BackupHistoryModel } = await import("../../db/models/backup.js");
+    const runId = BackupHistoryModel.createRun({
+      jobId: null,
+      type: "backup",
+      sourceType: "image",
+      sourceRef: containerName,
+      target: targets[0] ?? "local",
+    });
+
+    const start = Date.now();
+    try {
+      const destDir = join(env.BACKUP_LOCAL_ROOT, "images", containerName);
+      await mkdir(destDir, { recursive: true });
+      const fileName = `${timestampSlug()}.tar.gz`;
+      const filePath = join(destDir, fileName);
+
+      const image = docker.getImage(imageRef);
+      const stream = await image.get();
+      const gzip = createGzip();
+      const out = createWriteStream(filePath);
+
+      await new Promise<void>((resolve, reject) => {
+        stream.pipe(gzip).pipe(out);
+        out.on("finish", resolve);
+        out.on("error", reject);
+        stream.on("error", reject);
+      });
+
+      const stats = await stat(filePath);
+      const { createHash } = await import("node:crypto");
+      const { readFile } = await import("node:fs/promises");
+      const checksum = createHash("sha256").update(await readFile(filePath)).digest("hex");
+
+      let driveFileId: string | undefined;
+      if (targets.includes("gdrive") && GDriveService.isEnabled()) {
+        const uploaded = await GDriveService.uploadBackupFile(filePath, "apps", `image-${containerName}`);
+        const verified = await GDriveService.verifyUpload(uploaded.fileId, stats.size);
+        if (verified) driveFileId = uploaded.fileId;
+      }
+
+      let usbPath: string | undefined;
+      if (targets.includes("usb")) {
+        try {
+          if (await UsbBackupService.isAvailable()) {
+            const copied = await UsbBackupService.copyBackupFile(filePath, "paths", `image-${containerName}`);
+            usbPath = copied.usbPath;
+          }
+        } catch {
+          // Same rationale as elsewhere: don't fail the whole run over the USB leg.
+        }
+      }
+
+      BackupHistoryModel.complete(runId, {
+        status: "success",
+        filePath,
+        sizeBytes: stats.size,
+        checksumSha256: checksum,
+        driveFileId,
+        usbPath,
+        durationMs: Date.now() - start,
+      });
+
+      await BackupService.applyRetention("image", containerName);
+      return runId;
+    } catch (err) {
+      BackupHistoryModel.complete(runId, {
+        status: "failed",
+        error: (err as Error).message,
+        durationMs: Date.now() - start,
+      });
+      throw err;
+    }
+  },
+
+  /**
+   * Restores a container from a saved image archive (`docker load` +
+   * recreate). The container is stopped/removed and recreated from the
+   * loaded image with the same name/config it had at inspect time — volumes
+   * and networks it was attached to are preserved since they're referenced
+   * by name, not recreated here.
+   */
+  async restoreContainerImage(containerName: string, runId: string): Promise<void> {
+    const { BackupHistoryModel } = await import("../../db/models/backup.js");
+    const run = BackupHistoryModel.findByRunId(runId);
+    if (!run || !run.file_path) throw new Error("backup_run_not_found");
+
+    const container = docker.getContainer(containerName);
+    const info = await container.inspect();
+    const previousConfig = info;
+
+    const { createReadStream } = await import("node:fs");
+    const { createGunzip } = await import("node:zlib");
+    const gunzip = createGunzip();
+    const tarStream = createReadStream(run.file_path).pipe(gunzip);
+    const loadStream = await docker.loadImage(tarStream);
+    await new Promise<void>((resolve, reject) => {
+      docker.modem.followProgress(loadStream, (err: Error | null) => (err ? reject(err) : resolve()));
+    });
+
+    const wasRunning = previousConfig.State.Running;
+
+    // Create the replacement under a temporary name FIRST, before touching the
+    // live container — if createContainer throws (bad config, name clash,
+    // etc.), the original container is untouched and the app stays up. This
+    // works even when the container publishes a host port (e.g. ima-app on
+    // 3000): create() alone doesn't bind the port, only start() does, and the
+    // old container isn't stopped until after create() has already succeeded.
+    const tempName = `${containerName}-restore-${Date.now()}`;
+    const recreated = await docker.createContainer({
+      name: tempName,
+      Image: previousConfig.Config.Image,
+      Env: previousConfig.Config.Env,
+      Cmd: previousConfig.Config.Cmd,
+      Entrypoint: previousConfig.Config.Entrypoint,
+      ExposedPorts: previousConfig.Config.ExposedPorts,
+      Labels: previousConfig.Config.Labels,
+      HostConfig: previousConfig.HostConfig,
+      NetworkingConfig: {
+        EndpointsConfig: previousConfig.NetworkSettings.Networks,
+      },
+    });
+
+    await container.stop().catch(() => {});
+    await container.remove();
+    await recreated.rename({ name: containerName });
+
+    if (wasRunning) await recreated.start();
   },
 
   /**
