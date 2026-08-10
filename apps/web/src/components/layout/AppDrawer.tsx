@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 import { X } from "lucide-react";
 import { navItems } from "./navItems";
 import { cn } from "@/lib/utils";
+import { useHostname } from "@/lib/useHostname";
 
 interface AppDrawerProps {
   open: boolean;
@@ -37,6 +38,8 @@ function NavGroup({ group, onNavigate }: { group: "top" | "management" | "ops" |
 }
 
 export function AppDrawer({ open, onOpenChange }: AppDrawerProps) {
+  const hostname = useHostname();
+
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -47,7 +50,10 @@ export function AppDrawer({ open, onOpenChange }: AppDrawerProps) {
           aria-describedby={undefined}
         >
           <div className="flex items-center justify-between">
-            <Dialog.Title className="text-lg font-semibold">Server Admin</Dialog.Title>
+            <div>
+              <Dialog.Title className="text-lg font-semibold">Server Admin</Dialog.Title>
+              {hostname && <p className="text-xs text-muted-foreground">{hostname}</p>}
+            </div>
             <Dialog.Close className="rounded-md p-1 hover:bg-muted">
               <X className="h-5 w-5" />
             </Dialog.Close>

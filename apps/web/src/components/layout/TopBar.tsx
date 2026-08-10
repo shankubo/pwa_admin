@@ -1,7 +1,9 @@
+import { useEffect } from "react";
 import { Menu, Bell } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { navItems } from "./navItems";
 import { ServerSwitcher } from "./ServerSwitcher";
+import { useHostname } from "@/lib/useHostname";
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -11,6 +13,12 @@ interface TopBarProps {
 export function TopBar({ onMenuClick, alertCount = 0 }: TopBarProps) {
   const location = useLocation();
   const current = navItems.find((i) => (i.to === "/" ? location.pathname === "/" : location.pathname.startsWith(i.to)));
+  const hostname = useHostname();
+  const pageLabel = current?.label ?? "Server Admin";
+
+  useEffect(() => {
+    document.title = hostname ? `${pageLabel} — ${hostname}` : pageLabel;
+  }, [pageLabel, hostname]);
 
   return (
     <header
@@ -25,7 +33,10 @@ export function TopBar({ onMenuClick, alertCount = 0 }: TopBarProps) {
       >
         <Menu className="h-6 w-6" />
       </button>
-      <h1 className="text-base font-semibold">{current?.label ?? "Server Admin"}</h1>
+      <div className="flex flex-col items-center leading-tight">
+        <h1 className="text-base font-semibold">{pageLabel}</h1>
+        {hostname && <span className="text-[11px] text-muted-foreground">{hostname}</span>}
+      </div>
       <div className="flex items-center gap-1">
         <ServerSwitcher />
         <button

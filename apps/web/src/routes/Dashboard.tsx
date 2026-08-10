@@ -4,6 +4,7 @@ import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { useWsChannel } from "@/lib/ws";
 import { formatBytes } from "./Docker";
+import { useHostname } from "@/lib/useHostname";
 import { AlertTriangle, Cpu, Thermometer, HardDrive, MemoryStick, Usb, CheckCircle2 } from "lucide-react";
 
 function GaugeCard({
@@ -45,6 +46,7 @@ export function Dashboard() {
   const [stats, setStats] = useState<SystemStatsSnapshot | null>(null);
   const [alerts, setAlerts] = useState<SystemAlert[]>([]);
   const [usb, setUsb] = useState<UsbStatus | null>(null);
+  const hostname = useHostname();
 
   useWsChannel("sys.stats", (frame) => setStats(frame.data as SystemStatsSnapshot));
   useWsChannel("sys.alerts", (frame) => setAlerts(frame.data as SystemAlert[]));
@@ -121,7 +123,8 @@ export function Dashboard() {
 
       <Card>
         <CardTitle>Système</CardTitle>
-        <p className="text-sm">{stats ? `${stats.os.distro} — noyau ${stats.os.kernel}` : "…"}</p>
+        {hostname && <p className="text-sm font-medium">{hostname}</p>}
+        <p className="text-sm text-muted-foreground">{stats ? `${stats.os.distro} — noyau ${stats.os.kernel}` : "…"}</p>
       </Card>
     </div>
   );
