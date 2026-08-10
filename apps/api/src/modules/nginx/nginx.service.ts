@@ -8,7 +8,7 @@ import { db } from "../../db/index.js";
 import { env } from "../../config/env.js";
 import { runCommand, ExecError } from "../../utils/exec.js";
 import { GDriveService } from "../../services/gdrive.client.js";
-import { parseVhostSummary, applyMaintenanceMode } from "./nginx.parser.js";
+import { parseVhostSummary, applyMaintenanceMode, applyFailoverRewrite } from "./nginx.parser.js";
 import type {
   NginxStatus,
   NginxVhostSummary,
@@ -70,6 +70,13 @@ async function resolveActiveVhostPath(name: string): Promise<string> {
     if (!stats.isSymbolicLink()) return enabledPath;
   }
   return resolveVhostPath(env.NGINX_SITES_AVAILABLE, name);
+}
+
+/** Swaps only the port in a proxy_pass target (e.g. http://127.0.0.1:3000 ->
+ * http://127.0.0.1:3001) for the duplicate container's port, leaving the
+ * scheme/host/path untouched. */
+function rewriteProxyPassPort(proxyPassTarget: string, newPort: number): string {
+  return proxyPassTarget.replace(/:(\d+)(\/|$)/, `:${newPort}$2`);
 }
 
 export const NginxService = {
@@ -185,6 +192,7 @@ export const NginxService = {
    */
   async enableMaintenance(name: string): Promise<void> {
     if (this.isInMaintenance(name)) return;
+    if (this.isSwitchedToDuplicate(name)) throw new Error("vhost_switched_to_duplicate");
     const path = await resolveActiveVhostPath(name);
     if (!existsSync(path)) throw new Error("vhost_not_found");
 
@@ -245,6 +253,103 @@ export const NginxService = {
     if (!test.ok) throw new Error(`nginx_test_failed: ${test.output}`);
 
     db.prepare("DELETE FROM vhost_maintenance WHERE vhost_name = ?").run(name);
+    await this.reload();
+  },
+
+  isSwitchedToDuplicate(name: string): boolean {
+    const row = db.prepare("SELECT 1 FROM vhost_failover WHERE vhost_name = ?").get(name);
+    return !!row;
+  },
+
+  /**
+   * Manual, reversible disaster-recovery switch: rewrites the vhost's root
+   * and/or proxy_pass to point at its duplicate (created via
+   * SiteDuplicateService), so all traffic routes there instead — e.g. when
+   * the primary site/app is broken. Structurally mirrors enableMaintenance:
+   * snapshot before rewrite, tmp-file-then-sudo-cp write, test-before-reload,
+   * revert-on-test-failure. switchToPrimary() is the inverse, mirroring
+   * disableMaintenance's "restore exactly the tracked snapshot" behavior.
+   */
+  async switchToDuplicate(name: string): Promise<void> {
+    if (this.isSwitchedToDuplicate(name)) return;
+    if (this.isInMaintenance(name)) throw new Error("vhost_in_maintenance");
+
+    const duplicateRow = db
+      .prepare(
+        "SELECT content_path as contentPath, duplicate_port as duplicatePort, status FROM site_duplicates WHERE vhost_name = ?"
+      )
+      .get(name) as { contentPath: string | null; duplicatePort: number | null; status: string } | undefined;
+    if (!duplicateRow) throw new Error("no_duplicate_found");
+    if (duplicateRow.status !== "ready") throw new Error("duplicate_not_ready");
+
+    const path = await resolveActiveVhostPath(name);
+    if (!existsSync(path)) throw new Error("vhost_not_found");
+
+    const original = await readFile(path, "utf8");
+    const vhost = parseVhostSummary(name, original, true);
+
+    await mkdir(env.NGINX_CONFIG_BACKUP_DIR, { recursive: true });
+    const snapshotName = `${name}.${Date.now()}.bak`;
+    const snapshotPath = join(env.NGINX_CONFIG_BACKUP_DIR, snapshotName);
+    await copyFile(path, snapshotPath);
+    const snapshotResult = db
+      .prepare("INSERT INTO nginx_config_history (vhost_name, snapshot_path) VALUES (?, ?)")
+      .run(name, snapshotPath);
+    const snapshotId = Number(snapshotResult.lastInsertRowid);
+
+    const newProxyPass =
+      vhost.proxyPassTarget && duplicateRow.duplicatePort != null
+        ? rewriteProxyPassPort(vhost.proxyPassTarget, duplicateRow.duplicatePort)
+        : undefined;
+    const rewritten = applyFailoverRewrite(original, {
+      newRoot: vhost.root && duplicateRow.contentPath ? duplicateRow.contentPath : undefined,
+      newProxyPass,
+    });
+
+    const tmpPath = join(env.NGINX_CONFIG_BACKUP_DIR, `${name}.failover-${Date.now()}`);
+    await writeFile(tmpPath, rewritten, "utf8");
+    await runCommand("sudo", ["cp", tmpPath, path], { timeoutMs: 5000 });
+    await rm(tmpPath, { force: true });
+
+    const test = await this.testConfig();
+    if (!test.ok) {
+      const revertTmp = join(env.NGINX_CONFIG_BACKUP_DIR, `${name}.revert-${Date.now()}`);
+      await writeFile(revertTmp, original, "utf8");
+      await runCommand("sudo", ["cp", revertTmp, path], { timeoutMs: 5000 });
+      await rm(revertTmp, { force: true });
+      throw new Error(`nginx_test_failed: ${test.output}`);
+    }
+
+    db.prepare(
+      "INSERT INTO vhost_failover (vhost_name, snapshot_id) VALUES (?, ?) ON CONFLICT(vhost_name) DO UPDATE SET snapshot_id = excluded.snapshot_id, switched_at = datetime('now')"
+    ).run(name, snapshotId);
+
+    await this.reload();
+  },
+
+  async switchToPrimary(name: string): Promise<void> {
+    const row = db
+      .prepare("SELECT snapshot_id as snapshotId FROM vhost_failover WHERE vhost_name = ?")
+      .get(name) as { snapshotId: number } | undefined;
+    if (!row) throw new Error("vhost_not_switched_to_duplicate");
+
+    const snapshot = db
+      .prepare("SELECT snapshot_path as snapshotPath FROM nginx_config_history WHERE id = ?")
+      .get(row.snapshotId) as { snapshotPath: string } | undefined;
+    if (!snapshot) throw new Error("snapshot_not_found");
+
+    const original = await readFile(snapshot.snapshotPath, "utf8");
+    const path = await resolveActiveVhostPath(name);
+
+    const tmpPath = join(env.NGINX_CONFIG_BACKUP_DIR, `${name}.restore-${Date.now()}`);
+    await writeFile(tmpPath, original, "utf8");
+    await runCommand("sudo", ["cp", tmpPath, path], { timeoutMs: 5000 });
+    await rm(tmpPath, { force: true });
+
+    const test = await this.testConfig();
+    if (!test.ok) throw new Error(`nginx_test_failed: ${test.output}`);
+
+    db.prepare("DELETE FROM vhost_failover WHERE vhost_name = ?").run(name);
     await this.reload();
   },
 

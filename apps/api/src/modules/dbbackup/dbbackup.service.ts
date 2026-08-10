@@ -486,4 +486,208 @@ export const DbBackupService = {
   validateDbName(name: string): boolean {
     return DB_NAME_RE.test(name) && name.length <= 64;
   },
+
+  /**
+   * Dumps exactly one database (not the whole instance like dumpDocker/dumpNative
+   * do) — needed for site duplication, where only the site's own DB should be
+   * cloned, not everything running on the same instance. Stored under
+   * data/backups/site-duplicates/, separate from the tracked db/<ref> backup
+   * history tree, since these are internal scratch dumps for duplication, not
+   * user-facing backups.
+   */
+  async dumpSingleDatabase(location: "docker" | "native", ref: string, dbName: string): Promise<string> {
+    if (!this.validateDbName(dbName)) throw new Error("invalid_db_name");
+
+    const destDir = join(env.BACKUP_LOCAL_ROOT, "site-duplicates", location === "docker" ? ref : `native-${ref}`);
+    await mkdir(destDir, { recursive: true });
+
+    if (location === "docker") {
+      const container = docker.getContainer(ref);
+      const info = await container.inspect();
+      const engineConfig = DOCKER_ENGINES.find((e) => e.imageMatch.test(info.Config.Image));
+      if (!engineConfig) throw new Error("unsupported_db_engine");
+
+      const cmd =
+        engineConfig.engine === "postgres"
+          ? ["pg_dump", "-U", parseEnv(info.Config.Env ?? []).POSTGRES_USER ?? "postgres", "-Fc", dbName]
+          : engineConfig.engine === "mysql" || engineConfig.engine === "mariadb"
+            ? ["mysqldump", dbName]
+            : (() => {
+                throw new Error("single_db_dump_not_supported_for_engine");
+              })();
+
+      const filePath = join(destDir, `${dbName}.${engineConfig.extension}.gz`);
+      const exec = await container.exec({ Cmd: cmd, AttachStdout: true, AttachStderr: true });
+      const stream = await exec.start({ hijack: true, stdin: false });
+
+      const gzip = createGzip();
+      const out = createWriteStream(filePath);
+      await new Promise<void>((resolve, reject) => {
+        container.modem.demuxStream(stream, gzip as any, gzip as any);
+        stream.on("end", () => gzip.end());
+        gzip.pipe(out);
+        out.on("finish", resolve);
+        out.on("error", reject);
+        stream.on("error", reject);
+      });
+      return filePath;
+    }
+
+    const engineEntry = NATIVE_SERVICES.find((s) => s.service === ref);
+    if (!engineEntry) throw new Error("unsupported_native_service");
+
+    const { bin, args, extension } =
+      engineEntry.engine === "mariadb" || engineEntry.engine === "mysql"
+        ? { bin: "sudo", args: ["mysqldump", dbName], extension: "sql" }
+        : engineEntry.engine === "postgres"
+          ? { bin: "sudo", args: ["-u", "postgres", "pg_dump", "-Fc", dbName], extension: "dump" }
+          : (() => {
+              throw new Error("single_db_dump_not_supported_for_engine");
+            })();
+
+    const filePath = join(destDir, `${dbName}.${extension}.gz`);
+    const child = spawnCommand(bin, args);
+    const gzip = createGzip();
+    const out = createWriteStream(filePath);
+    let stderrOutput = "";
+    child.stderr?.on("data", (chunk) => (stderrOutput += chunk.toString()));
+
+    await new Promise<void>((resolve, reject) => {
+      child.stdout!.pipe(gzip).pipe(out);
+      out.on("finish", resolve);
+      out.on("error", reject);
+      child.on("error", reject);
+      child.on("close", (code) => {
+        if (code !== 0) reject(new Error(stderrOutput || `dump command exited with code ${code}`));
+      });
+    });
+    return filePath;
+  },
+
+  /**
+   * Restores a single-database dump (from dumpSingleDatabase) into a NEW
+   * database name — unlike restore()/restoreDocker()/restoreNative(), which
+   * always overwrite the same instance/DB names captured in the dump. Creates
+   * targetDbName first since a single-DB mysqldump doesn't embed a CREATE
+   * DATABASE statement the way --all-databases dumps do.
+   */
+  async restoreSingleDatabaseAs(
+    location: "docker" | "native",
+    ref: string,
+    dumpFilePath: string,
+    targetDbName: string
+  ): Promise<void> {
+    if (!this.validateDbName(targetDbName)) throw new Error("invalid_db_name");
+
+    if (location === "docker") {
+      const container = docker.getContainer(ref);
+      const info = await container.inspect();
+      const engineConfig = DOCKER_ENGINES.find((e) => e.imageMatch.test(info.Config.Image));
+      if (!engineConfig) throw new Error("unsupported_db_engine");
+      const envVars = parseEnv(info.Config.Env ?? []);
+
+      if (engineConfig.engine === "postgres") {
+        const createExec = await container.exec({
+          Cmd: ["psql", "-U", envVars.POSTGRES_USER ?? "postgres", "-c", `CREATE DATABASE "${targetDbName}";`],
+          AttachStdout: true,
+          AttachStderr: true,
+        });
+        await runDockerExecToCompletion(createExec);
+
+        const restoreExec = await container.exec({
+          Cmd: ["pg_restore", "-U", envVars.POSTGRES_USER ?? "postgres", "-d", targetDbName],
+          AttachStdin: true,
+          AttachStdout: true,
+          AttachStderr: true,
+        });
+        const stream = await restoreExec.start({ hijack: true, stdin: true });
+        await pipeGunzippedFileToDockerStream(dumpFilePath, stream);
+        return;
+      }
+
+      if (engineConfig.engine === "mysql" || engineConfig.engine === "mariadb") {
+        const pw =
+          engineConfig.engine === "mysql"
+            ? (envVars.MYSQL_ROOT_PASSWORD ?? "")
+            : (envVars.MARIADB_ROOT_PASSWORD ?? envVars.MYSQL_ROOT_PASSWORD ?? "");
+
+        const createExec = await container.exec({
+          Cmd: ["mysql", "-u", "root", `-p${pw}`, "-e", `CREATE DATABASE IF NOT EXISTS \`${targetDbName}\`;`],
+          AttachStdout: true,
+          AttachStderr: true,
+        });
+        await runDockerExecToCompletion(createExec);
+
+        const restoreExec = await container.exec({
+          Cmd: ["mysql", "-u", "root", `-p${pw}`, targetDbName],
+          AttachStdin: true,
+          AttachStdout: true,
+          AttachStderr: true,
+        });
+        const stream = await restoreExec.start({ hijack: true, stdin: true });
+        await pipeGunzippedFileToDockerStream(dumpFilePath, stream);
+        return;
+      }
+
+      throw new Error("single_db_restore_not_supported_for_engine");
+    }
+
+    const engineEntry = NATIVE_SERVICES.find((s) => s.service === ref);
+    if (!engineEntry) throw new Error("unsupported_native_service");
+
+    if (engineEntry.engine === "postgres") {
+      await runCommand("sudo", ["-u", "postgres", "psql", "-c", `CREATE DATABASE "${targetDbName}";`], {
+        timeoutMs: 10_000,
+      });
+      const child = spawnCommand("sudo", ["-u", "postgres", "pg_restore", "-d", targetDbName]);
+      await pipeGunzippedFileToChildStdin(dumpFilePath, child);
+      return;
+    }
+
+    if (engineEntry.engine === "mariadb" || engineEntry.engine === "mysql") {
+      await runCommand("sudo", ["mysql", "-e", `CREATE DATABASE IF NOT EXISTS \`${targetDbName}\`;`], {
+        timeoutMs: 10_000,
+      });
+      const child = spawnCommand("sudo", ["mysql", targetDbName]);
+      await pipeGunzippedFileToChildStdin(dumpFilePath, child);
+      return;
+    }
+
+    throw new Error("single_db_restore_not_supported_for_native_engine");
+  },
 };
+
+async function runDockerExecToCompletion(exec: { start: (opts: any) => Promise<NodeJS.ReadWriteStream> }): Promise<void> {
+  const stream = await exec.start({ hijack: true, stdin: false });
+  await new Promise<void>((resolve, reject) => {
+    stream.on("end", resolve);
+    stream.on("error", reject);
+    stream.resume();
+  });
+}
+
+async function pipeGunzippedFileToDockerStream(filePath: string, stream: NodeJS.ReadWriteStream): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const gunzip = createGunzip();
+    createReadStream(filePath).pipe(gunzip).pipe(stream as any);
+    stream.on("end", resolve);
+    stream.on("error", reject);
+  });
+}
+
+async function pipeGunzippedFileToChildStdin(
+  filePath: string,
+  child: ReturnType<typeof spawnCommand>
+): Promise<void> {
+  let stderrOutput = "";
+  child.stderr?.on("data", (chunk) => (stderrOutput += chunk.toString()));
+  await new Promise<void>((resolve, reject) => {
+    const gunzip = createGunzip();
+    createReadStream(filePath).pipe(gunzip).pipe(child.stdin!);
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(stderrOutput || `restore command exited with code ${code}`));
+    });
+  });
+}

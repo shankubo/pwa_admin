@@ -147,6 +147,45 @@ export function applyMaintenanceMode(rawConfig: string, maintenanceRoot: string)
   return result;
 }
 
+/**
+ * Rewrites every content-serving server{} block's `root` and/or `proxy_pass`
+ * directive value in place — sibling to applyMaintenanceMode, but substitutes
+ * directive values instead of swapping in a synthetic location block, so
+ * every existing `location` block's own structure (headers, rewrites, etc.)
+ * is preserved verbatim. Which directive(s) get rewritten is driven by which
+ * of newRoot/newProxyPass is passed — a mixed vhost (both root and proxy_pass
+ * present) gets both rewritten in the same pass, matching the current shape
+ * of the vhost being switched.
+ */
+export function applyFailoverRewrite(
+  rawConfig: string,
+  target: { newRoot?: string; newProxyPass?: string }
+): string {
+  const blocks = splitServerBlocks(rawConfig);
+  let result = "";
+  let cursor = 0;
+
+  for (const block of blocks) {
+    result += rawConfig.slice(cursor, block.start);
+
+    if (isRedirectOnlyBlock(block.text)) {
+      result += block.text;
+    } else {
+      let rewritten = block.text;
+      if (target.newRoot) {
+        rewritten = rewritten.replace(/^(\s*)root\s+[^;]+;/m, `$1root ${target.newRoot};`);
+      }
+      if (target.newProxyPass) {
+        rewritten = rewritten.replace(/^(\s*)proxy_pass\s+[^;]+;/m, `$1proxy_pass ${target.newProxyPass};`);
+      }
+      result += rewritten;
+    }
+    cursor = block.end;
+  }
+  result += rawConfig.slice(cursor);
+  return result;
+}
+
 function stripLocationBlocks(serverBlockText: string): string {
   let result = "";
   let cursor = 0;

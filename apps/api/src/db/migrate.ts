@@ -227,6 +227,34 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    id: 10,
+    name: "site_duplicates_and_failover",
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS site_duplicates (
+          vhost_name TEXT PRIMARY KEY,
+          content_path TEXT,
+          db_location TEXT,
+          db_ref TEXT,
+          db_name TEXT,
+          duplicate_db_name TEXT,
+          duplicate_container_id TEXT,
+          duplicate_container_name TEXT,
+          duplicate_port INTEGER,
+          status TEXT NOT NULL DEFAULT 'ready',
+          last_synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS vhost_failover (
+          vhost_name TEXT PRIMARY KEY,
+          snapshot_id INTEGER NOT NULL REFERENCES nginx_config_history(id),
+          switched_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

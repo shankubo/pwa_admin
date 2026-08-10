@@ -4,6 +4,7 @@ import { join, basename } from "node:path";
 import { createGzip } from "node:zlib";
 import { env } from "../../config/env.js";
 import { runCommand } from "../../utils/exec.js";
+import { dirSize } from "../../utils/dirSize.js";
 import { docker } from "../../services/docker.client.js";
 import { AppBackupRunModel, ApplicationModel, type ApplicationRow } from "../../db/models/application.js";
 import { GDriveService } from "../../services/gdrive.client.js";
@@ -18,22 +19,6 @@ function appSnapshotRoot(appName: string): string {
 
 function timestampSlug(): string {
   return new Date().toISOString().replace(/:/g, "-");
-}
-
-async function dirSize(path: string): Promise<number> {
-  let total = 0;
-  let entries;
-  try {
-    entries = await readdir(path, { withFileTypes: true });
-  } catch {
-    return 0;
-  }
-  for (const entry of entries) {
-    const full = join(path, entry.name);
-    if (entry.isDirectory()) total += await dirSize(full);
-    else total += (await stat(full)).size.valueOf();
-  }
-  return total;
 }
 
 /** Parses rsync's itemize-changes output to count files actually transferred

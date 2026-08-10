@@ -93,8 +93,24 @@ shan ALL=(root) NOPASSWD: /bin/systemctl is-active docker
 # stay password-gated — do not broaden this rule beyond this exact command.
 shan ALL=(root) NOPASSWD: /bin/systemctl restart pwa-admin
 
+# --- Sites module: site duplication (content + DB clone for manual failover) ---
+# Site roots live under /var/www/ (confirmed via `root` directives across real
+# vhosts on both deployed servers — see GET /nginx/vhosts), outside this app's
+# own data dir, so the existing rsync rules (scoped to backups/apps dirs) don't
+# cover this. Scoped to /var/www/* so a duplicate can only be written as a
+# sibling of an actual site root, never an arbitrary destination.
+shan ALL=(root) NOPASSWD: /usr/bin/rsync -a /var/www/*
+shan ALL=(root) NOPASSWD: /usr/bin/rm -rf /var/www/*__duplicate
+# Single-database dump/restore for site duplication — the existing mysqldump
+# rule only covers --all-databases, and pg_dump/pg_restore aren't covered at
+# all (only pg_dumpall is), since duplication needs one specific database
+# cloned under a new name, not the whole instance.
+shan ALL=(root) NOPASSWD: /usr/bin/mysqldump *
+shan ALL=(root) NOPASSWD: /usr/bin/pg_dump -Fc *
+shan ALL=(root) NOPASSWD: /usr/bin/pg_restore -d *
+
 # The system-wide sudoers `Defaults` sets `use_pty`, which makes sudo require
 # an allocated pseudo-terminal — fine for interactive SSH use, but the
 # pwa-admin service invokes sudo via execFile with no TTY at all, so every
 # scoped command here needs both `!requiretty` and `!use_pty` to run non-interactively.
-Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/bin/systemctl,/usr/bin/fail2ban-client,/usr/bin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat,/usr/sbin/ufw,/usr/bin/tail,/usr/bin/tailscale !requiretty,!use_pty
+Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/bin/systemctl,/usr/bin/fail2ban-client,/usr/bin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/pg_dump,/usr/bin/pg_restore,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat,/usr/sbin/ufw,/usr/bin/tail,/usr/bin/tailscale !requiretty,!use_pty

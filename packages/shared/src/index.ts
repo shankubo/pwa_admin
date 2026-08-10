@@ -11,3 +11,4 @@ export * from "./types/hardware.js";
 export * from "./types/security.js";
 export * from "./types/services.js";
 export * from "./types/serverConnection.js";
+export * from "./types/sites.js";
