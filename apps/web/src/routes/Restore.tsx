@@ -419,45 +419,30 @@ function StepLocal({
 }) {
   const appById = useMemo(() => new Map(apps.map((a) => [a.id, a])), [apps]);
   const successfulHistory = history.filter((h) => h.status === "success");
+  const dbBackups = successfulHistory.filter((h) => h.sourceType === "db");
+  const volumeBackups = successfulHistory.filter((h) => h.sourceType === "volume");
+  const pathBackups = successfulHistory.filter((h) => h.sourceType === "path");
   const successfulAppRuns = appRuns.filter((r) => r.status === "success");
+  const fullAppRuns = successfulAppRuns.filter((r) => r.kind === "full");
+  const partialAppRuns = successfulAppRuns.filter((r) => r.kind === "partial");
+
+  const hasAnything = successfulHistory.length > 0 || successfulAppRuns.length > 0;
 
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">Étape 2 — Choisissez l'élément à restaurer.</p>
 
-      {successfulHistory.length > 0 && (
-        <div>
-          <p className="mb-2 flex items-center gap-1 text-xs font-semibold text-muted-foreground">
-            <Database className="h-3.5 w-3.5" /> Sauvegardes génériques (volume / dossier / base de données)
-          </p>
-          <div className="flex flex-col gap-2">
-            {successfulHistory.map((h) => (
-              <button
-                key={h.runId}
-                type="button"
-                onClick={() => onSelect({ kind: "generic", run: h })}
-                className="rounded-md border border-border p-2 text-left text-sm hover:bg-muted"
-              >
-                <p className="font-medium">
-                  {h.sourceType}:{h.sourceRef}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(h.startedAt).toLocaleString()}
-                  {h.sizeBytes != null ? ` · ${formatBytes(h.sizeBytes)}` : ""}
-                </p>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      <GenericGroup title="Bases de données" icon={Database} items={dbBackups} onSelect={onSelect} />
+      <GenericGroup title="Volumes Docker" icon={Boxes} items={volumeBackups} onSelect={onSelect} />
+      <GenericGroup title="Dossiers (chemins)" icon={HardDrive} items={pathBackups} onSelect={onSelect} />
 
-      {successfulAppRuns.length > 0 && (
+      {fullAppRuns.length > 0 && (
         <div>
           <p className="mb-2 flex items-center gap-1 text-xs font-semibold text-muted-foreground">
-            <Boxes className="h-3.5 w-3.5" /> Applications
+            <Boxes className="h-3.5 w-3.5" /> Applications — backup complet
           </p>
           <div className="flex flex-col gap-2">
-            {successfulAppRuns.map((r) => {
+            {fullAppRuns.map((r) => {
               const app = appById.get(r.appId);
               if (!app) return null;
               return (
@@ -467,9 +452,35 @@ function StepLocal({
                   onClick={() => onSelect({ kind: "app", appId: r.appId, appName: app.name, run: r })}
                   className="rounded-md border border-border p-2 text-left text-sm hover:bg-muted"
                 >
-                  <p className="font-medium">
-                    {app.name} · {r.kind === "full" ? "backup complet" : "backup partiel"}
+                  <p className="font-medium">{app.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(r.startedAt).toLocaleString()}
+                    {r.sizeBytes != null ? ` · ${formatBytes(r.sizeBytes)}` : ""}
                   </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {partialAppRuns.length > 0 && (
+        <div>
+          <p className="mb-2 flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+            <Boxes className="h-3.5 w-3.5" /> Applications — backup partiel
+          </p>
+          <div className="flex flex-col gap-2">
+            {partialAppRuns.map((r) => {
+              const app = appById.get(r.appId);
+              if (!app) return null;
+              return (
+                <button
+                  key={r.runId}
+                  type="button"
+                  onClick={() => onSelect({ kind: "app", appId: r.appId, appName: app.name, run: r })}
+                  className="rounded-md border border-border p-2 text-left text-sm hover:bg-muted"
+                >
+                  <p className="font-medium">{app.name}</p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(r.startedAt).toLocaleString()}
                     {r.sizeBytes != null ? ` · ${formatBytes(r.sizeBytes)}` : ""}
@@ -492,9 +503,44 @@ function StepLocal({
         </div>
       )}
 
-      {successfulHistory.length === 0 && successfulAppRuns.length === 0 && (
-        <p className="text-sm text-muted-foreground">Aucune sauvegarde locale disponible.</p>
-      )}
+      {!hasAnything && <p className="text-sm text-muted-foreground">Aucune sauvegarde locale disponible.</p>}
+    </div>
+  );
+}
+
+function GenericGroup({
+  title,
+  icon: Icon,
+  items,
+  onSelect,
+}: {
+  title: string;
+  icon: typeof HardDrive;
+  items: BackupHistoryEntry[];
+  onSelect: (item: SelectedItem) => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <p className="mb-2 flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" /> {title}
+      </p>
+      <div className="flex flex-col gap-2">
+        {items.map((h) => (
+          <button
+            key={h.runId}
+            type="button"
+            onClick={() => onSelect({ kind: "generic", run: h })}
+            className="rounded-md border border-border p-2 text-left text-sm hover:bg-muted"
+          >
+            <p className="font-medium">{h.sourceRef}</p>
+            <p className="text-xs text-muted-foreground">
+              {new Date(h.startedAt).toLocaleString()}
+              {h.sizeBytes != null ? ` · ${formatBytes(h.sizeBytes)}` : ""}
+            </p>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -553,6 +599,9 @@ function AppImagePicker({
   );
 }
 
+/** Groups a flat USB archive list into named sections — a raw flat list mixes
+ * DB dumps, full app image exports, and volume/path snapshots together,
+ * which is hard to scan once there's more than a handful of entries. */
 function StepUsb({
   archives,
   onSelect,
@@ -560,26 +609,78 @@ function StepUsb({
   archives: UsbBackupArchive[] | null;
   onSelect: (archive: UsbBackupArchive) => void;
 }) {
+  const groups = useMemo(() => {
+    if (!archives) return null;
+    const db: UsbBackupArchive[] = [];
+    const images: UsbBackupArchive[] = [];
+    const volumes: UsbBackupArchive[] = [];
+    const paths: UsbBackupArchive[] = [];
+    for (const a of archives) {
+      if (a.category === "db") db.push(a);
+      else if (a.category === "volumes") volumes.push(a);
+      else if (a.sourceRef.startsWith("image-")) images.push(a);
+      else paths.push(a);
+    }
+    const byDateDesc = (list: UsbBackupArchive[]) => [...list].sort((x, y) => y.modifiedAt.localeCompare(x.modifiedAt));
+    return {
+      db: byDateDesc(db),
+      images: byDateDesc(images),
+      volumes: byDateDesc(volumes),
+      paths: byDateDesc(paths),
+    };
+  }, [archives]);
+
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">Étape 2 — Archives présentes sur le disque USB.</p>
-      {!archives && <p className="text-sm text-muted-foreground">Chargement…</p>}
-      {archives?.length === 0 && <p className="text-sm text-muted-foreground">Aucune archive trouvée sur le disque.</p>}
-      {archives?.map((a) => (
-        <button
-          key={a.fullPath}
-          type="button"
-          onClick={() => onSelect(a)}
-          className="rounded-md border border-border p-2 text-left text-sm hover:bg-muted"
-        >
-          <p className="font-medium">
-            {a.category}/{a.sourceRef}/{a.fileName}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {formatBytes(a.sizeBytes)} · {new Date(a.modifiedAt).toLocaleString()}
-          </p>
-        </button>
-      ))}
+      {!groups && <p className="text-sm text-muted-foreground">Chargement…</p>}
+      {groups && archives?.length === 0 && (
+        <p className="text-sm text-muted-foreground">Aucune archive trouvée sur le disque.</p>
+      )}
+      {groups && (
+        <>
+          <ArchiveGroup title="Bases de données" icon={Database} archives={groups.db} onSelect={onSelect} />
+          <ArchiveGroup title="Images de conteneur" icon={Container} archives={groups.images} onSelect={onSelect} />
+          <ArchiveGroup title="Volumes Docker" icon={Boxes} archives={groups.volumes} onSelect={onSelect} />
+          <ArchiveGroup title="Dossiers (chemins)" icon={HardDrive} archives={groups.paths} onSelect={onSelect} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function ArchiveGroup({
+  title,
+  icon: Icon,
+  archives,
+  onSelect,
+}: {
+  title: string;
+  icon: typeof HardDrive;
+  archives: UsbBackupArchive[];
+  onSelect: (archive: UsbBackupArchive) => void;
+}) {
+  if (archives.length === 0) return null;
+  return (
+    <div>
+      <p className="mb-2 flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" /> {title}
+      </p>
+      <div className="flex flex-col gap-2">
+        {archives.map((a) => (
+          <button
+            key={a.fullPath}
+            type="button"
+            onClick={() => onSelect(a)}
+            className="rounded-md border border-border p-2 text-left text-sm hover:bg-muted"
+          >
+            <p className="font-medium">{a.sourceRef.replace(/^image-/, "")}</p>
+            <p className="text-xs text-muted-foreground">
+              {formatBytes(a.sizeBytes)} · {new Date(a.modifiedAt).toLocaleString()}
+            </p>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
