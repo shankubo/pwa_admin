@@ -125,7 +125,20 @@ async function listDockerDatabases(
 
   const cmd =
     engine === "postgres"
-      ? ["psql", "-U", envVars.POSTGRES_USER ?? "postgres", "-t", "-A", "-c", "SELECT datname FROM pg_database WHERE datistemplate = false;"]
+      ? // -d postgres: psql with no -d defaults to a database named after the
+        // connecting user (envVars.POSTGRES_USER, e.g. "shan"), which usually
+        // doesn't exist — the "postgres" maintenance database always does.
+        [
+          "psql",
+          "-U",
+          envVars.POSTGRES_USER ?? "postgres",
+          "-d",
+          "postgres",
+          "-t",
+          "-A",
+          "-c",
+          "SELECT datname FROM pg_database WHERE datistemplate = false;",
+        ]
       : ["mysql", "-u", "root", `-p${envVars.MYSQL_ROOT_PASSWORD ?? envVars.MARIADB_ROOT_PASSWORD ?? ""}`, "-N", "-e", "SHOW DATABASES;"];
 
   try {
@@ -651,7 +664,9 @@ export const DbBackupService = {
 
       if (engineConfig.engine === "postgres") {
         const createExec = await container.exec({
-          Cmd: ["psql", "-U", envVars.POSTGRES_USER ?? "postgres", "-c", `CREATE DATABASE "${targetDbName}";`],
+          // -d postgres: psql with no -d defaults to a database named after
+          // the connecting user, which usually doesn't exist.
+          Cmd: ["psql", "-U", envVars.POSTGRES_USER ?? "postgres", "-d", "postgres", "-c", `CREATE DATABASE "${targetDbName}";`],
           AttachStdout: true,
           AttachStderr: true,
         });

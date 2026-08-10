@@ -293,7 +293,7 @@ async function dropDuplicateDatabase(location: "docker" | "native", ref: string,
     const envVars = parseDockerEnv(info.Config.Env ?? []);
     const isPostgres = /postgres/i.test(info.Config.Image);
     const cmd = isPostgres
-      ? ["psql", "-U", envVars.POSTGRES_USER ?? "postgres", "-c", `DROP DATABASE IF EXISTS "${dbName}";`]
+      ? ["psql", "-U", envVars.POSTGRES_USER ?? "postgres", "-d", "postgres", "-c", `DROP DATABASE IF EXISTS "${dbName}";`]
       : [
           "mysql",
           "-u",
