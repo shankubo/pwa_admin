@@ -93,8 +93,19 @@ async function findFreePortNear(originalPort: number): Promise<number> {
   throw new Error("no_free_port_found_near_original");
 }
 
+/**
+ * Clones a container onto a free port. If dbNameRewrite is given, rewrites
+ * every env var whose VALUE exactly matches the source database name to the
+ * duplicate's database name instead — without this, the cloned container
+ * keeps every DB_NAME/POSTGRES_DB/-style env var pointing at the source
+ * database, so it silently reads/writes the SAME data as the original
+ * despite nginx routing traffic to a "different" container. Matching by
+ * value (not a guessed variable name like DB_NAME) works regardless of the
+ * app's own env var naming convention.
+ */
 async function cloneContainerAsDuplicate(
-  sourceContainerId: string
+  sourceContainerId: string,
+  dbNameRewrite?: { from: string; to: string }
 ): Promise<{ id: string; name: string; port: number }> {
   const source = docker.getContainer(sourceContainerId);
   const info = await source.inspect();
@@ -114,6 +125,14 @@ async function cloneContainerAsDuplicate(
     );
   }
 
+  const rewrittenEnv = (info.Config.Env ?? []).map((entry) => {
+    if (!dbNameRewrite) return entry;
+    const idx = entry.indexOf("=");
+    if (idx < 0) return entry;
+    const value = entry.slice(idx + 1);
+    return value === dbNameRewrite.from ? `${entry.slice(0, idx)}=${dbNameRewrite.to}` : entry;
+  });
+
   // A duplicate with the same name may already exist from a previous
   // create/refresh — remove it first so createContainer doesn't collide.
   const existing = docker.getContainer(duplicateName);
@@ -122,7 +141,7 @@ async function cloneContainerAsDuplicate(
   const created = await docker.createContainer({
     name: duplicateName,
     Image: info.Config.Image,
-    Env: info.Config.Env,
+    Env: rewrittenEnv,
     Cmd: info.Config.Cmd,
     Entrypoint: info.Config.Entrypoint,
     ExposedPorts: info.Config.ExposedPorts,
@@ -221,20 +240,11 @@ async function runCreateDuplicate(
     await runCommand("sudo", ["rsync", "-a", `${normalizedRoot}/`, contentPath], { timeoutMs: 600_000 });
   }
 
-  let duplicateContainerId: string | null = null;
-  let duplicateContainerName: string | null = null;
-  let duplicatePort: number | null = null;
-  if (vhost.proxyPassTarget) {
-    const linkedContainer = await findLinkedContainer(vhost.proxyPassTarget);
-    if (linkedContainer) {
-      setProgress(vhostName, "Clonage du conteneur…");
-      const cloned = await cloneContainerAsDuplicate(linkedContainer.id);
-      duplicateContainerId = cloned.id;
-      duplicateContainerName = cloned.name;
-      duplicatePort = cloned.port;
-    }
-  }
-
+  // DB duplication runs BEFORE the container clone, on purpose: the cloned
+  // container's env vars get rewritten to point at duplicateDbName (see
+  // cloneContainerAsDuplicate's dbNameRewrite param), so that name — and the
+  // database itself — must already exist before the duplicate container
+  // starts and tries to connect.
   let duplicateDbName: string | null = null;
   if (opts.dbLocation && opts.dbRef && opts.dbName) {
     if (!DbBackupService.validateDbName(opts.dbName)) throw new Error("invalid_db_name");
@@ -244,6 +254,23 @@ async function runCreateDuplicate(
     setProgress(vhostName, "Duplication de la base de données…");
     const dumpPath = await DbBackupService.dumpSingleDatabase(opts.dbLocation, opts.dbRef, opts.dbName);
     await DbBackupService.restoreSingleDatabaseAs(opts.dbLocation, opts.dbRef, dumpPath, duplicateDbName);
+  }
+
+  let duplicateContainerId: string | null = null;
+  let duplicateContainerName: string | null = null;
+  let duplicatePort: number | null = null;
+  if (vhost.proxyPassTarget) {
+    const linkedContainer = await findLinkedContainer(vhost.proxyPassTarget);
+    if (linkedContainer) {
+      setProgress(vhostName, "Clonage du conteneur…");
+      const cloned = await cloneContainerAsDuplicate(
+        linkedContainer.id,
+        opts.dbName && duplicateDbName ? { from: opts.dbName, to: duplicateDbName } : undefined
+      );
+      duplicateContainerId = cloned.id;
+      duplicateContainerName = cloned.name;
+      duplicatePort = cloned.port;
+    }
   }
 
   db.prepare(
