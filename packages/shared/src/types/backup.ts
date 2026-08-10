@@ -81,6 +81,10 @@ export interface UsbDriveInfo {
   totalBytes: number | null;
   freeBytes: number | null;
   backupRoot: string;
+  /** Whether BACKUP/<hostname> already exists on this drive — false means
+   * it's a USB/SSD drive that hasn't been designated as a backup target yet
+   * (e.g. just plugged in), distinct from one actively holding backups. */
+  isBackupConfigured: boolean;
 }
 
 export interface UsbStatus {

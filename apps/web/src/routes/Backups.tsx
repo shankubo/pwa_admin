@@ -114,7 +114,7 @@ export function Backups() {
       .then((s) => setGdriveAuthorized(s.authorized))
       .catch(() => setGdriveAuthorized(false));
     apiJson<UsbStatus>("/backups/usb/status")
-      .then((s) => setUsbAvailable(s.available))
+      .then((s) => setUsbAvailable(s.drives.some((d) => d.isBackupConfigured)))
       .catch(() => setUsbAvailable(false));
   }, []);
 
@@ -410,7 +410,7 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
       .then((s) => setGdriveAuthorized(s.authorized))
       .catch(() => setGdriveAuthorized(false));
     apiJson<UsbStatus>("/backups/usb/status")
-      .then((s) => setUsbAvailable(s.available))
+      .then((s) => setUsbAvailable(s.drives.some((d) => d.isBackupConfigured)))
       .catch(() => setUsbAvailable(false));
   }, []);
 
@@ -678,7 +678,7 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
                 disabled={!usbAvailable}
               />
               usb
-              {!usbAvailable && <span className="text-xs text-muted-foreground">(non détecté)</span>}
+              {!usbAvailable && <span className="text-xs text-muted-foreground">(non configuré — voir plus bas)</span>}
             </label>
             <label className="flex items-center gap-1">
               <input type="checkbox" checked={downloadAfter} onChange={() => setDownloadAfter((v) => !v)} />
@@ -839,6 +839,7 @@ function UsbConnection() {
   const [archives, setArchives] = useState<UsbBackupArchive[] | null>(null);
   const [showArchives, setShowArchives] = useState(false);
   const [loadingArchives, setLoadingArchives] = useState(false);
+  const [enabling, setEnabling] = useState<string | null>(null);
 
   function loadStatus() {
     apiJson<UsbStatus>("/backups/usb/status")
@@ -847,6 +848,16 @@ function UsbConnection() {
   }
 
   useEffect(loadStatus, []);
+
+  async function enableDrive(mountpoint: string) {
+    setEnabling(mountpoint);
+    try {
+      await apiJson("/backups/usb/enable", { method: "POST", body: JSON.stringify({ mountpoint }) });
+      loadStatus();
+    } finally {
+      setEnabling(null);
+    }
+  }
 
   async function loadArchives() {
     setShowArchives((v) => !v);
@@ -880,22 +891,45 @@ function UsbConnection() {
         </p>
       ) : (
         <div className="flex flex-col gap-2">
-          {status.drives.map((d) => (
-            <div key={d.mountpoint} className="rounded-md border border-border p-2 text-sm">
-              <p className="flex items-center gap-1 text-primary">
-                <CheckCircle2 className="h-4 w-4" /> {d.label} ({d.device})
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {d.filesystem ?? "?"} · {d.freeBytes != null ? formatBytes(d.freeBytes) : "?"} libre
-                {d.totalBytes != null ? ` / ${formatBytes(d.totalBytes)}` : ""}
-              </p>
-              <p className="truncate text-xs text-muted-foreground">{d.backupRoot}</p>
-            </div>
-          ))}
+          {status.drives.map((d) =>
+            d.isBackupConfigured ? (
+              <div key={d.mountpoint} className="rounded-md border border-border p-2 text-sm">
+                <p className="flex items-center gap-1 text-primary">
+                  <CheckCircle2 className="h-4 w-4" /> {d.label} ({d.device})
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {d.filesystem ?? "?"} · {d.freeBytes != null ? formatBytes(d.freeBytes) : "?"} libre
+                  {d.totalBytes != null ? ` / ${formatBytes(d.totalBytes)}` : ""}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">{d.backupRoot}</p>
+              </div>
+            ) : (
+              <div key={d.mountpoint} className="rounded-md border border-warning/40 bg-warning/10 p-2 text-sm">
+                <p className="flex items-center gap-1 text-warning">
+                  <AlertTriangle className="h-4 w-4" /> {d.label} ({d.device}) — non configuré comme disque de sauvegarde
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {d.filesystem ?? "?"} · {d.freeBytes != null ? formatBytes(d.freeBytes) : "?"} libre
+                  {d.totalBytes != null ? ` / ${formatBytes(d.totalBytes)}` : ""}
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  disabled={enabling === d.mountpoint}
+                  onClick={() => enableDrive(d.mountpoint)}
+                >
+                  {enabling === d.mountpoint ? "Activation…" : "Activer comme disque de sauvegarde"}
+                </Button>
+              </div>
+            )
+          )}
 
-          <Button size="sm" variant="outline" onClick={loadArchives}>
-            {showArchives ? "Masquer les archives" : "Parcourir les archives sur le disque"}
-          </Button>
+          {status.drives.some((d) => d.isBackupConfigured) && (
+            <Button size="sm" variant="outline" onClick={loadArchives}>
+              {showArchives ? "Masquer les archives" : "Parcourir les archives sur le disque"}
+            </Button>
+          )}
 
           {showArchives && (
             <div className="flex flex-col gap-1">

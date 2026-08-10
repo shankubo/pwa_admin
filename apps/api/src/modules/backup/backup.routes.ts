@@ -327,6 +327,30 @@ export default async function backupRoutes(app: FastifyInstance) {
     reply.send(await UsbBackupService.browseArchives());
   });
 
+  // Designates a detected-but-unconfigured USB/SSD drive (e.g. just plugged
+  // in) as a backup target by creating BACKUP/<hostname> on it. Deliberately
+  // separate from detection: a drive merely being connected must never be
+  // treated as a backup destination without this explicit opt-in — most
+  // importantly the RPi's own rootfs, when it boots off an external USB/SSD,
+  // must never be silently written to as if it were a backup drive.
+  app.post(
+    "/backups/usb/enable",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("backup.usb-drive.enable")],
+      schema: {
+        body: { type: "object", required: ["mountpoint"], properties: { mountpoint: { type: "string" } } },
+      },
+    },
+    async (req, reply) => {
+      const { mountpoint } = req.body as { mountpoint: string };
+      try {
+        reply.send(await UsbBackupService.enableAsBackupDrive(mountpoint));
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      }
+    }
+  );
+
   // Uploads an archive from the admin's PC and registers it as a real
   // backup_history row (status "success", target "local") so it becomes
   // restorable through the existing /backups/restore and

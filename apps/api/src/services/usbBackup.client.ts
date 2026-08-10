@@ -20,6 +20,12 @@ interface LsblkOutput {
 
 const BACKUP_ROOT_SEGMENT = "BACKUP";
 
+// Mount points that are never a backup target even if lsblk reports tran=usb
+// on them — e.g. a Raspberry Pi booting its rootfs off an external USB/SSD
+// (common once the SD card is retired) would otherwise show its own system
+// disk as an "available USB backup drive".
+const SYSTEM_MOUNTPOINTS = new Set(["/", "/boot", "/boot/firmware"]);
+
 export function sanitizeSegment(value: string): string {
   const cleaned = value.replace(/[^a-zA-Z0-9._-]/g, "_");
   if (!cleaned || cleaned === "." || cleaned === "..") throw new Error("invalid_path_segment");
@@ -40,10 +46,10 @@ function collectUsbMountedPartitions(devices: LsblkDevice[]): LsblkDevice[] {
   const result: LsblkDevice[] = [];
   for (const dev of devices) {
     const devIsUsb = dev.tran === "usb" || dev.rm === true;
-    if (devIsUsb && dev.mountpoint) result.push(dev);
+    if (devIsUsb && dev.mountpoint && !SYSTEM_MOUNTPOINTS.has(dev.mountpoint)) result.push(dev);
     for (const child of dev.children ?? []) {
       const childIsUsb = devIsUsb || child.tran === "usb" || child.rm === true;
-      if (childIsUsb && child.mountpoint) result.push(child);
+      if (childIsUsb && child.mountpoint && !SYSTEM_MOUNTPOINTS.has(child.mountpoint)) result.push(child);
     }
   }
   return result;
@@ -78,6 +84,10 @@ export const UsbBackupService = {
     for (const dev of mounted) {
       const mountpoint = dev.mountpoint!;
       const { totalBytes, freeBytes } = await freeSpace(mountpoint);
+      const backupRoot = join(mountpoint, BACKUP_ROOT_SEGMENT, hostSlug);
+      const isBackupConfigured = await stat(backupRoot)
+        .then((s) => s.isDirectory())
+        .catch(() => false);
       drives.push({
         mountpoint,
         label: dev.label || dev.name,
@@ -85,10 +95,23 @@ export const UsbBackupService = {
         filesystem: dev.fstype,
         totalBytes,
         freeBytes,
-        backupRoot: join(mountpoint, BACKUP_ROOT_SEGMENT, hostSlug),
+        backupRoot,
+        isBackupConfigured,
       });
     }
     return drives;
+  },
+
+  /** Designates a detected-but-unconfigured USB/SSD drive as a backup target
+   * by creating BACKUP/<hostname> on it — the marker collectUsbMountedPartitions'
+   * callers use to distinguish an intentional backup drive from any other USB
+   * storage that happens to be plugged in. */
+  async enableAsBackupDrive(mountpoint: string): Promise<UsbDriveInfo> {
+    const drives = await this.detectDrives();
+    const drive = drives.find((d) => d.mountpoint === mountpoint);
+    if (!drive) throw new Error("usb_drive_not_found");
+    await mkdir(drive.backupRoot, { recursive: true });
+    return { ...drive, isBackupConfigured: true };
   },
 
   async status(): Promise<UsbStatus> {
@@ -97,7 +120,7 @@ export const UsbBackupService = {
   },
 
   async isAvailable(): Promise<boolean> {
-    return (await this.detectDrives()).length > 0;
+    return (await this.detectDrives()).some((d) => d.isBackupConfigured);
   },
 
   buildArchivePath(
@@ -120,7 +143,7 @@ export const UsbBackupService = {
     category: "volumes" | "paths" | "db",
     sourceRef: string
   ): Promise<{ usbPath: string; mountpoint: string }> {
-    const drives = await this.detectDrives();
+    const drives = (await this.detectDrives()).filter((d) => d.isBackupConfigured);
     if (drives.length === 0) throw new Error("no_usb_drive_detected");
     const drive = drives[0]; // single-drive write support this iteration
     const fileName = basename(localPath);

@@ -58,16 +58,17 @@ export function Restore() {
     apiJson<AppBackupRun[]>("/applications/runs/all").then(setAppRuns).catch(() => setAppRuns([]));
   }, []);
 
+  const usbConfigured = usbStatus?.drives.some((d) => d.isBackupConfigured) ?? false;
+
   useEffect(() => {
-    if (source !== "usb" || !usbStatus?.available || usbArchives) return;
+    if (source !== "usb" || !usbConfigured || usbArchives) return;
     apiJson<UsbBackupArchive[]>("/backups/usb/archives")
       .then(setUsbArchives)
       .catch(() => setUsbArchives([]));
-  }, [source, usbStatus, usbArchives]);
+  }, [source, usbConfigured, usbArchives]);
 
   const localAvailable = (history?.some((h) => h.status === "success") ?? false) ||
     (appRuns?.some((r) => r.status === "success") ?? false);
-  const usbAvailable = !!usbStatus?.available;
 
   function reset() {
     setStep(1);
@@ -139,7 +140,7 @@ export function Restore() {
       {step === 1 && (
         <StepSource
           localAvailable={localAvailable}
-          usbAvailable={usbAvailable}
+          usbAvailable={usbConfigured}
           gdriveAuthorized={gdriveAuthorized}
           onSelect={(s) => {
             setSource(s);

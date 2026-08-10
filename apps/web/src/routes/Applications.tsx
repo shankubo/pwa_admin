@@ -618,7 +618,7 @@ function NewAppForm({
       .then((s) => setGdriveAuthorized(s.authorized))
       .catch(() => setGdriveAuthorized(false));
     apiJson<UsbStatus>("/backups/usb/status")
-      .then((s) => setUsbAvailable(s.available))
+      .then((s) => setUsbAvailable(s.drives.some((d) => d.isBackupConfigured)))
       .catch(() => setUsbAvailable(false));
   }, []);
 
@@ -829,7 +829,9 @@ function NewAppForm({
               disabled={!usbAvailable}
             />
             <Usb className="h-3.5 w-3.5" /> usb
-            {!usbAvailable && <span className="text-xs text-muted-foreground">(aucun disque détecté)</span>}
+            {!usbAvailable && (
+              <span className="text-xs text-muted-foreground">(aucun disque configuré — voir Backups)</span>
+            )}
           </label>
         </div>
 
