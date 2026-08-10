@@ -32,7 +32,7 @@ const SECTIONS: HelpSection[] = [
   {
     icon: LayoutDashboard,
     title: "Dashboard",
-    summary: "Écran d'accueil : état de santé du Raspberry Pi en un coup d'œil.",
+    summary: "Écran d'accueil : état de santé du serveur en un coup d'œil.",
     details: [
       "Les jauges CPU, RAM, disque et température se mettent à jour en temps réel via WebSocket.",
       "Une bannière d'alerte apparaît automatiquement si un seuil critique est dépassé (température, disque plein, etc.).",
@@ -87,7 +87,7 @@ const SECTIONS: HelpSection[] = [
   {
     icon: Hexagon,
     title: "Node.js (PM2)",
-    summary: "Applications Node.js tournant directement sur le Pi (hors Docker), gérées par PM2.",
+    summary: "Applications Node.js tournant directement sur le serveur (hors Docker), gérées par PM2.",
     details: [
       "Liste des process avec statut, CPU, RAM, uptime et nombre de redémarrages.",
       "Actions start/stop/restart/reload et consultation des logs en direct.",
@@ -97,11 +97,11 @@ const SECTIONS: HelpSection[] = [
   {
     icon: Network,
     title: "Réseau & Sécurité",
-    summary: "Exposition réseau, blocage d'IP, et informations matérielles du Pi.",
+    summary: "Exposition réseau, blocage d'IP, et informations matérielles du serveur.",
     details: [
       "Ports ouverts sur la machine, avec le processus ou conteneur propriétaire.",
       "Blocage/déblocage d'adresses IP via fail2ban.",
-      "Onglet Système : modèle exact du Raspberry Pi, tension d'alimentation, date/heure et fuseau, interfaces réseau et IP, Wi-Fi (scan et connexion), statut SSH, services actifs et en échec.",
+      "Onglet Système : modèle matériel (sur Raspberry Pi : tension d'alimentation et throttling), date/heure et fuseau, interfaces réseau et IP, Wi-Fi (scan et connexion), statut SSH, services actifs et en échec.",
     ],
   },
   {
@@ -241,7 +241,7 @@ export function Help() {
         <p className="text-xs font-medium text-primary">Gestion des serveurs · Admin tools</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Guide rapide de chaque menu de l'application, et liste des dépendances système nécessaires au bon
-          fonctionnement de l'outil sur le Raspberry Pi.
+          fonctionnement de l'outil sur le serveur (Raspberry Pi ou Ubuntu/Debian).
         </p>
       </Card>
 
@@ -273,8 +273,8 @@ export function Help() {
           <Terminal className="h-4 w-4" /> Dépendances système à installer
         </h2>
         <Card className="mb-2 text-xs text-muted-foreground">
-          Ces logiciels doivent être présents sur le Raspberry Pi pour que les modules correspondants
-          fonctionnent. La plupart sont déjà standards sur Raspberry Pi OS / Debian.
+          Ces logiciels doivent être présents sur le serveur pour que les modules correspondants
+          fonctionnent. La plupart sont déjà standards sur Raspberry Pi OS / Debian / Ubuntu.
         </Card>
         <div className="flex flex-col gap-2">
           {DEPENDENCIES.map((dep) => (
