@@ -18,7 +18,7 @@ import type {
   NginxVhostAccessibility,
   NginxVhostErrorSummary,
   NginxConfigBackupRun,
-} from "@pwa-admin-pi/shared";
+} from "@pwa-admin/shared";
 
 const VHOST_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 

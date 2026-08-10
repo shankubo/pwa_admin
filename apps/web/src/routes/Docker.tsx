@@ -7,7 +7,7 @@ import type {
   VolumeSummary,
   NetworkSummary,
   BackupHistoryEntry,
-} from "@pwa-admin-pi/shared";
+} from "@pwa-admin/shared";
 import { apiJson, apiFetch } from "@/lib/api";
 import { useWsChannel } from "@/lib/ws";
 import { Card } from "@/components/ui/Card";

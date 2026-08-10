@@ -24,7 +24,7 @@ export function TopBar({ onMenuClick, alertCount = 0 }: TopBarProps) {
       >
         <Menu className="h-6 w-6" />
       </button>
-      <h1 className="text-base font-semibold">{current?.label ?? "Pi Admin"}</h1>
+      <h1 className="text-base font-semibold">{current?.label ?? "Server Admin"}</h1>
       <button
         type="button"
         aria-label="Alertes"

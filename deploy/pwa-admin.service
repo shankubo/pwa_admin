@@ -1,5 +1,5 @@
 [Unit]
-Description=Pi Admin PWA - Raspberry Pi administration tool
+Description=Server Admin PWA - server administration tool
 After=network.target docker.service
 Wants=docker.service
 
@@ -12,14 +12,14 @@ Type=simple
 # rules in this directory instead.
 User=shan
 Group=shan
-WorkingDirectory=/home/shan/pwa_admin_pi
-EnvironmentFile=/home/shan/pwa_admin_pi/.env
+WorkingDirectory=/home/shan/pwa_admin
+EnvironmentFile=/home/shan/pwa_admin/.env
 ExecStart=/usr/bin/node apps/api/dist/server.js
 Restart=on-failure
 RestartSec=5
 # NOTE: NoNewPrivileges is intentionally NOT set here — the app's whole
 # privilege model relies on shelling out through `sudo` for the specific
-# nginx/apt/fail2ban/ss commands scoped in sudoers.d/pwa-admin-pi (never
+# nginx/apt/fail2ban/ss commands scoped in sudoers.d/pwa-admin (never
 # running the Node process itself as root). NoNewPrivileges=true blocks sudo
 # from elevating at all, which breaks every privileged action in the app.
 

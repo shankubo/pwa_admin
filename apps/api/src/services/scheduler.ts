@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { BackupJobModel } from "../db/models/backup.js";
 import { ApplicationModel } from "../db/models/application.js";
-import type { BackupTarget, AppBackupRunKind } from "@pwa-admin-pi/shared";
+import type { BackupTarget, AppBackupRunKind } from "@pwa-admin/shared";
 
 const scheduledTasks = new Map<number, cron.ScheduledTask>();
 const scheduledAppTasks = new Map<string, cron.ScheduledTask>();

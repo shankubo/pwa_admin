@@ -5,7 +5,7 @@ import { db } from "../../db/index.js";
 import { env } from "../../config/env.js";
 import { spawnCommand } from "../../utils/exec.js";
 import { registerChannel } from "../../services/wsHub.js";
-import type { OsJob, OsJobKind } from "@pwa-admin-pi/shared";
+import type { OsJob, OsJobKind } from "@pwa-admin/shared";
 
 let jobRunning = false;
 const jobPushers = new Map<string, Set<(data: unknown) => void>>();

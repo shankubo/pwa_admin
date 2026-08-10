@@ -181,6 +181,43 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    id: 6,
+    name: "access_tokens",
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS access_tokens (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          token_hash TEXT NOT NULL UNIQUE,
+          label TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          last_used_at TEXT
+        );
+      `);
+    },
+  },
+  {
+    id: 7,
+    name: "backup_history_usb_path",
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE backup_history ADD COLUMN usb_path TEXT;
+      `);
+    },
+  },
+  {
+    id: 8,
+    name: "app_backup_usb_copy_tracking",
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE app_backup_runs ADD COLUMN usb_copy_status TEXT NOT NULL DEFAULT 'none';
+        ALTER TABLE app_backup_runs ADD COLUMN usb_copy_progress_pct INTEGER;
+        ALTER TABLE app_backup_runs ADD COLUMN usb_paths TEXT;
+        ALTER TABLE app_backup_runs ADD COLUMN usb_copy_error TEXT;
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

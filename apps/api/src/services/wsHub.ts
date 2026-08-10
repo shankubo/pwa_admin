@@ -1,5 +1,5 @@
 import type { WebSocket } from "@fastify/websocket";
-import type { WsChannel, WsServerFrame, WsSubscribeMessage } from "@pwa-admin-pi/shared";
+import type { WsChannel, WsServerFrame, WsSubscribeMessage } from "@pwa-admin/shared";
 
 interface Subscription {
   socket: WebSocket;

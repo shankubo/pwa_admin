@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import type { NginxVhostSummary } from "@pwa-admin-pi/shared";
+import type { NginxVhostSummary } from "@pwa-admin/shared";
 
 /**
  * Minimal server-block parser for the fields the UI needs (server_name, listen,

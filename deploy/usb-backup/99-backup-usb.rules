@@ -1,0 +1,8 @@
+# Matches both classic USB mass-storage (ID_BUS=usb) and USB Attached SCSI
+# bridges/enclosures (ID_BUS=scsi but ID_USB_DRIVER set, e.g. "uas") — a UAS
+# external SSD reports itself as SCSI at the ID_BUS level, so ID_BUS=="usb"
+# alone misses it. ID_USB_DRIVER being non-empty is the reliable signal.
+SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_BUS}=="usb", ACTION=="add", TAG+="systemd", ENV{SYSTEMD_WANTS}="backup-usb-mount@%k.service"
+SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_USB_DRIVER}=="?*", ACTION=="add", TAG+="systemd", ENV{SYSTEMD_WANTS}="backup-usb-mount@%k.service"
+SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_BUS}=="usb", ACTION=="remove", RUN+="/usr/bin/systemctl stop backup-usb-mount@%k.service"
+SUBSYSTEM=="block", ENV{DEVTYPE}=="partition", ENV{ID_USB_DRIVER}=="?*", ACTION=="remove", RUN+="/usr/bin/systemctl stop backup-usb-mount@%k.service"

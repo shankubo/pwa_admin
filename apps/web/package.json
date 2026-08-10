@@ -1,5 +1,5 @@
 {
-  "name": "@pwa-admin-pi/web",
+  "name": "@pwa-admin/web",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@pwa-admin-pi/shared": "*",
+    "@pwa-admin/shared": "*",
     "@radix-ui/react-dialog": "^1.1.2",
     "@radix-ui/react-slot": "^1.1.0",
     "class-variance-authority": "^0.7.0",

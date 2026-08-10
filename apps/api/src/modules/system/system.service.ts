@@ -1,7 +1,7 @@
 import si from "systeminformation";
 import { runCommand } from "../../utils/exec.js";
 import { env } from "../../config/env.js";
-import type { SystemStatsSnapshot, SystemAlert } from "@pwa-admin-pi/shared";
+import type { SystemStatsSnapshot, SystemAlert } from "@pwa-admin/shared";
 
 async function readThrottled(): Promise<SystemStatsSnapshot["cpu"]["throttled"]> {
   try {

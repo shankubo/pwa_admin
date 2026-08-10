@@ -1,5 +1,5 @@
 {
-  "name": "@pwa-admin-pi/api",
+  "name": "@pwa-admin/api",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -18,7 +18,7 @@
     "@fastify/rate-limit": "^10.1.1",
     "@fastify/static": "^8.0.2",
     "@fastify/websocket": "^11.0.1",
-    "@pwa-admin-pi/shared": "*",
+    "@pwa-admin/shared": "*",
     "bcrypt": "^5.1.1",
     "better-sqlite3": "^11.5.0",
     "dockerode": "^4.0.3",

@@ -4,7 +4,7 @@ import { applicationToApiShape, appBackupRunToApiShape, AppBackupRunModel } from
 import { BackupService } from "../backup/backup.service.js";
 import { withAudit } from "../../middleware/auditLog.js";
 import { SchedulerService } from "../../services/scheduler.js";
-import type { AppBackupRunKind, BackupTarget } from "@pwa-admin-pi/shared";
+import type { AppBackupRunKind, BackupTarget } from "@pwa-admin/shared";
 
 export default async function applicationRoutes(app: FastifyInstance) {
   const auth = { preHandler: (app as any).requireAuth };
@@ -27,7 +27,7 @@ export default async function applicationRoutes(app: FastifyInstance) {
             paths: { type: "array", items: { type: "string" } },
             dbLocation: { type: "string", enum: ["docker", "native"] },
             dbRef: { type: "string" },
-            targets: { type: "array", items: { type: "string", enum: ["local", "gdrive"] } },
+            targets: { type: "array", items: { type: "string", enum: ["local", "gdrive", "usb"] } },
             scheduleFullCron: { type: "string" },
             schedulePartialCron: { type: "string" },
             retentionDays: { type: "number" },

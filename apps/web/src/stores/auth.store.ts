@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { CurrentUser } from "@pwa-admin-pi/shared";
+import type { CurrentUser } from "@pwa-admin/shared";
 
 interface AuthState {
   accessToken: string | null;

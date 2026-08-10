@@ -4,8 +4,9 @@ import { backupJobToApiShape, backupHistoryToApiShape } from "../../db/models/ba
 import { withAudit } from "../../middleware/auditLog.js";
 import { SchedulerService } from "../../services/scheduler.js";
 import { GDriveAuthService, GDriveService } from "../../services/gdrive.client.js";
+import { UsbBackupService } from "../../services/usbBackup.client.js";
 import { env } from "../../config/env.js";
-import type { BackupSourceType, BackupTarget } from "@pwa-admin-pi/shared";
+import type { BackupSourceType, BackupTarget } from "@pwa-admin/shared";
 
 export default async function backupRoutes(app: FastifyInstance) {
   const auth = { preHandler: (app as any).requireAuth };
@@ -28,7 +29,7 @@ export default async function backupRoutes(app: FastifyInstance) {
         body: {
           type: "object",
           properties: {
-            targets: { type: "array", items: { type: "string", enum: ["local", "gdrive"] } },
+            targets: { type: "array", items: { type: "string", enum: ["local", "gdrive", "usb"] } },
           },
         },
       },
@@ -65,7 +66,7 @@ export default async function backupRoutes(app: FastifyInstance) {
             name: { type: "string", minLength: 1, maxLength: 100 },
             sourceType: { type: "string", enum: ["volume", "db", "path"] },
             sourceRef: { type: "string", minLength: 1, maxLength: 200 },
-            targets: { type: "array", items: { type: "string", enum: ["local", "gdrive"] } },
+            targets: { type: "array", items: { type: "string", enum: ["local", "gdrive", "usb"] } },
             scheduleCron: { type: "string" },
             retentionDays: { type: "number" },
             retentionMinCopies: { type: "number" },
@@ -214,6 +215,16 @@ export default async function backupRoutes(app: FastifyInstance) {
     reply.send(await BackupService.storageUsage());
   });
 
+  // --- External USB/SSD backup drive ---
+
+  app.get("/backups/usb/status", auth, async (_req, reply) => {
+    reply.send(await UsbBackupService.status());
+  });
+
+  app.get("/backups/usb/archives", auth, async (_req, reply) => {
+    reply.send(await UsbBackupService.browseArchives());
+  });
+
   app.get("/backups/gdrive/compare", auth, async (_req, reply) => {
     try {
       reply.send(await BackupService.compareWithGDrive());
@@ -292,7 +303,7 @@ export default async function backupRoutes(app: FastifyInstance) {
       const testDir = join(env.BACKUP_LOCAL_ROOT, "_gdrive-test");
       await mkdir(testDir, { recursive: true });
       const testFile = join(testDir, `connectivity-test-${Date.now()}.txt`);
-      await writeFile(testFile, `Pi Admin GDrive connectivity test — ${new Date().toISOString()}`);
+      await writeFile(testFile, `Server Admin GDrive connectivity test — ${new Date().toISOString()}`);
       try {
         const uploaded = await GDriveService.uploadBackupFile(testFile, "volumes", "_connectivity-test");
         reply.send({ ok: true, fileId: uploaded.fileId });

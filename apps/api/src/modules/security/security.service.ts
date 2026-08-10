@@ -15,7 +15,7 @@ import type {
   TlsCertInfo,
   AppAuthSecurity,
   SecurityOverview,
-} from "@pwa-admin-pi/shared";
+} from "@pwa-admin/shared";
 
 export const SecurityService = {
   async getUfwStatus(): Promise<UfwStatus> {

@@ -1,7 +1,0 @@
-[Unit]
-Description=Renew Tailscale HTTPS cert for pwa-admin-pi
-
-[Service]
-Type=oneshot
-User=shan
-ExecStart=/home/shan/pwa_admin_pi/deploy/renew-tailscale-cert.sh /home/shan/pwa_admin_pi

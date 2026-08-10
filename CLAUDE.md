@@ -1,6 +1,6 @@
-# Pi Admin PWA — instructions pour Claude Code
+# Server Admin PWA — instructions pour Claude Code
 
-PWA mobile complète pour administrer un Raspberry Pi de production (Debian 13 trixie, aarch64) sans SSH : Docker, Nginx, sauvegardes (locales + Google Drive), monitoring système, paquets OS, réseau/sécurité, PM2, matériel. Déployée et testée en continu contre le vrai serveur de production — pas d'environnement de staging séparé.
+PWA mobile complète pour administrer un serveur Linux de production sans SSH : Docker, Nginx, sauvegardes (locales + Google Drive), monitoring système, paquets OS, réseau/sécurité, PM2, matériel. Déployée et testée en continu contre le vrai serveur de production (`shan@ubuntu_ext`, alias local pour fr01pc999, Ubuntu x86_64) — pas d'environnement de staging séparé.
 
 ## Architecture
 
@@ -14,7 +14,7 @@ deploy/           Unit systemd, règles sudoers scoped, scripts d'installation/d
 docs/             Documentation complémentaire
 ```
 
-Le service `pwa-admin-pi` tourne directement sur le Pi (pas containerisé) sous l'utilisateur `shan` (pas de compte système dédié — serveur mono-admin), écoutant en HTTPS natif sur le port 8443. `apps/api` sert à la fois l'API `/api/*` et les fichiers statiques buildés de `apps/web` (`fastify-static`, fallback SPA vers `index.html`).
+Le service `pwa-admin` tourne directement sur le serveur (pas containerisé) sous l'utilisateur `shan` (pas de compte système dédié — serveur mono-admin), écoutant en HTTPS natif sur le port 8443. `apps/api` sert à la fois l'API `/api/*` et les fichiers statiques buildés de `apps/web` (`fastify-static`, fallback SPA vers `index.html`).
 
 ### apps/api — modules backend (`apps/api/src/modules/`)
 
@@ -50,7 +50,7 @@ Types TS purs, un fichier par domaine dans `src/types/`, tous ré-exportés depu
 ### Sécurité — le point non négociable de ce projet
 
 - **Jamais de shell string interpolé.** Seul `runCommand`/`spawnCommand` dans `apps/api/src/utils/exec.ts` est autorisé pour exécuter des commandes système, toujours en argv-array (`execFile`/`spawn`), jamais de concaténation de chaîne shell.
-- **Le service ne tourne jamais en root.** Toute élévation passe par des règles `sudoers.d/pwa-admin-pi` **scoped à la commande exacte** (jamais `NOPASSWD: ALL`). Ce fichier a une section par module ; toute nouvelle commande nécessitant sudo doit y être ajoutée avec un commentaire expliquant pourquoi.
+- **Le service ne tourne jamais en root.** Toute élévation passe par des règles `sudoers.d/pwa-admin` **scoped à la commande exacte** (jamais `NOPASSWD: ALL`). Ce fichier a une section par module ; toute nouvelle commande nécessitant sudo doit y être ajoutée avec un commentaire expliquant pourquoi.
 - **`Defaults!<liste de binaires> !requiretty,!use_pty`** doit couvrir tout nouveau binaire invoqué via sudo dans les règles scoped — sans ça, `sudo` échoue en environnement non-interactif (le service n'a pas de TTY) avec "a terminal is required". C'est un piège classique : oublier `!use_pty` casse silencieusement une nouvelle règle sudo alors que la syntaxe sudoers est valide.
 - **Accès réseau Tailscale-only.** L'app n'est jamais exposée publiquement — voir la section "Accès réseau" du README. Ne jamais suggérer un reverse-proxy public, un port-forward, ou une route Cloudflare Tunnel vers le port 8443.
 - Toute action destructive (start/stop/remove Docker, enable/disable/reload Nginx, upgrade/remove paquet OS, ban/unban IP, restore backup, suppression fichier Drive) passe par `withAudit()` (`apps/api/src/middleware/auditLog.ts`) et est journalisée dans `audit_log`.
@@ -58,10 +58,10 @@ Types TS purs, un fichier par domaine dans `src/types/`, tous ré-exportés depu
 
 ### Déploiement et tests
 
-- **Il n'y a pas d'environnement de staging.** Tout changement backend/frontend est testé directement contre le vrai serveur de production (`shan@server`, accessible via Tailscale). C'est le mode de travail accepté sur ce projet.
-- Pattern de déploiement de fichiers modifiés vers le Pi : transfert via `base64 -w0 <fichier> | ssh shan@server "base64 -d > ~/<chemin>"` — **jamais** un simple `cat | ssh "cat > ..."`, qui corrompt l'encodage (mojibake) sur les caractères accentués français.
-- Après tout changement, rebuild sur le Pi lui-même (jamais de cross-compile depuis Windows — `better-sqlite3` doit compiler sur l'architecture cible) : `npm run build --workspace=packages/shared`, puis `apps/api`, puis `apps/web`, dans cet ordre (shared d'abord, les deux autres en dépendent).
-- Redémarrage du service : `sudo systemctl restart pwa-admin-pi`, puis vérifier `sudo journalctl -u pwa-admin-pi -n 20 --no-pager` pour confirmer un démarrage propre.
+- **Il n'y a pas d'environnement de staging.** Tout changement backend/frontend est testé directement contre le vrai serveur de production (`shan@ubuntu_ext`, alias local pour fr01pc999, accessible via Tailscale). C'est le mode de travail accepté sur ce projet.
+- Pattern de déploiement de fichiers modifiés vers le serveur : transfert via `base64 -w0 <fichier> | ssh ubuntu_ext "base64 -d > ~/<chemin>"` — **jamais** un simple `cat | ssh "cat > ..."`, qui corrompt l'encodage (mojibake) sur les caractères accentués français.
+- Après tout changement, rebuild sur le serveur lui-même (jamais de cross-compile depuis Windows — `better-sqlite3` doit compiler sur l'architecture cible) : `npm run build --workspace=packages/shared`, puis `apps/api`, puis `apps/web`, dans cet ordre (shared d'abord, les deux autres en dépendent).
+- Redémarrage du service : `sudo systemctl restart pwa-admin`, puis vérifier `sudo journalctl -u pwa-admin -n 20 --no-pager` pour confirmer un démarrage propre.
 - **Pattern de test end-to-end** : créer un compte admin de debug temporaire (`npm run create-admin --workspace=apps/api -- <nom> <mdp>`), se logger via curl pour obtenir un JWT, exercer les vrais endpoints contre le vrai état du serveur, vérifier le résultat à la fois via la réponse API et directement en base/filesystem, **puis supprimer le compte de debug** (dans l'ordre `refresh_tokens` → `audit_log` → `users`, contraintes FK) avant de considérer la tâche terminée.
 - Toujours `npx tsc --noEmit -p tsconfig.json` sur `apps/api` et `apps/web` (et `npx tsc -p tsconfig.json` sur `packages/shared`) avant de déployer — le CI n'existe pas sur ce projet, c'est la seule vérification automatisée.
 

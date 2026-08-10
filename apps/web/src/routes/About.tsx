@@ -45,12 +45,12 @@ export function About() {
             <Cpu className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold">Pi Admin PWA</h1>
+            <h1 className="text-lg font-semibold">Server Admin PWA</h1>
             <p className="text-xs text-muted-foreground">Version {APP_VERSION}</p>
           </div>
         </div>
         <p className="mt-3 text-sm text-muted-foreground">
-          Application web progressive (PWA) mobile complète pour administrer un serveur Raspberry Pi sans avoir à
+          Application web progressive (PWA) mobile complète pour administrer un serveur Linux sans avoir à
           ouvrir un terminal SSH. Elle centralise la gestion des sites web (Nginx), des conteneurs Docker, des
           sauvegardes (locales et Google Drive), la surveillance système temps réel (CPU, RAM, disque,
           température), la gestion des paquets Debian/OS, du réseau et de la sécurité, ainsi que des processus
@@ -141,7 +141,7 @@ export function About() {
       </Card>
 
       <div className="flex items-center justify-center gap-1 py-2 text-xs text-muted-foreground">
-        <Info className="h-3.5 w-3.5" /> Pi Admin PWA {APP_VERSION} — {DEVELOPER}
+        <Info className="h-3.5 w-3.5" /> Server Admin PWA {APP_VERSION} — {DEVELOPER}
       </div>
     </div>
   );

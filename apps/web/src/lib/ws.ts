@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { WsChannel, WsServerFrame, WsSubscribeMessage } from "@pwa-admin-pi/shared";
+import type { WsChannel, WsServerFrame, WsSubscribeMessage } from "@pwa-admin/shared";
 import { useAuthStore } from "@/stores/auth.store";
 
 type FrameHandler = (frame: WsServerFrame) => void;

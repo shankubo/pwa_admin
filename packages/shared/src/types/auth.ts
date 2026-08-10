@@ -23,3 +23,25 @@ export interface CurrentUser {
   username: string;
   twoFactorEnabled: boolean;
 }
+
+export interface TokenLoginRequest {
+  token: string;
+}
+
+export interface CreateAccessTokenRequest {
+  label: string;
+}
+
+export interface CreateAccessTokenResponse {
+  id: number;
+  label: string;
+  token: string;
+  createdAt: string;
+}
+
+export interface AccessTokenSummary {
+  id: number;
+  label: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}

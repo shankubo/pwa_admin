@@ -104,7 +104,7 @@ export default async function dockerRoutes(app: FastifyInstance) {
           required: ["label"],
           properties: {
             label: { type: "string", minLength: 1, maxLength: 200 },
-            targets: { type: "array", items: { type: "string", enum: ["local", "gdrive"] } },
+            targets: { type: "array", items: { type: "string", enum: ["local", "gdrive", "usb"] } },
           },
         },
       },

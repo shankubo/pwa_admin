@@ -11,7 +11,7 @@ import type {
   SystemdUnitSummary,
   SshStatus,
   HardwareOverview,
-} from "@pwa-admin-pi/shared";
+} from "@pwa-admin/shared";
 
 async function readDeviceTreeModel(): Promise<string | null> {
   try {

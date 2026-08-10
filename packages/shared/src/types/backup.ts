@@ -1,5 +1,5 @@
 export type BackupSourceType = "volume" | "db" | "path";
-export type BackupTarget = "local" | "gdrive";
+export type BackupTarget = "local" | "gdrive" | "usb";
 export type BackupRunType = "backup" | "restore" | "pre-restore-snapshot";
 export type BackupRunStatus = "pending" | "running" | "success" | "failed";
 
@@ -25,6 +25,8 @@ export interface BackupHistoryEntry {
   target: BackupTarget;
   /** Set once the archive is confirmed uploaded to Google Drive, regardless of `target`. */
   driveFileId: string | null;
+  /** Set once the archive is confirmed copied to the detected USB drive, regardless of `target`. */
+  usbPath: string | null;
   status: BackupRunStatus;
   sizeBytes: number | null;
   checksumSha256: string | null;
@@ -66,6 +68,38 @@ export interface GDriveComparisonResult {
   totalVerified: number;
   totalMissing: number;
   totalOrphans: number;
+}
+
+/** A mounted external USB drive detected via lsblk, and the app's own backup
+ * root within it (`<mountpoint>/BACKUP/<hostname>`) — namespaced by hostname
+ * so one drive can hold backups from several machines without collision. */
+export interface UsbDriveInfo {
+  mountpoint: string;
+  label: string;
+  device: string;
+  filesystem: string | null;
+  totalBytes: number | null;
+  freeBytes: number | null;
+  backupRoot: string;
+}
+
+export interface UsbStatus {
+  available: boolean;
+  hostname: string;
+  drives: UsbDriveInfo[];
+}
+
+/** An archive found under a USB drive's BACKUP/<hostname>/<category>/<sourceRef>/
+ * tree with no corresponding backup_history row — either from a fresh/wiped
+ * database (disaster recovery) or an untracked copy. */
+export interface UsbBackupArchive {
+  mountpoint: string;
+  category: "volumes" | "paths" | "db";
+  sourceRef: string;
+  fileName: string;
+  fullPath: string;
+  sizeBytes: number;
+  modifiedAt: string;
 }
 
 export type DbEngine = "postgres" | "mysql" | "mariadb" | "mongo" | "redis";
@@ -139,4 +173,12 @@ export interface AppBackupRun {
   /** One Drive file ID per uploaded path archive (one tar.gz per app path), once driveUploadStatus is "success". */
   driveFileIds: string[] | null;
   driveUploadError: string | null;
+  /** Mirrors driveUploadStatus but for the USB drive leg — also asynchronous
+   * and best-effort, since a run should still succeed via local (and possibly
+   * gdrive) even if no USB drive is plugged in or the copy fails partway. */
+  usbCopyStatus: DriveUploadStatus;
+  usbCopyProgressPct: number | null;
+  /** One USB destination path per copied path archive (one tar.gz per app path), once usbCopyStatus is "success". */
+  usbPaths: string[] | null;
+  usbCopyError: string | null;
 }

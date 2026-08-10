@@ -1,5 +1,5 @@
 import { runCommand } from "../../utils/exec.js";
-import type { Pm2Process, Pm2Status } from "@pwa-admin-pi/shared";
+import type { Pm2Process, Pm2Status } from "@pwa-admin/shared";
 
 const PROCESS_NAME_RE = /^[a-zA-Z0-9_-]+$/;
 

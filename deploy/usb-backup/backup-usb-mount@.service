@@ -1,0 +1,9 @@
+[Unit]
+Description=Mount external USB backup drive (%i)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/backup-usb-mount.sh %i
+ExecStop=/usr/bin/umount /media/backup-usb

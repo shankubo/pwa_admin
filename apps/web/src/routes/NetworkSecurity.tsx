@@ -5,7 +5,7 @@ import type {
   VisitorStats,
   BlockedIpEntry,
   NginxVhostSummary,
-} from "@pwa-admin-pi/shared";
+} from "@pwa-admin/shared";
 import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";

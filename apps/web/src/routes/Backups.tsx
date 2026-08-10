@@ -9,7 +9,9 @@ import type {
   DetectedBindMount,
   VolumeSummary,
   GDriveComparisonResult,
-} from "@pwa-admin-pi/shared";
+  UsbStatus,
+  UsbBackupArchive,
+} from "@pwa-admin/shared";
 import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -26,6 +28,7 @@ import {
   AlertTriangle,
   Search,
   Loader2,
+  Usb,
 } from "lucide-react";
 
 const STATUS_FILTERS: { key: "all" | BackupRunStatus; label: string }[] = [
@@ -47,6 +50,7 @@ export function Backups() {
   const [gdriveAuthorized, setGdriveAuthorized] = useState(false);
   const [comparison, setComparison] = useState<GDriveComparisonResult | null>(null);
   const [comparing, setComparing] = useState(false);
+  const [usbAvailable, setUsbAvailable] = useState(false);
 
   async function runComparison() {
     setComparing(true);
@@ -85,6 +89,9 @@ export function Backups() {
     apiJson<{ authorized: boolean }>("/backups/gdrive/status")
       .then((s) => setGdriveAuthorized(s.authorized))
       .catch(() => setGdriveAuthorized(false));
+    apiJson<UsbStatus>("/backups/usb/status")
+      .then((s) => setUsbAvailable(s.available))
+      .catch(() => setUsbAvailable(false));
   }, []);
 
   async function runJob(id: number) {
@@ -98,7 +105,9 @@ export function Backups() {
   }
 
   async function dumpDb(location: "docker" | "native", ref: string) {
-    const targets: BackupTarget[] = gdriveAuthorized ? ["local", "gdrive"] : ["local"];
+    const targets: BackupTarget[] = ["local"];
+    if (gdriveAuthorized) targets.push("gdrive");
+    if (usbAvailable) targets.push("usb");
     await apiJson(`/dbbackup/${location}/${encodeURIComponent(ref)}/dump`, {
       method: "POST",
       body: JSON.stringify({ targets }),
@@ -144,6 +153,8 @@ export function Backups() {
         onCompare={runComparison}
         onDeletedFile={runComparison}
       />
+
+      <UsbConnection />
 
       <div>
         <div className="mb-2 flex items-center justify-between">
@@ -263,7 +274,8 @@ export function Backups() {
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {h.target}
-                    {h.driveFileId ? " + gdrive" : ""} · {new Date(h.startedAt).toLocaleString()}
+                    {h.driveFileId ? " + gdrive" : ""}
+                    {h.usbPath ? " + usb" : ""} · {new Date(h.startedAt).toLocaleString()}
                     {h.durationMs != null ? ` · ${(h.durationMs / 1000).toFixed(1)}s` : ""}
                   </p>
                 </div>
@@ -321,7 +333,7 @@ function RunDetailPanel({
       <div className="flex flex-col gap-1 text-sm">
         <p>Type : {run.type}</p>
         <p>Source : {run.sourceType}:{run.sourceRef}</p>
-        <p>Cible : {run.target}{run.driveFileId ? " + gdrive" : ""}</p>
+        <p>Cible : {run.target}{run.driveFileId ? " + gdrive" : ""}{run.usbPath ? " + usb" : ""}</p>
         <p>Statut : {run.status}</p>
         {run.driveFileId && (
           <a
@@ -333,6 +345,7 @@ function RunDetailPanel({
             Ouvrir sur Google Drive
           </a>
         )}
+        {run.usbPath && <p className="truncate text-xs text-muted-foreground">USB : {run.usbPath}</p>}
         {run.checksumSha256 && <p className="truncate text-xs text-muted-foreground">SHA256 : {run.checksumSha256}</p>}
         {run.error && <p className="text-xs text-destructive">{run.error}</p>}
       </div>
@@ -534,6 +547,10 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
             <input type="checkbox" checked={targets.includes("gdrive")} onChange={() => toggleTarget("gdrive")} />
             gdrive
           </label>
+          <label className="flex items-center gap-1">
+            <input type="checkbox" checked={targets.includes("usb")} onChange={() => toggleTarget("usb")} />
+            usb
+          </label>
         </div>
         <input
           type="text"
@@ -679,6 +696,95 @@ function OrphanGroupCard({
         ))}
       </div>
     </div>
+  );
+}
+
+function UsbConnection() {
+  const [status, setStatus] = useState<UsbStatus | null>(null);
+  const [archives, setArchives] = useState<UsbBackupArchive[] | null>(null);
+  const [showArchives, setShowArchives] = useState(false);
+  const [loadingArchives, setLoadingArchives] = useState(false);
+
+  function loadStatus() {
+    apiJson<UsbStatus>("/backups/usb/status")
+      .then(setStatus)
+      .catch(() => setStatus(null));
+  }
+
+  useEffect(loadStatus, []);
+
+  async function loadArchives() {
+    setShowArchives((v) => !v);
+    if (archives) return;
+    setLoadingArchives(true);
+    try {
+      setArchives(await apiJson<UsbBackupArchive[]>("/backups/usb/archives"));
+    } catch {
+      setArchives([]);
+    } finally {
+      setLoadingArchives(false);
+    }
+  }
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between">
+        <CardTitle className="flex items-center gap-1">
+          <Usb className="h-4 w-4" /> Disque USB / SSD
+        </CardTitle>
+        <Button size="sm" variant="outline" onClick={loadStatus}>
+          Rafraîchir
+        </Button>
+      </div>
+
+      {!status ? (
+        <p className="text-sm text-muted-foreground">Chargement…</p>
+      ) : !status.available ? (
+        <p className="flex items-center gap-1 text-sm text-warning">
+          <XCircle className="h-4 w-4" /> Aucun disque USB détecté (branchez-le, il sera monté automatiquement).
+        </p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {status.drives.map((d) => (
+            <div key={d.mountpoint} className="rounded-md border border-border p-2 text-sm">
+              <p className="flex items-center gap-1 text-primary">
+                <CheckCircle2 className="h-4 w-4" /> {d.label} ({d.device})
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {d.filesystem ?? "?"} · {d.freeBytes != null ? formatBytes(d.freeBytes) : "?"} libre
+                {d.totalBytes != null ? ` / ${formatBytes(d.totalBytes)}` : ""}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">{d.backupRoot}</p>
+            </div>
+          ))}
+
+          <Button size="sm" variant="outline" onClick={loadArchives}>
+            {showArchives ? "Masquer les archives" : "Parcourir les archives sur le disque"}
+          </Button>
+
+          {showArchives && (
+            <div className="flex flex-col gap-1">
+              {loadingArchives && <p className="text-xs text-muted-foreground">Chargement…</p>}
+              {!loadingArchives && archives?.length === 0 && (
+                <p className="text-xs text-muted-foreground">Aucune archive trouvée sur le disque.</p>
+              )}
+              {archives?.map((a) => (
+                <div key={a.fullPath} className="flex items-center justify-between text-xs">
+                  <div className="min-w-0">
+                    <p className="truncate">
+                      {a.category}/{a.sourceRef}/{a.fileName}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {formatBytes(a.sizeBytes)} · {new Date(a.modifiedAt).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
 

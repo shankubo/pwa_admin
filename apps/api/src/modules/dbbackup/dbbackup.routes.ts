@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { DbBackupService } from "./dbbackup.service.js";
 import { BackupHistoryModel } from "../../db/models/backup.js";
 import { withAudit } from "../../middleware/auditLog.js";
-import type { BackupTarget } from "@pwa-admin-pi/shared";
+import type { BackupTarget } from "@pwa-admin/shared";
 
 export default async function dbBackupRoutes(app: FastifyInstance) {
   const auth = { preHandler: (app as any).requireAuth };
@@ -26,7 +26,7 @@ export default async function dbBackupRoutes(app: FastifyInstance) {
         body: {
           type: "object",
           properties: {
-            targets: { type: "array", items: { type: "string", enum: ["local", "gdrive"] } },
+            targets: { type: "array", items: { type: "string", enum: ["local", "gdrive", "usb"] } },
           },
         },
       },

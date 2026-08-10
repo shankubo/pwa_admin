@@ -6,6 +6,7 @@ import { docker } from "../../services/docker.client.js";
 import { env } from "../../config/env.js";
 import { BackupHistoryModel, BackupJobModel } from "../../db/models/backup.js";
 import { GDriveService } from "../../services/gdrive.client.js";
+import { UsbBackupService } from "../../services/usbBackup.client.js";
 import { runCommand } from "../../utils/exec.js";
 import type {
   BackupSourceType,
@@ -14,7 +15,8 @@ import type {
   GDriveComparisonResult,
   OrphanDriveFile,
   DriveVerificationEntry,
-} from "@pwa-admin-pi/shared";
+  UsbBackupArchive,
+} from "@pwa-admin/shared";
 
 function timestampSlug(): string {
   return new Date().toISOString().replace(/:/g, "-");
@@ -111,12 +113,28 @@ export const BackupService = {
         if (verified) driveFileId = uploaded.fileId;
       }
 
+      let usbPath: string | undefined;
+      if (targets.includes("usb")) {
+        try {
+          if (await UsbBackupService.isAvailable()) {
+            const copied = await UsbBackupService.copyBackupFile(archivePath, "paths", label);
+            usbPath = copied.usbPath;
+          }
+          // else: no drive plugged in right now — silently skip this target,
+          // the run still succeeds via local (and possibly gdrive) above.
+        } catch {
+          // Copy started but failed partway (disk full, unplugged mid-copy) —
+          // don't fail the whole run over the USB leg specifically.
+        }
+      }
+
       BackupHistoryModel.complete(runId, {
         status: "success",
         filePath: archivePath,
         sizeBytes: stats.size,
         checksumSha256: checksum,
         driveFileId,
+        usbPath,
         durationMs: Date.now() - start,
       });
 
@@ -175,12 +193,26 @@ export const BackupService = {
         if (verified) driveFileId = uploaded.fileId;
       }
 
+      let usbPath: string | undefined;
+      if (targets.includes("usb")) {
+        try {
+          if (await UsbBackupService.isAvailable()) {
+            const copied = await UsbBackupService.copyBackupFile(archivePath, "volumes", volumeName);
+            usbPath = copied.usbPath;
+          }
+        } catch {
+          // Copy started but failed partway (disk full, unplugged mid-copy) —
+          // don't fail the whole run over the USB leg specifically.
+        }
+      }
+
       BackupHistoryModel.complete(runId, {
         status: "success",
         filePath: archivePath,
         sizeBytes: stats.size,
         checksumSha256: checksum,
         driveFileId,
+        usbPath,
         durationMs: Date.now() - start,
       });
 

@@ -7,7 +7,7 @@ import type {
   BackupRunStatus,
   BackupJob,
   BackupHistoryEntry,
-} from "@pwa-admin-pi/shared";
+} from "@pwa-admin/shared";
 
 export interface BackupJobRow {
   id: number;
@@ -33,6 +33,7 @@ export interface BackupHistoryRow {
   size_bytes: number | null;
   checksum_sha256: string | null;
   drive_file_id: string | null;
+  usb_path: string | null;
   duration_ms: number | null;
   error: string | null;
   started_at: string;
@@ -61,6 +62,7 @@ export function backupHistoryToApiShape(row: BackupHistoryRow): BackupHistoryEnt
     sourceRef: row.source_ref,
     target: row.target,
     driveFileId: row.drive_file_id,
+    usbPath: row.usb_path,
     status: row.status,
     sizeBytes: row.size_bytes,
     checksumSha256: row.checksum_sha256,
@@ -141,9 +143,9 @@ export const BackupHistoryModel = {
     return runId;
   },
 
-  complete(runId: string, result: { status: BackupRunStatus; filePath?: string; sizeBytes?: number; checksumSha256?: string; driveFileId?: string; durationMs?: number; error?: string }): void {
+  complete(runId: string, result: { status: BackupRunStatus; filePath?: string; sizeBytes?: number; checksumSha256?: string; driveFileId?: string; usbPath?: string; durationMs?: number; error?: string }): void {
     db.prepare(
-      `UPDATE backup_history SET status = ?, file_path = ?, size_bytes = ?, checksum_sha256 = ?, drive_file_id = ?, duration_ms = ?, error = ?, finished_at = datetime('now')
+      `UPDATE backup_history SET status = ?, file_path = ?, size_bytes = ?, checksum_sha256 = ?, drive_file_id = ?, usb_path = ?, duration_ms = ?, error = ?, finished_at = datetime('now')
        WHERE run_id = ?`
     ).run(
       result.status,
@@ -151,6 +153,7 @@ export const BackupHistoryModel = {
       result.sizeBytes ?? null,
       result.checksumSha256 ?? null,
       result.driveFileId ?? null,
+      result.usbPath ?? null,
       result.durationMs ?? null,
       result.error ?? null,
       runId

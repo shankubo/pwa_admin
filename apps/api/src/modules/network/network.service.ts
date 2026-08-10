@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { runCommand, isValidIp } from "../../utils/exec.js";
 import { env } from "../../config/env.js";
 import { docker } from "../../services/docker.client.js";
-import type { ListeningPort, TopPageEntry, VisitorStats, Fail2banJailStatus, BlockedIpEntry } from "@pwa-admin-pi/shared";
+import type { ListeningPort, TopPageEntry, VisitorStats, Fail2banJailStatus, BlockedIpEntry } from "@pwa-admin/shared";
 
 const analyticsCache = new Map<string, { data: unknown; expiresAt: number }>();
 const CACHE_TTL_MS = 60_000;

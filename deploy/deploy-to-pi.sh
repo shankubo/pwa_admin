@@ -8,7 +8,7 @@ set -euo pipefail
 # Usage: ./deploy/deploy-to-pi.sh user@host [remote_dir]
 
 REMOTE="${1:?Usage: deploy-to-pi.sh user@host [remote_dir]}"
-REMOTE_DIR="${2:-~/pwa_admin_pi}"
+REMOTE_DIR="${2:-~/pwa_admin}"
 
 echo "== Syncing source to ${REMOTE}:${REMOTE_DIR} =="
 rsync -az --delete \

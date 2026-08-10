@@ -10,7 +10,7 @@ import type {
   NginxConfigBackupRun,
   TopPageEntry,
   VisitorStats,
-} from "@pwa-admin-pi/shared";
+} from "@pwa-admin/shared";
 import { apiFetch, apiJson } from "@/lib/api";
 import { useWsChannel } from "@/lib/ws";
 import { Card, CardTitle } from "@/components/ui/Card";

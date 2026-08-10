@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { SystemStatsSnapshot, SystemAlert } from "@pwa-admin-pi/shared";
+import type { SystemStatsSnapshot, SystemAlert } from "@pwa-admin/shared";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { useWsChannel } from "@/lib/ws";
 import { AlertTriangle, Cpu, Thermometer, HardDrive, MemoryStick } from "lucide-react";

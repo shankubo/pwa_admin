@@ -15,9 +15,9 @@ export default defineConfig({
         "icons/**/*.png",
       ],
       manifest: {
-        name: "Pi Admin",
-        short_name: "PiAdmin",
-        description: "Administration mobile complète pour Raspberry Pi",
+        name: "Server Admin",
+        short_name: "ServerAdmin",
+        description: "Administration mobile complète pour serveur Linux",
         theme_color: "#0f172a",
         background_color: "#0f172a",
         display: "standalone",

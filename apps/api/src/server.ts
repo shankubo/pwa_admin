@@ -107,7 +107,7 @@ app.get("/healthz", async () => ({ ok: true }));
 try {
   await app.listen({ port: env.PORT, host: env.HOST });
   app.log.info(
-    `pwa-admin-pi API listening on ${useTls ? "https" : "http"}://${env.HOST}:${env.PORT}`
+    `pwa-admin API listening on ${useTls ? "https" : "http"}://${env.HOST}:${env.PORT}`
   );
 } catch (err) {
   app.log.error(err);

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import si from "systeminformation";
 import { runCommand, isValidPackageName } from "../../utils/exec.js";
 import { AptJobRunner } from "./aptJobRunner.js";
-import type { OsInfo, InstalledPackage, UpgradablePackage } from "@pwa-admin-pi/shared";
+import type { OsInfo, InstalledPackage, UpgradablePackage } from "@pwa-admin/shared";
 
 export const OsService = {
   async getInfo(): Promise<OsInfo> {

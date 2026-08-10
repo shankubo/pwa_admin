@@ -12,7 +12,7 @@ import type {
   VolumeSummary,
   NetworkSummary,
   DockerSystemDf,
-} from "@pwa-admin-pi/shared";
+} from "@pwa-admin/shared";
 
 function calcCpuPercent(stats: any): number {
   const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - stats.precpu_stats.cpu_usage.total_usage;

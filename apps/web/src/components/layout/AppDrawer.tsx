@@ -47,7 +47,7 @@ export function AppDrawer({ open, onOpenChange }: AppDrawerProps) {
           aria-describedby={undefined}
         >
           <div className="flex items-center justify-between">
-            <Dialog.Title className="text-lg font-semibold">Pi Admin</Dialog.Title>
+            <Dialog.Title className="text-lg font-semibold">Server Admin</Dialog.Title>
             <Dialog.Close className="rounded-md p-1 hover:bg-muted">
               <X className="h-5 w-5" />
             </Dialog.Close>

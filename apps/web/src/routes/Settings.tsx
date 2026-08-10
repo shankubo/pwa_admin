@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { CurrentUser } from "@pwa-admin-pi/shared";
+import type { AccessTokenSummary, CreateAccessTokenResponse, CurrentUser } from "@pwa-admin/shared";
 import { apiFetch, apiJson } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth.store";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { ShieldCheck, ShieldOff, LogOut } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ShieldCheck, ShieldOff, LogOut, KeyRound, Trash2 } from "lucide-react";
 
 // No shared type exists for audit log rows — these are raw sqlite columns (snake_case).
 interface AuditLogRow {
@@ -61,6 +62,8 @@ export function Settings() {
       {user && user.twoFactorEnabled && (
         <TwoFactorDisableCard onDisabled={() => setUser({ ...user, twoFactorEnabled: false })} />
       )}
+
+      <AccessTokensCard />
 
       <AuditLogCard />
 
@@ -207,6 +210,117 @@ function TwoFactorDisableCard({ onDisabled }: { onDisabled: () => void }) {
           </Button>
         </form>
       )}
+    </Card>
+  );
+}
+
+function AccessTokensCard() {
+  const [tokens, setTokens] = useState<AccessTokenSummary[]>([]);
+  const [label, setLabel] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [newToken, setNewToken] = useState<CreateAccessTokenResponse | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  async function load() {
+    try {
+      setTokens(await apiJson<AccessTokenSummary[]>("/auth/tokens"));
+    } finally {
+      setLoaded(true);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setCreating(true);
+    try {
+      const created = await apiJson<CreateAccessTokenResponse>("/auth/tokens", {
+        method: "POST",
+        body: JSON.stringify({ label }),
+      });
+      setNewToken(created);
+      setLabel("");
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function revoke(id: number) {
+    await apiFetch(`/auth/tokens/${id}`, { method: "DELETE" });
+    await load();
+  }
+
+  return (
+    <Card>
+      <CardTitle className="flex items-center gap-1">
+        <KeyRound className="h-4 w-4" /> Jetons d'accès
+      </CardTitle>
+      <p className="text-xs text-muted-foreground">
+        Permet de se connecter depuis un autre appareil sans mot de passe, via "Connexion par jeton" sur l'écran de
+        connexion. Réservé à des appareils de confiance déjà sur le tailnet.
+      </p>
+
+      {newToken && (
+        <div className="rounded-md border border-primary/50 bg-primary/5 p-3 text-xs">
+          <p className="mb-1 font-medium">
+            Jeton créé pour « {newToken.label} » — copiez-le maintenant, il ne sera plus affiché :
+          </p>
+          <code className="block break-all rounded bg-background p-2">{newToken.token}</code>
+          <Button size="sm" variant="outline" className="mt-2" onClick={() => setNewToken(null)}>
+            J'ai copié le jeton
+          </Button>
+        </div>
+      )}
+
+      <form onSubmit={create} className="flex gap-2">
+        <input
+          type="text"
+          placeholder="Nom de l'appareil (ex. iPhone Shan)"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+          required
+        />
+        <Button type="submit" size="sm" disabled={creating}>
+          {creating ? "…" : "Générer"}
+        </Button>
+      </form>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+
+      <div className="flex flex-col gap-1">
+        {tokens.map((t) => (
+          <div key={t.id} className="flex items-center justify-between border-b border-border/50 py-1.5 text-xs last:border-0">
+            <div>
+              <p className="font-medium">{t.label}</p>
+              <p className="text-muted-foreground">
+                Créé le {new Date(t.createdAt).toLocaleDateString()}
+                {t.lastUsedAt ? ` · utilisé le ${new Date(t.lastUsedAt).toLocaleDateString()}` : " · jamais utilisé"}
+              </p>
+            </div>
+            <ConfirmDialog
+              trigger={
+                <Button size="sm" variant="ghost">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              }
+              title="Révoquer ce jeton ?"
+              description={`L'appareil « ${t.label} » ne pourra plus se connecter avec ce jeton.`}
+              confirmLabel="Révoquer"
+              onConfirm={() => revoke(t.id)}
+            />
+          </div>
+        ))}
+        {loaded && tokens.length === 0 && <p className="text-sm text-muted-foreground">Aucun jeton actif.</p>}
+      </div>
     </Card>
   );
 }

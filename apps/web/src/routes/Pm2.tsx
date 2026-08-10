@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Pm2Process, Pm2Status } from "@pwa-admin-pi/shared";
+import type { Pm2Process, Pm2Status } from "@pwa-admin/shared";
 import { apiJson, apiFetch } from "@/lib/api";
 import { useWsChannel } from "@/lib/ws";
 import { Card, CardTitle } from "@/components/ui/Card";

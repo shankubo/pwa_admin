@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { randomBytes } from "node:crypto";
 import { AuthService, UserModel } from "./auth.service.js";
+import { AccessTokenModel } from "../../db/models/accessToken.js";
 import { env } from "../../config/env.js";
 import { withAudit } from "../../middleware/auditLog.js";
 
@@ -210,6 +211,80 @@ export default async function authRoutes(app: FastifyInstance) {
     reply.clearCookie("refresh_token", { path: "/api/auth" });
     return reply.send({ ok: true });
   });
+
+  app.post(
+    "/auth/token-login",
+    {
+      config: {
+        rateLimit: {
+          max: env.LOGIN_RATE_LIMIT_MAX,
+          timeWindow: env.LOGIN_RATE_LIMIT_WINDOW,
+        },
+      },
+      schema: {
+        body: {
+          type: "object",
+          required: ["token"],
+          properties: { token: { type: "string", minLength: 1, maxLength: 200 } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { token } = request.body as { token: string };
+      const userId = AuthService.verifyAccessToken(token);
+      if (!userId) return reply.code(401).send({ error: "invalid_token" });
+
+      const user = UserModel.findById(userId);
+      if (!user) return reply.code(401).send({ error: "user_not_found" });
+
+      const accessToken = app.jwt.sign({ sub: user.id, username: user.username });
+      const refreshToken = AuthService.issueRefreshToken(user.id);
+      reply.setCookie("refresh_token", refreshToken, {
+        httpOnly: true,
+        secure: env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/api/auth",
+      });
+      return reply.send({ accessToken });
+    }
+  );
+
+  app.post(
+    "/auth/tokens",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("auth.token.create")],
+      schema: {
+        body: {
+          type: "object",
+          required: ["label"],
+          properties: { label: { type: "string", minLength: 1, maxLength: 100 } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const payload = request.user as { sub: number };
+      const { label } = request.body as { label: string };
+      const issued = AuthService.issueAccessToken(payload.sub, label);
+      return reply.send({ id: issued.id, label, token: issued.token, createdAt: issued.createdAt });
+    }
+  );
+
+  app.get("/auth/tokens", { preHandler: (app as any).requireAuth }, async (request, reply) => {
+    const payload = request.user as { sub: number };
+    return reply.send(AccessTokenModel.listForUser(payload.sub));
+  });
+
+  app.delete(
+    "/auth/tokens/:id",
+    { preHandler: [(app as any).requireAuth, withAudit("auth.token.revoke")] },
+    async (request, reply) => {
+      const payload = request.user as { sub: number };
+      const { id } = request.params as { id: string };
+      const revoked = AccessTokenModel.revoke(Number(id), payload.sub);
+      if (!revoked) return reply.code(404).send({ error: "not_found" });
+      return reply.send({ ok: true });
+    }
+  );
 
   app.get(
     "/auth/me",

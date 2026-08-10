@@ -4,6 +4,7 @@ import QRCode from "qrcode";
 import { randomBytes, createHash } from "node:crypto";
 import { db } from "../../db/index.js";
 import { UserModel } from "../../db/models/user.js";
+import { AccessTokenModel } from "../../db/models/accessToken.js";
 import { env } from "../../config/env.js";
 
 const BCRYPT_ROUNDS = 12;
@@ -57,6 +58,19 @@ export const AuthService = {
   revokeRefreshToken(token: string): void {
     const tokenHash = createHash("sha256").update(token).digest("hex");
     db.prepare("UPDATE refresh_tokens SET revoked = 1 WHERE token_hash = ?").run(tokenHash);
+  },
+  issueAccessToken(userId: number, label: string): { id: number; token: string; createdAt: string } {
+    const token = randomBytes(32).toString("hex");
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const row = AccessTokenModel.create(userId, tokenHash, label);
+    return { id: row.id, token, createdAt: row.created_at };
+  },
+  verifyAccessToken(token: string): number | null {
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const row = AccessTokenModel.findByHash(tokenHash);
+    if (!row) return null;
+    AccessTokenModel.touchLastUsed(row.id);
+    return row.user_id;
   },
 
   recordLoginAttempt(username: string, ip: string, success: boolean): void {

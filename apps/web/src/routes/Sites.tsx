@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { NginxVhostSummary, NginxVhostDetail, NginxCertStatus } from "@pwa-admin-pi/shared";
+import type { NginxVhostSummary, NginxVhostDetail, NginxCertStatus } from "@pwa-admin/shared";
 import { apiFetch, apiJson } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";

@@ -7,7 +7,7 @@ import type {
   BackupTarget,
   BackupRunStatus,
   DriveUploadStatus,
-} from "@pwa-admin-pi/shared";
+} from "@pwa-admin/shared";
 
 export interface ApplicationRow {
   id: number;
@@ -41,6 +41,10 @@ export interface AppBackupRunRow {
   drive_upload_progress_pct: number | null;
   drive_file_ids: string | null;
   drive_upload_error: string | null;
+  usb_copy_status: DriveUploadStatus;
+  usb_copy_progress_pct: number | null;
+  usb_paths: string | null;
+  usb_copy_error: string | null;
 }
 
 export function applicationToApiShape(row: ApplicationRow): Application {
@@ -75,6 +79,10 @@ export function appBackupRunToApiShape(row: AppBackupRunRow): AppBackupRun {
     driveUploadProgressPct: row.drive_upload_progress_pct,
     driveFileIds: row.drive_file_ids ? JSON.parse(row.drive_file_ids) : null,
     driveUploadError: row.drive_upload_error,
+    usbCopyStatus: row.usb_copy_status,
+    usbCopyProgressPct: row.usb_copy_progress_pct,
+    usbPaths: row.usb_paths ? JSON.parse(row.usb_paths) : null,
+    usbCopyError: row.usb_copy_error,
   };
 }
 
@@ -211,6 +219,24 @@ export const AppBackupRunModel = {
       fields.progressPct !== undefined ? fields.progressPct : (current?.drive_upload_progress_pct ?? null),
       fields.fileIds ? JSON.stringify(fields.fileIds) : (current?.drive_file_ids ?? null),
       fields.error !== undefined ? fields.error : (current?.drive_upload_error ?? null),
+      runId
+    );
+  },
+
+  setUsbCopyStatus(
+    runId: string,
+    status: DriveUploadStatus,
+    fields: { progressPct?: number; paths?: string[]; error?: string } = {}
+  ): void {
+    const current = this.findByRunId(runId);
+    db.prepare(
+      `UPDATE app_backup_runs SET usb_copy_status = ?, usb_copy_progress_pct = ?, usb_paths = ?, usb_copy_error = ?
+       WHERE run_id = ?`
+    ).run(
+      status,
+      fields.progressPct !== undefined ? fields.progressPct : (current?.usb_copy_progress_pct ?? null),
+      fields.paths ? JSON.stringify(fields.paths) : (current?.usb_paths ?? null),
+      fields.error !== undefined ? fields.error : (current?.usb_copy_error ?? null),
       runId
     );
   },

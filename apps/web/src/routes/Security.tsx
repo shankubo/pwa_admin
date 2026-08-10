@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { SecurityOverview } from "@pwa-admin-pi/shared";
+import type { SecurityOverview } from "@pwa-admin/shared";
 import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import {

@@ -1,6 +1,6 @@
-# Pi Admin PWA
+# Server Admin PWA
 
-PWA mobile complète pour administrer un Raspberry Pi : sites web (Nginx), Docker (conteneurs + sauvegardes de bases de données), sauvegardes locales et Google Drive, monitoring système (CPU/RAM/disque/température), gestion des paquets Debian/OS, et sécurité réseau (ports, fail2ban).
+PWA mobile complète pour administrer un serveur Linux (Raspberry Pi ou VM/serveur Debian/Ubuntu) : sites web (Nginx), Docker (conteneurs + sauvegardes de bases de données), sauvegardes locales et Google Drive, monitoring système (CPU/RAM/disque/température), gestion des paquets Debian/OS, et sécurité réseau (ports, fail2ban).
 
 Voir le plan d'implémentation complet pour l'architecture détaillée, l'ordre des phases et les décisions de conception.
 
@@ -24,23 +24,23 @@ npm run dev:web   # démarre le frontend Vite (proxy /api vers le backend)
 
 > **Note Windows** : `better-sqlite3` (module natif) nécessite les Visual Studio Build Tools pour compiler sur Windows. Sur le Raspberry Pi (Debian ARM avec gcc/make/python3), ce problème ne se pose pas. Le typecheck (`tsc --noEmit`) et le build du frontend PWA sont validés sans ce module sur une machine de dev Windows ; le démarrage réel du serveur est à tester sur le Pi (ou après installation des Build Tools).
 
-## Déploiement sur le Raspberry Pi
+## Déploiement sur le serveur
 
-Le déploiement se fait en syncant le code source puis en buildant **sur le Pi lui-même** (les modules natifs comme `better-sqlite3` doivent compiler sur l'architecture cible — cross-compiler depuis Windows serait fragile).
+Le déploiement se fait en syncant le code source puis en buildant **sur la machine cible elle-même** (les modules natifs comme `better-sqlite3` doivent compiler sur l'architecture cible — cross-compiler depuis Windows serait fragile).
 
 ```bash
-./deploy/deploy-to-pi.sh shan@server
-# puis, sur le Pi :
-ssh shan@server
-cd ~/pwa_admin_pi
+./deploy/deploy-to-pi.sh shan@ubuntu_ext
+# puis, sur le serveur :
+ssh ubuntu_ext
+cd ~/pwa_admin
 cp deploy/env.server.example .env    # puis remplir les secrets JWT
 ./deploy/install.sh                   # installe sudoers.d + unit systemd
 npm run create-admin --workspace=apps/api -- <username> <password>
-sudo systemctl enable --now pwa-admin-pi
-sudo journalctl -u pwa-admin-pi -f
+sudo systemctl enable --now pwa-admin
+sudo journalctl -u pwa-admin -f
 ```
 
-Le service tourne sous l'utilisateur admin existant (pas de compte système séparé sur un serveur mono-admin), avec des permissions élevées strictement scoped via `deploy/sudoers.d/pwa-admin-pi` (nginx reload/restart, apt update/upgrade, fail2ban ban/unban, `ss` — jamais un accès root complet ni le service lancé en root).
+Le service tourne sous l'utilisateur admin existant (pas de compte système séparé sur un serveur mono-admin), avec des permissions élevées strictement scoped via `deploy/sudoers.d/pwa-admin` (nginx reload/restart, apt update/upgrade, fail2ban ban/unban, `ss` — jamais un accès root complet ni le service lancé en root).
 
 ## État actuel
 
@@ -67,11 +67,11 @@ Toutes les phases du plan sont implémentées :
 
 Cette app a un contrôle total sur Docker/Nginx/apt/pare-feu — elle ne doit **jamais** être exposée publiquement (pas de route Cloudflare Tunnel, pas de reverse-proxy public vers le port 8443). L'accès admin passe exclusivement par [Tailscale](https://tailscale.com), qui crée un VPN mesh privé où le port n'est joignable que depuis les appareils déjà authentifiés sur le tailnet — aucun paquet d'un attaquant sur Internet n'atteint même le port.
 
-**Mise en place (déjà faite sur `shan@server`)** :
+**Mise en place (déjà faite sur `shan@ubuntu_ext` / fr01pc999)** :
 
 1. **Pare-feu (UFW)** : le port 8443 est explicitement `DENY` depuis le LAN (`192.168.1.0/24`) et le VPN WireGuard existant (`10.66.66.0/24`), et `ALLOW` uniquement depuis la plage Tailscale (`100.64.0.0/10`). Toute autre IP reste bloquée par la politique par défaut (`deny incoming`). Règles dans `sudo ufw status numbered`.
 2. **HTTPS via certificat Tailscale** : `tailscale cert <machine>.<tailnet>.ts.net` génère un vrai certificat Let's Encrypt (validé par les navigateurs, pas d'avertissement) stocké dans `secrets/tailscale-cert/` et référencé par `TLS_CERT_PATH`/`TLS_KEY_PATH` dans `.env`. Le serveur Fastify écoute alors en HTTPS natif.
-3. **Renouvellement automatique** : `deploy/pwa-admin-pi-cert-renew.timer` (systemd timer, hebdomadaire) relance `deploy/renew-tailscale-cert.sh`, qui régénère le certificat si besoin et redémarre le service. Vérifier avec `sudo systemctl list-timers pwa-admin-pi-cert-renew.timer`.
+3. **Renouvellement automatique** : `deploy/pwa-admin-cert-renew.timer` (systemd timer, hebdomadaire) relance `deploy/renew-tailscale-cert.sh`, qui régénère le certificat si besoin et redémarre le service. Vérifier avec `sudo systemctl list-timers pwa-admin-cert-renew.timer`.
 
 **Accès depuis vos appareils** : installez Tailscale sur votre téléphone/PC, connectez-vous au même compte (`votre.adresse_mail@...`), puis ouvrez `https://<machine>.<tailnet>.ts.net:8443` (ou l'IP Tailscale `https://100.x.x.x:8443`). Fonctionne aussi bien en 4G/5G qu'en Wi-Fi — Tailscale route le trafic peu importe le réseau physique.
 

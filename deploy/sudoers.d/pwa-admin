@@ -1,7 +1,7 @@
-# Sudoers rules for the pwa-admin-pi service user (shan).
+# Sudoers rules for the pwa-admin service user (shan).
 # Scoped NOPASSWD entries only — never grant broad sudo access.
-# Install with: sudo cp pwa-admin-pi /etc/sudoers.d/pwa-admin-pi && sudo chmod 440 /etc/sudoers.d/pwa-admin-pi
-# Always validate with `visudo -c -f /etc/sudoers.d/pwa-admin-pi` before relying on this file.
+# Install with: sudo cp pwa-admin /etc/sudoers.d/pwa-admin && sudo chmod 440 /etc/sudoers.d/pwa-admin
+# Always validate with `visudo -c -f /etc/sudoers.d/pwa-admin` before relying on this file.
 
 # --- Nginx module ---
 shan ALL=(root) NOPASSWD: /usr/sbin/nginx -t
@@ -12,11 +12,11 @@ shan ALL=(root) NOPASSWD: /bin/systemctl is-active nginx
 # /etc/nginx is root-owned; enable/disable (symlink) and config writes go through these.
 shan ALL=(root) NOPASSWD: /usr/bin/ln -s /etc/nginx/sites-available/*, /etc/nginx/sites-enabled/*
 shan ALL=(root) NOPASSWD: /usr/bin/rm -f /etc/nginx/sites-enabled/*
-shan ALL=(root) NOPASSWD: /usr/bin/cp /home/shan/pwa_admin_pi/data/nginx-config-history/*, /etc/nginx/sites-available/*
+shan ALL=(root) NOPASSWD: /usr/bin/cp /home/shan/pwa_admin/data/nginx-config-history/*, /etc/nginx/sites-available/*
 # Full config backup (sites-available + nginx.conf), scoped to its own staging dir.
-shan ALL=(root) NOPASSWD: /usr/bin/tar czf /home/shan/pwa_admin_pi/data/backups/nginx-config/*.tar.gz -C /etc/nginx sites-available
-shan ALL=(root) NOPASSWD: /usr/bin/tar czf /home/shan/pwa_admin_pi/data/backups/nginx-config/*.tar.gz -C /etc/nginx sites-available nginx.conf
-shan ALL=(root) NOPASSWD: /usr/bin/chown shan /home/shan/pwa_admin_pi/data/backups/nginx-config/*.tar.gz
+shan ALL=(root) NOPASSWD: /usr/bin/tar czf /home/shan/pwa_admin/data/backups/nginx-config/*.tar.gz -C /etc/nginx sites-available
+shan ALL=(root) NOPASSWD: /usr/bin/tar czf /home/shan/pwa_admin/data/backups/nginx-config/*.tar.gz -C /etc/nginx sites-available nginx.conf
+shan ALL=(root) NOPASSWD: /usr/bin/chown shan /home/shan/pwa_admin/data/backups/nginx-config/*.tar.gz
 # Cert files referenced by ssl_certificate are frequently root-only (e.g. /etc/ssl/private), same rationale as `nginx -t`.
 shan ALL=(root) NOPASSWD: /usr/bin/openssl x509 -in * -noout -enddate -issuer -subject
 
@@ -59,8 +59,8 @@ shan ALL=(postgres) NOPASSWD: /usr/bin/psql, /usr/bin/pg_dumpall
 # Bind-mount sources are frequently owned by container-internal uids/gids the
 # admin service user can't read directly; sudo tar is scoped to exactly this
 # archive/extract shape, never a broader filesystem-write grant.
-shan ALL=(root) NOPASSWD: /usr/bin/tar czf /home/shan/pwa_admin_pi/data/backups/paths/* -C * .
-shan ALL=(root) NOPASSWD: /usr/bin/tar xzf /home/shan/pwa_admin_pi/data/backups/paths/*/*.tar.gz -C *
+shan ALL=(root) NOPASSWD: /usr/bin/tar czf /home/shan/pwa_admin/data/backups/paths/* -C * .
+shan ALL=(root) NOPASSWD: /usr/bin/tar xzf /home/shan/pwa_admin/data/backups/paths/*/*.tar.gz -C *
 
 # --- Applications module: rsync --link-dest snapshots + retention cleanup ---
 # Same rationale as the tar rules above (bind-mount ownership), plus rm -rf
@@ -68,17 +68,17 @@ shan ALL=(root) NOPASSWD: /usr/bin/tar xzf /home/shan/pwa_admin_pi/data/backups/
 shan ALL=(root) NOPASSWD: /usr/bin/rsync -a --itemize-changes *
 shan ALL=(root) NOPASSWD: /usr/bin/rsync -a --itemize-changes --link-dest=* *
 shan ALL=(root) NOPASSWD: /usr/bin/rsync -a --delete * /home/shan/*
-shan ALL=(root) NOPASSWD: /usr/bin/rm -rf /home/shan/pwa_admin_pi/data/backups/apps/*
+shan ALL=(root) NOPASSWD: /usr/bin/rm -rf /home/shan/pwa_admin/data/backups/apps/*
 
 # --- Applications module: Drive upload staging (tar the snapshot, hand ownership back) ---
 # The snapshot dir may contain files with container-internal ownership; tar
 # them into a Node-writable staging file, then chown so Node can stream/delete
 # it without further sudo calls per upload.
-shan ALL=(root) NOPASSWD: /usr/bin/tar czf /home/shan/pwa_admin_pi/data/backups/_tmp-drive-upload/*.tar.gz -C * .
-shan ALL=(root) NOPASSWD: /usr/bin/chown shan /home/shan/pwa_admin_pi/data/backups/_tmp-drive-upload/*.tar.gz
+shan ALL=(root) NOPASSWD: /usr/bin/tar czf /home/shan/pwa_admin/data/backups/_tmp-drive-upload/*.tar.gz -C * .
+shan ALL=(root) NOPASSWD: /usr/bin/chown shan /home/shan/pwa_admin/data/backups/_tmp-drive-upload/*.tar.gz
 
 # The system-wide sudoers `Defaults` sets `use_pty`, which makes sudo require
 # an allocated pseudo-terminal — fine for interactive SSH use, but the
-# pwa-admin-pi service invokes sudo via execFile with no TTY at all, so every
+# pwa-admin service invokes sudo via execFile with no TTY at all, so every
 # scoped command here needs both `!requiretty` and `!use_pty` to run non-interactively.
 Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/bin/systemctl,/usr/bin/fail2ban-client,/usr/sbin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat,/usr/sbin/ufw,/usr/bin/tail !requiretty,!use_pty

@@ -4,9 +4,10 @@ import { env } from "../../config/env.js";
 import { runCommand } from "../../utils/exec.js";
 import { AppBackupRunModel, ApplicationModel, type ApplicationRow } from "../../db/models/application.js";
 import { GDriveService } from "../../services/gdrive.client.js";
+import { UsbBackupService } from "../../services/usbBackup.client.js";
 import { DbBackupService } from "../dbbackup/dbbackup.service.js";
 import { BackupService } from "../backup/backup.service.js";
-import type { AppBackupRunKind, BackupTarget } from "@pwa-admin-pi/shared";
+import type { AppBackupRunKind, BackupTarget } from "@pwa-admin/shared";
 
 function appSnapshotRoot(appName: string): string {
   return join(env.BACKUP_LOCAL_ROOT, "apps", appName);
@@ -118,6 +119,15 @@ export const ApplicationService = {
         this.uploadSnapshotToDrive(app, runId, snapshotDir, paths).catch(() => {});
       }
 
+      // Same rationale as the Drive leg above: don't block the (already
+      // "success") local backup on a possibly multi-GB USB copy. Unlike Drive,
+      // "no drive plugged in" is an expected, frequent case here, not a config
+      // gate, so availability is only checked once the async job starts.
+      if (targets.includes("usb")) {
+        AppBackupRunModel.setUsbCopyStatus(runId, "pending");
+        this.copySnapshotToUsb(app, runId, snapshotDir, paths).catch(() => {});
+      }
+
       return runId;
     } catch (err) {
       AppBackupRunModel.complete(runId, { status: "failed", error: (err as Error).message });
@@ -181,6 +191,57 @@ export const ApplicationService = {
       AppBackupRunModel.setDriveUploadStatus(runId, "success", { progressPct: 100, fileIds });
     } catch (err) {
       AppBackupRunModel.setDriveUploadStatus(runId, "failed", { error: (err as Error).message });
+    }
+  },
+
+  /**
+   * USB counterpart to uploadSnapshotToDrive: compresses each path in the
+   * snapshot to its own tar.gz and copies it onto the detected USB drive,
+   * updating usb_copy_status/progress as it goes. Runs after the Drive leg
+   * (if any) rather than in parallel, since both share the same sudo tar of
+   * the snapshot directory and running them concurrently would just contend
+   * for the same disk I/O.
+   */
+  async copySnapshotToUsb(
+    app: ApplicationRow,
+    runId: string,
+    snapshotDir: string,
+    paths: string[]
+  ): Promise<void> {
+    if (!(await UsbBackupService.isAvailable())) {
+      AppBackupRunModel.setUsbCopyStatus(runId, "none");
+      return;
+    }
+
+    const tmpDir = join(env.BACKUP_LOCAL_ROOT, "_tmp-usb-upload");
+    await mkdir(tmpDir, { recursive: true });
+
+    const usbPaths: string[] = [];
+    try {
+      for (let i = 0; i < paths.length; i++) {
+        const label = basename(paths[i]);
+        const snapshotPathDir = join(snapshotDir, label);
+        const archivePath = join(tmpDir, `${runId}-${label}.tar.gz`);
+
+        const pathBaseProgress = Math.round((i / paths.length) * 100);
+        AppBackupRunModel.setUsbCopyStatus(runId, "compressing", { progressPct: pathBaseProgress });
+
+        await runCommand("sudo", ["tar", "czf", archivePath, "-C", snapshotPathDir, "."], {
+          timeoutMs: 600_000,
+        });
+        await runCommand("sudo", ["chown", process.env.USER ?? "shan", archivePath], { timeoutMs: 5_000 }).catch(
+          () => {}
+        );
+
+        AppBackupRunModel.setUsbCopyStatus(runId, "uploading", { progressPct: pathBaseProgress });
+        const copied = await UsbBackupService.copyBackupFile(archivePath, "paths", `${app.name}-${label}`);
+        usbPaths.push(copied.usbPath);
+        await rm(archivePath, { force: true });
+      }
+
+      AppBackupRunModel.setUsbCopyStatus(runId, "success", { progressPct: 100, paths: usbPaths });
+    } catch (err) {
+      AppBackupRunModel.setUsbCopyStatus(runId, "failed", { error: (err as Error).message });
     }
   },
 

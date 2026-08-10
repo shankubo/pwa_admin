@@ -8,8 +8,9 @@ import { env } from "../../config/env.js";
 import { BackupHistoryModel } from "../../db/models/backup.js";
 import { BackupService } from "../backup/backup.service.js";
 import { GDriveService } from "../../services/gdrive.client.js";
+import { UsbBackupService } from "../../services/usbBackup.client.js";
 import { runCommand, spawnCommand } from "../../utils/exec.js";
-import type { DetectedDatabase, DbEngine, BackupTarget } from "@pwa-admin-pi/shared";
+import type { DetectedDatabase, DbEngine, BackupTarget } from "@pwa-admin/shared";
 
 const DB_NAME_RE = /^[a-zA-Z0-9_-]+$/;
 
@@ -252,12 +253,26 @@ export const DbBackupService = {
         if (verified) driveFileId = uploaded.fileId;
       }
 
+      let usbPath: string | undefined;
+      if (targets.includes("usb")) {
+        try {
+          if (await UsbBackupService.isAvailable()) {
+            const copied = await UsbBackupService.copyBackupFile(filePath, "db", containerName);
+            usbPath = copied.usbPath;
+          }
+        } catch {
+          // Copy started but failed partway (disk full, unplugged mid-copy) —
+          // don't fail the whole run over the USB leg specifically.
+        }
+      }
+
       BackupHistoryModel.complete(runId, {
         status: "success",
         filePath,
         sizeBytes: stats.size,
         checksumSha256: checksum,
         driveFileId,
+        usbPath,
         durationMs: Date.now() - start,
       });
 
@@ -335,12 +350,26 @@ export const DbBackupService = {
         if (verified) driveFileId = uploaded.fileId;
       }
 
+      let usbPath: string | undefined;
+      if (targets.includes("usb")) {
+        try {
+          if (await UsbBackupService.isAvailable()) {
+            const copied = await UsbBackupService.copyBackupFile(filePath, "db", service);
+            usbPath = copied.usbPath;
+          }
+        } catch {
+          // Copy started but failed partway (disk full, unplugged mid-copy) —
+          // don't fail the whole run over the USB leg specifically.
+        }
+      }
+
       BackupHistoryModel.complete(runId, {
         status: "success",
         filePath,
         sizeBytes: stats.size,
         checksumSha256: checksum,
         driveFileId,
+        usbPath,
         durationMs: Date.now() - start,
       });
 

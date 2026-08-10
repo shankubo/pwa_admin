@@ -1,5 +1,5 @@
 [Unit]
-Description=Weekly renewal check for pwa-admin-pi's Tailscale HTTPS cert
+Description=Weekly renewal check for pwa-admin's Tailscale HTTPS cert
 
 [Timer]
 OnCalendar=weekly
