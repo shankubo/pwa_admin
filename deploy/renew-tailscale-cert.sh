@@ -17,5 +17,8 @@ sudo chown "$(whoami)":"$(whoami)" "$DOMAIN.crt" "$DOMAIN.key"
 chmod 644 "$DOMAIN.crt"
 chmod 600 "$DOMAIN.key"
 
-sudo systemctl restart pwa-admin
-echo "Tailscale cert renewed/verified for $DOMAIN, service restarted."
+# Deliberately does NOT restart pwa-admin here — that command must never have
+# a NOPASSWD sudoers rule (the service must not be able to restart itself
+# without human confirmation), so this timer-run script can't do it either.
+# The refreshed cert files sit on disk until the next manual restart.
+echo "Tailscale cert renewed/verified for $DOMAIN. Restart pwa-admin manually to pick it up."

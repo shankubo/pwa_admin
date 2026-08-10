@@ -79,6 +79,9 @@ shan ALL=(root) NOPASSWD: /usr/bin/chown shan /home/shan/pwa_admin/data/backups/
 
 # --- Services module: status/update for Tailscale, Docker, PM2 ---
 shan ALL=(root) NOPASSWD: /usr/bin/tailscale update
+# Weekly cert-renew timer (renew-tailscale-cert.sh) runs non-interactively,
+# so it needs this scoped to the single machine domain `tailscale status` reports.
+shan ALL=(root) NOPASSWD: /usr/bin/tailscale cert *
 shan ALL=(root) NOPASSWD: /usr/bin/apt-get install --only-upgrade -y docker-ce docker-ce-cli containerd.io
 shan ALL=(root) NOPASSWD: /bin/systemctl restart docker
 shan ALL=(root) NOPASSWD: /bin/systemctl is-active docker
