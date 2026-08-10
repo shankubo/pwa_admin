@@ -21,7 +21,7 @@ import {
   User,
 } from "lucide-react";
 
-const APP_VERSION = "0.2.0";
+const APP_VERSION = __GIT_DATE__ ? `${__GIT_DATE__} · ${__GIT_COMMIT__}` : __GIT_COMMIT__;
 const DEVELOPER = "Shan.K";
 
 const MODULES: { icon: typeof LayoutDashboard; title: string; description: string }[] = [

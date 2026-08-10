@@ -131,6 +131,11 @@ function ContainersTab() {
               <div className="flex items-center gap-2">
                 <ContainerIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="truncate font-medium">{c.name}</span>
+                {c.name.endsWith("-duplicate") && (
+                  <span className="shrink-0 rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
+                    duplicata
+                  </span>
+                )}
               </div>
               <p className="mt-0.5 truncate text-xs text-muted-foreground">{c.image}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">{c.status}</p>

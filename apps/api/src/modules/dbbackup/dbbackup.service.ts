@@ -112,6 +112,50 @@ async function resolveServiceId(service: string): Promise<string | null> {
   }
 }
 
+/** Lists databases inside a running DB container via docker exec (no sudo
+ * needed — same rationale as dumpDocker: this runs inside the container via
+ * dockerode, not a host shell command). Used to populate a real picker
+ * instead of asking the admin to type an exact DB name from memory. */
+async function listDockerDatabases(
+  container: ReturnType<typeof docker.getContainer>,
+  engine: DbEngine,
+  envVars: Record<string, string>
+): Promise<string[]> {
+  if (engine !== "postgres" && engine !== "mysql" && engine !== "mariadb") return [];
+
+  const cmd =
+    engine === "postgres"
+      ? ["psql", "-U", envVars.POSTGRES_USER ?? "postgres", "-t", "-A", "-c", "SELECT datname FROM pg_database WHERE datistemplate = false;"]
+      : ["mysql", "-u", "root", `-p${envVars.MYSQL_ROOT_PASSWORD ?? envVars.MARIADB_ROOT_PASSWORD ?? ""}`, "-N", "-e", "SHOW DATABASES;"];
+
+  try {
+    const exec = await container.exec({ Cmd: cmd, AttachStdout: true, AttachStderr: true });
+    const stream = await exec.start({ hijack: true, stdin: false });
+    let stdout = "";
+    const { Writable } = await import("node:stream");
+    const stdoutSink = new Writable({
+      write(chunk, _enc, cb) {
+        stdout += chunk.toString();
+        cb();
+      },
+    });
+    const stderrSink = new Writable({ write(_chunk, _enc, cb) { cb(); } });
+    await new Promise<void>((resolve, reject) => {
+      container.modem.demuxStream(stream, stdoutSink, stderrSink);
+      stream.on("end", resolve);
+      stream.on("error", reject);
+    });
+    const inspection = await exec.inspect();
+    if (inspection.ExitCode !== 0) return [];
+    return stdout
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((name) => name && !SYSTEM_SCHEMAS.has(name));
+  } catch {
+    return [];
+  }
+}
+
 async function listNativeDatabases(engine: DbEngine): Promise<string[]> {
   try {
     if (engine === "mariadb" || engine === "mysql") {
@@ -167,11 +211,13 @@ export const DbBackupService = {
     for (const c of containers) {
       const match = DOCKER_ENGINES.find((e) => e.imageMatch.test(c.Image));
       if (match) {
+        const envVars = parseEnv((await docker.getContainer(c.Id).inspect()).Config.Env ?? []);
         detected.push({
           location: "docker",
           ref: c.Id,
           displayName: c.Names[0]?.replace(/^\//, "") ?? c.Id.slice(0, 12),
           engine: match.engine,
+          databases: await listDockerDatabases(docker.getContainer(c.Id), match.engine, envVars),
         });
       }
     }

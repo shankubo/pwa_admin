@@ -407,6 +407,13 @@ function CreateDuplicateDialog({
 
   const selectedDb = detectedDbs?.find((d) => `${d.location}:${d.ref}` === dbValue);
 
+  // Auto-select when there's exactly one database on the chosen instance —
+  // no reason to make the admin pick from a list of one, and it removes the
+  // main source of typo errors (a free-text field for the exact DB name).
+  useEffect(() => {
+    if (selectedDb?.databases?.length === 1) setDbName(selectedDb.databases[0]);
+  }, [selectedDb]);
+
   async function submit() {
     setError(null);
     setSubmitting(true);
@@ -455,7 +462,7 @@ function CreateDuplicateDialog({
         </select>
       </div>
 
-      {selectedDb && selectedDb.location === "native" && (
+      {selectedDb && (selectedDb.databases?.length ?? 0) > 1 && (
         <div className="mb-2">
           <p className="mb-1 text-xs font-medium text-muted-foreground">Base précise</p>
           <select
@@ -473,17 +480,8 @@ function CreateDuplicateDialog({
         </div>
       )}
 
-      {selectedDb && selectedDb.location === "docker" && (
-        <div className="mb-2">
-          <p className="mb-1 text-xs font-medium text-muted-foreground">Nom exact de la base dans le conteneur</p>
-          <input
-            type="text"
-            value={dbName}
-            onChange={(e) => setDbName(e.target.value)}
-            placeholder="ex: myapp"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
-          />
-        </div>
+      {selectedDb && (selectedDb.databases?.length ?? 0) === 0 && (
+        <p className="mb-2 text-xs text-destructive">Aucune base détectée sur cette instance.</p>
       )}
 
       {error && <p className="mb-2 text-xs text-destructive">{error}</p>}
