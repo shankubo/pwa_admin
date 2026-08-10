@@ -88,6 +88,11 @@ export function Restore() {
             method: "POST",
             body: JSON.stringify({ runId: selected.run.runId, confirm: true }),
           });
+        } else if (selected.run.sourceType === "image") {
+          await apiJson("/backups/restore-image", {
+            method: "POST",
+            body: JSON.stringify({ runId: selected.run.runId, confirm: true }),
+          });
         } else {
           await apiJson("/backups/restore", {
             method: "POST",

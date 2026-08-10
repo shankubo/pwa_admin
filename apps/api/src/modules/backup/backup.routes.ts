@@ -6,6 +6,7 @@ import { join, basename } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { BackupService, BackupJobModel, BackupHistoryModel } from "./backup.service.js";
+import { ApplicationService } from "../application/application.service.js";
 import { backupJobToApiShape, backupHistoryToApiShape } from "../../db/models/backup.js";
 import { withAudit } from "../../middleware/auditLog.js";
 import { SchedulerService } from "../../services/scheduler.js";
@@ -282,6 +283,36 @@ export default async function backupRoutes(app: FastifyInstance) {
     }
   );
 
+  // Generic counterpart to /applications/:id/restore-image — for a
+  // container-image backup reached from the general Restore flow (e.g. an
+  // archive imported from USB) rather than from an Application's own image
+  // history, where there's no application id to scope the request to.
+  app.post(
+    "/backups/restore-image",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("backup.restore-image", (r) => (r.body as any)?.runId)],
+      schema: {
+        body: {
+          type: "object",
+          required: ["runId", "confirm"],
+          properties: {
+            runId: { type: "string" },
+            confirm: { type: "boolean", const: true },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { runId } = req.body as { runId: string };
+      const entry = BackupHistoryModel.findByRunId(runId);
+      if (!entry?.file_path || entry.source_type !== "image") {
+        return reply.code(404).send({ error: "backup_not_found" });
+      }
+      await ApplicationService.restoreContainerImage(entry.source_ref, runId);
+      reply.send({ ok: true });
+    }
+  );
+
   app.get("/backups/storage", auth, async (_req, reply) => {
     reply.send(await BackupService.storageUsage());
   });
@@ -369,14 +400,27 @@ export default async function backupRoutes(app: FastifyInstance) {
       const archive = archives.find((a) => a.fullPath === fullPath);
       if (!archive) return reply.code(404).send({ error: "archive_not_found" });
 
-      const sourceType: BackupSourceType = archive.category === "volumes" ? "volume" : archive.category === "db" ? "db" : "path";
+      // Container image exports are also stored under the "paths" category
+      // (see ApplicationService.backupContainerImage), tagged by the
+      // "image-<containerName>" sourceRef prefix — distinguish them from
+      // real bind-mount path backups, which restore through a completely
+      // different code path (detectBindMounts guard vs. image load+swap).
+      const isImageExport = archive.category === "paths" && archive.sourceRef.startsWith("image-");
+      const sourceType: BackupSourceType = archive.category === "volumes"
+        ? "volume"
+        : archive.category === "db"
+          ? "db"
+          : isImageExport
+            ? "image"
+            : "path";
+      const sourceRef = isImageExport ? archive.sourceRef.slice("image-".length) : archive.sourceRef;
       const stats = await stat(fullPath);
 
       const runId = BackupHistoryModel.createRun({
         jobId: null,
         type: "backup",
         sourceType,
-        sourceRef: archive.sourceRef,
+        sourceRef,
         target: "usb",
       });
       BackupHistoryModel.complete(runId, {
