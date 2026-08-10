@@ -15,6 +15,18 @@ function siteUrl(s: SiteSummary): string | null {
   return `${scheme}://${host}/`;
 }
 
+function translateFailoverError(message: string): string {
+  const known: Record<string, string> = {
+    vhost_in_maintenance: "Ce site est en mode maintenance — quittez la maintenance avant de basculer vers le duplicata.",
+    no_duplicate_found: "Aucun duplicata n'existe pour ce site.",
+    duplicate_not_ready: "Le duplicata n'est pas encore prêt (création ou rafraîchissement en cours).",
+    vhost_not_switched_to_duplicate: "Ce site n'est pas actuellement basculé vers son duplicata.",
+    snapshot_not_found: "L'ancienne configuration du site est introuvable — impossible de revenir en arrière automatiquement.",
+  };
+  const errorCode = message.split(":")[0].trim();
+  return known[errorCode] ?? message;
+}
+
 function certBadgeClass(daysRemaining: number | null) {
   if (daysRemaining == null) return "bg-muted text-muted-foreground";
   if (daysRemaining < 14) return "bg-destructive/15 text-destructive";
@@ -26,6 +38,7 @@ export function Sites() {
   const [sites, setSites] = useState<SiteSummary[] | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   async function load() {
     try {
@@ -50,8 +63,13 @@ export function Sites() {
   }
 
   async function switchFailover(name: string, action: "switch" | "revert") {
-    await apiJson(`/sites/${name}/failover/${action}`, { method: "POST" });
-    await load();
+    try {
+      setActionError(null);
+      await apiJson(`/sites/${name}/failover/${action}`, { method: "POST" });
+      await load();
+    } catch (err) {
+      setActionError(translateFailoverError((err as Error).message));
+    }
   }
 
   if (error) return <Card className="text-sm text-destructive">{error}</Card>;
@@ -60,6 +78,7 @@ export function Sites() {
 
   return (
     <div className="flex flex-col gap-3">
+      {actionError && <Card className="text-sm text-destructive">{actionError}</Card>}
       {sites.map((s) => (
         <Card key={s.name}>
           <div
