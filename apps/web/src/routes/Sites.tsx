@@ -39,6 +39,7 @@ export function Sites() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [cloningFor, setCloningFor] = useState<string | null>(null);
 
   async function load() {
     try {
@@ -175,6 +176,11 @@ export function Sites() {
               )
             )}
 
+            {!s.hasDuplicate && (s.root || s.linkedContainer) && (
+              <Button size="sm" variant="outline" onClick={() => setCloningFor(s.name)}>
+                <Copy className="h-3.5 w-3.5" /> Cloner
+              </Button>
+            )}
             {s.hasDuplicate && !s.failoverActive && (
               <ConfirmDialog
                 trigger={
@@ -194,6 +200,21 @@ export function Sites() {
               </Button>
             )}
           </div>
+
+          {cloningFor === s.name && (
+            <div onClick={(e) => e.stopPropagation()}>
+              <CreateDuplicateDialog
+                name={s.name}
+                hasRoot={!!s.root}
+                hasLinkedContainer={!!s.linkedContainer}
+                onClose={() => setCloningFor(null)}
+                onCreated={() => {
+                  setCloningFor(null);
+                  load();
+                }}
+              />
+            </div>
+          )}
 
           {expanded === s.name && <SiteDetailPanel name={s.name} />}
         </Card>
@@ -405,7 +426,8 @@ function SiteDuplicateSection({
       {showCreateDialog && (
         <CreateDuplicateDialog
           name={name}
-          detail={detail}
+          hasRoot={!!detail.vhost.root}
+          hasLinkedContainer={!!detail.linkedContainer}
           onClose={() => setShowCreateDialog(false)}
           onCreated={() => {
             setShowCreateDialog(false);
@@ -419,12 +441,14 @@ function SiteDuplicateSection({
 
 function CreateDuplicateDialog({
   name,
-  detail,
+  hasRoot,
+  hasLinkedContainer,
   onClose,
   onCreated,
 }: {
   name: string;
-  detail: SiteDetail;
+  hasRoot: boolean;
+  hasLinkedContainer: boolean;
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -473,8 +497,8 @@ function CreateDuplicateDialog({
   return (
     <div className="mt-3 rounded-md border border-border p-3">
       <p className="mb-2 text-xs text-muted-foreground">
-        {detail.vhost.root && "Le contenu du dossier du site sera copié. "}
-        {detail.linkedContainer && "Un second conteneur (même image, port différent) sera créé et démarré. "}
+        {hasRoot && "Le contenu du dossier du site sera copié. "}
+        {hasLinkedContainer && "Un second conteneur (même image, port différent) sera créé et démarré. "}
         Sélectionnez une base de données ci-dessous si ce site en utilise une.
       </p>
 
