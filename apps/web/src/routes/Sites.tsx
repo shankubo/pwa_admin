@@ -305,7 +305,7 @@ function SiteDetailPanel({ name }: { name: string }) {
             </button>
           )}
         </div>
-        <LiveLogPanel initialText={logText} emptyLabel="Aucun log." />
+        <LiveLogPanel key={logTab} initialText={logText} emptyLabel="Aucun log." />
       </div>
 
       <SiteDuplicateSection name={name} detail={detail} onChanged={loadDetail} />
