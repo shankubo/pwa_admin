@@ -11,6 +11,8 @@ import {
   Network,
   Boxes,
   DatabaseBackup,
+  RotateCcw,
+  Wrench,
   Activity,
   Settings as SettingsIcon,
   ChevronDown,
@@ -99,23 +101,36 @@ const SECTIONS: HelpSection[] = [
   {
     icon: Boxes,
     title: "Applications",
-    summary: "Le système de sauvegarde le plus complet : conteneur + dossiers + base de données regroupés.",
+    summary: "Le système de sauvegarde le plus complet : conteneur + dossiers + volumes + base de données regroupés.",
     details: [
-      "Une « Application » associe un ou plusieurs conteneurs, leurs dossiers montés sur le disque, et une base de données optionnelle.",
-      "Sauvegarde complète (« full ») : instantané intégral. Sauvegarde partielle : ne copie que les fichiers nouveaux/modifiés depuis le dernier instantané (économise l'espace disque).",
+      "Une « Application » associe un ou plusieurs conteneurs, leurs dossiers montés sur le disque (bind mounts), leurs volumes Docker nommés, et une base de données optionnelle.",
+      "Sauvegarde complète (« full ») : instantané intégral, y compris un export de l'image de chaque conteneur (pour pouvoir tout recréer même si l'image d'origine est perdue). Sauvegarde partielle : ne copie que les fichiers nouveaux/modifiés depuis le dernier instantané (économise l'espace disque, pas d'export d'image).",
       "Peut être planifiée automatiquement (ex : partielle quotidienne, complète hebdomadaire) via des préréglages simples.",
-      "La restauration prend d'abord un instantané de sécurité avant d'écraser les données actuelles.",
-      "Une application peut aussi n'avoir qu'une base de données, sans dossier, si le conteneur est sans état (ex : simple reverse-proxy).",
+      "Une application peut aussi n'avoir qu'une base de données, sans dossier ni volume, si le conteneur est sans état (ex : simple reverse-proxy).",
+      "Cet écran ne sert qu'à créer/gérer les sauvegardes — pour restaurer, direction l'écran Restore.",
     ],
   },
   {
     icon: DatabaseBackup,
     title: "Backups",
-    summary: "Sauvegardes ponctuelles ou planifiées de volumes, dossiers et bases de données.",
+    summary: "Création et suppression de sauvegardes ponctuelles ou planifiées de volumes, dossiers et bases de données.",
     details: [
-      "Création de jobs de sauvegarde avec planification cron et rétention configurable.",
-      "Cible locale et/ou Google Drive (connexion à autoriser une seule fois dans cet écran).",
-      "Historique complet de toutes les sauvegardes et restaurations effectuées.",
+      "Deux étapes : choisir le type (Complet, ou Partiel pour un dump de base de données), puis la destination (local, USB si un disque est branché, Google Drive si connecté, et/ou téléchargement direct vers votre appareil).",
+      "Un disque USB/SSD branché est détecté et monté automatiquement — les sauvegardes y sont rangées dans un dossier propre à ce serveur.",
+      "Historique de toutes les sauvegardes avec suppression possible (le fichier local est supprimé ; les copies USB/Drive existantes ne sont pas touchées).",
+      "Cet écran ne propose plus aucune action de restauration — c'est volontaire, pour éviter tout clic accidentel qui écraserait des données. La restauration se fait exclusivement depuis l'écran Restore.",
+    ],
+  },
+  {
+    icon: RotateCcw,
+    title: "Restore",
+    summary: "Restauration guidée en 3 étapes, seul endroit de l'application où l'on peut écraser des données.",
+    details: [
+      "Étape 1 : choisir la source — Local (sauvegardes déjà sur ce serveur), USB (disque branché contenant des archives), Google Drive, ou téléverser un fichier de sauvegarde depuis votre PC/téléphone.",
+      "Étape 2 : choisir l'élément précis à restaurer, regroupé par catégorie (bases de données, volumes, dossiers, images de conteneur, applications complètes/partielles) pour rester lisible même avec beaucoup d'archives.",
+      "Étape 3 : confirmation explicite (taper « RESTORE ») avant toute action irréversible.",
+      "Restaurer une image de conteneur est sans interruption de service en cas d'échec : le nouveau conteneur est créé et vérifié avant que l'ancien soit arrêté — si la recréation échoue, l'application en cours reste intacte.",
+      "Une archive trouvée sur un disque USB sans historique connu (ex. après une réinstallation complète) peut être importée directement depuis cet écran pour devenir restaurable.",
     ],
   },
   {
@@ -127,6 +142,16 @@ const SECTIONS: HelpSection[] = [
     ],
   },
   {
+    icon: Wrench,
+    title: "Services",
+    summary: "Statut et actions de mise à jour pour les services installés sur le serveur (Tailscale, Docker, PM2).",
+    details: [
+      "Chaque service affiche s'il est installé, en cours d'exécution, sa version, et quelques informations complémentaires (nombre de conteneurs, de processus, etc.).",
+      "Actions disponibles : mettre à jour Tailscale, mettre à jour ou redémarrer Docker (redémarrage = interruption brève de tous les conteneurs), recharger le daemon PM2.",
+      "Le résultat de chaque action (sortie de la commande exécutée) reste consultable pour diagnostiquer un éventuel échec.",
+    ],
+  },
+  {
     icon: SettingsIcon,
     title: "Settings",
     summary: "Compte administrateur et journal d'audit.",
@@ -135,6 +160,11 @@ const SECTIONS: HelpSection[] = [
       "Journal d'audit listant toutes les actions sensibles effectuées (qui, quoi, quand, résultat).",
     ],
   },
+];
+
+const TIPS: string[] = [
+  "L'icône serveur en haut à droite permet d'enregistrer plusieurs déploiements (ex : un Raspberry Pi et un serveur Ubuntu) et de basculer rapidement de l'un à l'autre — chacun reste une installation indépendante avec sa propre connexion.",
+  "Tirer l'écran vers le bas depuis le haut d'une page et maintenir quelques secondes force un rechargement complet de l'application — utile pour récupérer la dernière version après une mise à jour.",
 ];
 
 interface Dependency {
@@ -215,6 +245,20 @@ export function Help() {
             <HelpSectionCard key={s.title} section={s} />
           ))}
         </div>
+      </div>
+
+      <div>
+        <h2 className="mb-2 text-sm font-semibold text-muted-foreground">Astuces</h2>
+        <Card>
+          <ul className="flex flex-col gap-1.5">
+            {TIPS.map((tip, i) => (
+              <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                <span>{tip}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
       </div>
 
       <div>

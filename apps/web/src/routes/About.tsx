@@ -10,6 +10,8 @@ import {
   Network,
   Boxes,
   DatabaseBackup,
+  RotateCcw,
+  Wrench,
   Activity,
   Settings as SettingsIcon,
   ShieldCheck,
@@ -19,20 +21,22 @@ import {
   User,
 } from "lucide-react";
 
-const APP_VERSION = "0.1.0";
+const APP_VERSION = "0.2.0";
 const DEVELOPER = "Shan.K";
 
 const MODULES: { icon: typeof LayoutDashboard; title: string; description: string }[] = [
-  { icon: LayoutDashboard, title: "Dashboard", description: "Vue d'ensemble : CPU, RAM, disque, température et alertes actives en un coup d'œil." },
+  { icon: LayoutDashboard, title: "Dashboard", description: "Vue d'ensemble : CPU, RAM, disque, température, disque USB/SSD connecté et alertes actives en un coup d'œil." },
   { icon: Container, title: "Docker", description: "Conteneurs, images, volumes et réseaux : démarrer, arrêter, logs et stats en direct, export/import d'images, sauvegarde de volumes." },
-  { icon: Server, title: "Nginx", description: "Vhosts, activation/désactivation, édition de configuration validée, certificats, accessibilité, trafic, sauvegarde de config." },
+  { icon: Server, title: "Nginx", description: "Vhosts, activation/désactivation, édition de configuration validée, certificats, accessibilité, trafic, sauvegarde de config, mode maintenance par site." },
   { icon: Globe, title: "Sites", description: "Vue agrégée par site combinant les infos Nginx et les conteneurs Docker associés." },
   { icon: Package, title: "OS / Paquets", description: "Informations système, paquets installés, mises à jour Debian/apt avec suivi en direct." },
   { icon: Hexagon, title: "Node.js (PM2)", description: "Processus Node.js gérés par PM2 directement sur l'hôte : statut, logs en direct, start/stop/restart." },
   { icon: Network, title: "Réseau & Sécurité", description: "Ports ouverts, blocage d'IP (fail2ban), matériel (modèle, tension, IP, Wi-Fi, SSH), services système." },
-  { icon: Boxes, title: "Applications", description: "Sauvegardes complètes composées (conteneur + dossiers + base de données), pleines ou partielles, locales et/ou Google Drive." },
-  { icon: DatabaseBackup, title: "Backups", description: "Sauvegarde/restauration de volumes, dossiers montés et bases de données, planification automatique, historique." },
+  { icon: Boxes, title: "Applications", description: "Sauvegardes complètes composées (conteneurs + dossiers + volumes Docker + base de données), pleines ou partielles, locales/USB/Google Drive." },
+  { icon: DatabaseBackup, title: "Backups", description: "Création et suppression de sauvegardes de volumes, dossiers et bases de données — local, USB ou Google Drive." },
+  { icon: RotateCcw, title: "Restore", description: "Restauration guidée en 3 étapes (source → archive → confirmation), seul point d'entrée de l'app pour restaurer des données." },
   { icon: Activity, title: "System", description: "Monitoring détaillé : température, throttling, disques, réseau, système d'exploitation." },
+  { icon: Wrench, title: "Services", description: "Statut et mise à jour des services installés sur le serveur (Tailscale, Docker, PM2)." },
   { icon: SettingsIcon, title: "Settings", description: "Compte administrateur, activation de la 2FA, journal d'audit de toutes les actions sensibles." },
 ];
 
@@ -52,9 +56,11 @@ export function About() {
         <p className="mt-3 text-sm text-muted-foreground">
           Application web progressive (PWA) mobile complète pour administrer un serveur Linux sans avoir à
           ouvrir un terminal SSH. Elle centralise la gestion des sites web (Nginx), des conteneurs Docker, des
-          sauvegardes (locales et Google Drive), la surveillance système temps réel (CPU, RAM, disque,
-          température), la gestion des paquets Debian/OS, du réseau et de la sécurité, ainsi que des processus
-          Node.js — le tout depuis un téléphone, en toute sécurité via Tailscale.
+          sauvegardes et restaurations (locales, USB/SSD et Google Drive), la surveillance système temps réel
+          (CPU, RAM, disque, température), la gestion des paquets Debian/OS, du réseau et de la sécurité, des
+          services installés (Tailscale, Docker, PM2) et des processus Node.js — le tout depuis un téléphone,
+          en toute sécurité via Tailscale. Plusieurs déploiements indépendants (ex. Pi + serveur Ubuntu) peuvent
+          être enregistrés et basculés depuis la même interface.
         </p>
       </Card>
 
@@ -135,8 +141,9 @@ export function About() {
           <Cloud className="h-4 w-4" /> Stockage des sauvegardes
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Local (disque du Raspberry Pi) et/ou Google Drive (compte personnel via OAuth2), configurable par
-          sauvegarde.
+          Local (disque du serveur), disque USB/SSD externe (détecté et monté automatiquement) et/ou Google
+          Drive (compte personnel via OAuth2), configurable par sauvegarde. La restauration se fait depuis
+          l'écran Restore, quelle que soit la source d'origine.
         </p>
       </Card>
 

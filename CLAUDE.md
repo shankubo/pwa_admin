@@ -1,6 +1,6 @@
 # Server Admin PWA — instructions pour Claude Code
 
-PWA mobile complète pour administrer un serveur Linux de production sans SSH : Docker, Nginx, sauvegardes (locales + Google Drive), monitoring système, paquets OS, réseau/sécurité, PM2, matériel. Déployée et testée en continu contre le vrai serveur de production (`shan@ubuntu_ext`, alias local pour fr01pc999, Ubuntu x86_64) — pas d'environnement de staging séparé.
+PWA mobile complète pour administrer un serveur Linux de production sans SSH : Docker, Nginx, sauvegardes/restauration (locales + USB/SSD + Google Drive), monitoring système, paquets OS, réseau/sécurité, PM2, services (Tailscale/Docker/PM2), matériel. Déployée et testée en continu contre le vrai serveur de production (`shan@ubuntu_ext`, alias local pour fr01pc999, Ubuntu x86_64) — pas d'environnement de staging séparé.
 
 ## Architecture
 
@@ -27,19 +27,24 @@ Chaque module suit le pattern `*.routes.ts` (endpoints Fastify) + `*.service.ts`
 - **sites** — vue agrégée Nginx + Docker par site
 - **network** — ports ouverts (`ss -tulpn`), analytics de trafic (top pages/visiteurs depuis les logs Nginx), fail2ban (statut/ban/unban)
 - **os** — info système, paquets installés/upgradables, jobs async update/upgrade avec suivi live (WS `os.upgrade`), paquets held
-- **backup** — jobs planifiés (node-cron), sauvegarde volumes/bind-mounts, restauration avec snapshot de sécurité, upload Google Drive, comparaison local↔Drive
+- **backup** — jobs planifiés (node-cron), sauvegarde volumes/bind-mounts, restauration avec snapshot de sécurité, upload Google Drive, comparaison local↔Drive, disque USB/SSD externe (détection/montage auto via udev, copie/parcours d'archives), upload depuis le PC admin (multipart → ligne `backup_history` restaurable), suppression de sauvegarde, téléchargement via token JWT courte durée (le body d'une requête GET ne peut pas porter un header Authorization pour un lien direct)
 - **dbbackup** — détection DB (Docker + natif : MariaDB/MySQL/PostgreSQL/Redis), dump/restore
-- **application** — "Applications" composites (conteneur + dossiers + DB), backups full/partiels via `rsync --link-dest`, upload Drive asynchrone avec suivi de progression
+- **application** — "Applications" composites (conteneurs + dossiers + volumes Docker nommés + DB), backups full/partiels via `rsync --link-dest`, export/restauration d'image de conteneur (`docker save`/`load` + recreate sûr : le remplaçant est créé et vérifié avant que l'ancien conteneur soit arrêté), upload Drive asynchrone avec suivi de progression
 - **pm2** — process Node.js gérés par PM2 sur l'hôte (hors Docker) : liste, start/stop/restart/reload, logs live (WS `pm2.logs`)
 - **hardware** — modèle Pi, tension, horloge, interfaces réseau/IP, Wi-Fi (scan/connexion via nmcli), statut SSH, services systemd actifs/en échec
 - **security** — vue d'ensemble sécurité : UFW, fail2ban, SSH, Tailscale, unattended-upgrades, TLS de l'app, 2FA/JWT
+- **services** — statut + actions de mise à jour/redémarrage pour Tailscale/Docker/PM2 (réutilise `SecurityService.getTailscaleStatus()` et `Pm2Service.list()`, ne duplique pas leur logique de détection)
 - **audit** — lecture du journal d'audit
 
 Services transverses (`apps/api/src/services/`) : `docker.client.ts` (dockerode), `gdrive.client.ts` (OAuth2 Google Drive), `scheduler.ts` (node-cron), `wsHub.ts` (multiplexage WebSocket).
 
 ### apps/web — écrans (`apps/web/src/routes/`)
 
-Dashboard, Docker, Nginx, Sites, OsSystem, Pm2, NetworkSecurity, Security, Applications, Backups, System, Help, About, Settings, Login. Navigation par menu hamburger (`components/layout/AppDrawer.tsx`, `navItems.ts`). Composants UI réutilisables dans `components/ui/` (Card, Button, ConfirmDialog).
+Dashboard, Docker, Nginx, Sites, OsSystem, Pm2, NetworkSecurity, Security, Applications, Backups, Restore, System, Services, Help, About, Settings, Login. Navigation par menu hamburger (`components/layout/AppDrawer.tsx`, `navItems.ts`). Composants UI réutilisables dans `components/ui/` (Card, Button, ConfirmDialog).
+
+**Backups vs Restore — séparation volontaire.** Backups ne fait que créer/supprimer des sauvegardes ; Restore est le seul endroit de l'app qui peut écraser des données, via un assistant en 3 étapes (source → archive groupée par catégorie → confirmation typée "RESTORE"). Ne jamais réintroduire une action de restauration dans Backups/Applications — c'est un choix délibéré pour réduire le risque de clic accidentel.
+
+`components/layout/PullToRefresh.tsx` (enveloppe `<Outlet/>` dans `Shell.tsx`) : tirer l'écran vers le bas et maintenir ~3s force un `window.location.reload()` complet — pas un simple refetch — pour récupérer un service worker à jour après déploiement. `components/layout/ServerSwitcher.tsx` + `stores/serverConnections.store.ts` : sélecteur multi-serveur purement client (localStorage), chaque entrée est un déploiement pwa-admin totalement indépendant (pas de backend partagé) ; changer de serveur redirige vers son propre `/login` car le refresh-token cookie ne traverse pas les origines.
 
 ### packages/shared
 
@@ -59,9 +64,10 @@ Types TS purs, un fichier par domaine dans `src/types/`, tous ré-exportés depu
 ### Déploiement et tests
 
 - **Il n'y a pas d'environnement de staging.** Tout changement backend/frontend est testé directement contre le vrai serveur de production (`shan@ubuntu_ext`, alias local pour fr01pc999, accessible via Tailscale). C'est le mode de travail accepté sur ce projet.
-- Pattern de déploiement de fichiers modifiés vers le serveur : transfert via `base64 -w0 <fichier> | ssh ubuntu_ext "base64 -d > ~/<chemin>"` — **jamais** un simple `cat | ssh "cat > ..."`, qui corrompt l'encodage (mojibake) sur les caractères accentués français.
+- **Déploiement = `git push` puis `git pull` côté serveur**, pas de transfert de fichier individuel : `git add -A && git commit && git push origin master` en local, puis `ssh ubuntu_ext "cd ~/pwa_admin && git fetch origin master -q && git checkout -f origin/master -B master"`. Le dossier `~/pwa_admin` sur le serveur est un clone git à part entière (remote via SSH `git@github.com:...`), pas juste un arbre de fichiers synchronisés — `.env`, `data/`, `secrets/`, `node_modules/` sont dans `.gitignore` donc jamais écrasés par ce flux.
 - Après tout changement, rebuild sur le serveur lui-même (jamais de cross-compile depuis Windows — `better-sqlite3` doit compiler sur l'architecture cible) : `npm run build --workspace=packages/shared`, puis `apps/api`, puis `apps/web`, dans cet ordre (shared d'abord, les deux autres en dépendent).
-- Redémarrage du service : `sudo systemctl restart pwa-admin`, puis vérifier `sudo journalctl -u pwa-admin -n 20 --no-pager` pour confirmer un démarrage propre.
+- Redémarrage du service : `sudo systemctl restart pwa-admin` — **nécessite un mot de passe sudo interactif**, l'utilisateur `shan` n'a pas de règle NOPASSWD pour `systemctl restart pwa-admin` (volontaire : le service ne doit pas pouvoir se redémarrer lui-même sans confirmation humaine). Ne jamais essayer de contourner ça — toujours demander à l'utilisateur de lancer cette commande lui-même dans son propre terminal. Vérifier ensuite `sudo journalctl -u pwa-admin -n 20 --no-pager` pour confirmer un démarrage propre.
+- Toute modification de `deploy/sudoers.d/pwa-admin` doit être recopiée manuellement vers `/etc/sudoers.d/pwa-admin` sur le serveur (`sudo cp ... && sudo visudo -c -f ...`) — le déploiement git ne touche jamais ce fichier système. Oublier cette étape après un commit qui ajoute une règle sudo produit un échec silencieux ("a password is required") qui ressemble à un bug applicatif.
 - **Pattern de test end-to-end** : créer un compte admin de debug temporaire (`npm run create-admin --workspace=apps/api -- <nom> <mdp>`), se logger via curl pour obtenir un JWT, exercer les vrais endpoints contre le vrai état du serveur, vérifier le résultat à la fois via la réponse API et directement en base/filesystem, **puis supprimer le compte de debug** (dans l'ordre `refresh_tokens` → `audit_log` → `users`, contraintes FK) avant de considérer la tâche terminée.
 - Toujours `npx tsc --noEmit -p tsconfig.json` sur `apps/api` et `apps/web` (et `npx tsc -p tsconfig.json` sur `packages/shared`) avant de déployer — le CI n'existe pas sur ce projet, c'est la seule vérification automatisée.
 
@@ -82,6 +88,9 @@ Types TS purs, un fichier par domaine dans `src/types/`, tous ré-exportés depu
 - `sites-enabled/<name>` n'est pas toujours un symlink vers `sites-available/<name>` — certains vhosts pré-existants sont des fichiers indépendants divergents dans `sites-enabled` (contenu réellement chargé par nginx différent de `sites-available`). Toujours vérifier avec `readlink` avant d'éditer par nom de vhost ; `resolveActiveVhostPath()` dans `nginx.service.ts` gère ce cas pour le mode maintenance.
 - Le mode maintenance doit explicitement ajouter `auth_basic off;` dans son bloc `location` si le `server{}` a un `auth_basic` — sinon cette directive est héritée et bloque l'accès à la page de maintenance elle-même (401 au lieu de la page).
 - Un fichier vhost combinant plusieurs `server_name` distincts (ex. plusieurs sous-domaines dans un seul fichier) fait que toute action par-site (maintenance, enable/disable) s'applique à tous les domaines du fichier — séparer un fichier par site si une gestion indépendante est nécessaire.
+- `applyMaintenanceMode` (`nginx.parser.ts`) ne doit **pas** filtrer les blocs `server{}` sur `listen 443/ssl` uniquement — un vhost dont TLS est terminé en amont (tunnel/proxy devant le serveur) écoute en clair sur le port 80 et sert du vrai contenu ; le filtrer comme "pas concerné" rend la bascule maintenance un no-op silencieux (le fichier reste inchangé, `nginx -t`/reload réussissent trivialement, mais le site continue de servir normalement). Le bon critère est `isRedirectOnlyBlock` : un bloc est skippé seulement s'il ne fait qu'un `return 301/302 https://...` sans `location` servant réellement du contenu — TLS-terminé ou HTTP-brut-mais-content-serving sont tous deux éligibles à la bascule.
+- Route GET sans try/catch alors que les routes POST du même fichier en ont un = piège récurrent (vu sur `/pm2/processes` et `/network/ports`) : Fastify renvoie son 500 générique au lieu d'un message exploitable. Toute route qui shell out ou touche le filesystem doit avoir son propre try/catch, même en lecture.
+- `deploy/install.sh` doit copier `deploy/maintenance-page/index.html` vers `NGINX_MAINTENANCE_ROOT` (`/var/www/server-admin-maintenance` par défaut) — cette étape a été oubliée à l'origine, laissant `applyMaintenanceMode` pointer vers un dossier vide (nginx tombe sur son 503 brut au lieu de la vraie page). Si `NGINX_MAINTENANCE_ROOT` change dans `.env`, le dossier doit être recréé/repeuplé manuellement sur le serveur.
 
 ## Commandes utiles
 
