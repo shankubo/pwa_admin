@@ -13,12 +13,14 @@ function GaugeCard({
   value,
   unit,
   severity,
+  subtext,
 }: {
   icon: typeof Cpu;
   label: string;
   value: string;
   unit?: string;
   severity?: "warning" | "critical";
+  subtext?: string;
 }) {
   return (
     <Card>
@@ -38,6 +40,7 @@ function GaugeCard({
         {value}
         {unit && <span className="ml-0.5 text-sm font-normal text-muted-foreground">{unit}</span>}
       </p>
+      {subtext && <p className="text-xs text-muted-foreground">{subtext}</p>}
     </Card>
   );
 }
@@ -97,6 +100,7 @@ export function Dashboard() {
           value={primaryDisk ? primaryDisk.usedPercent.toFixed(0) : "…"}
           unit="%"
           severity={alertFor("disk_usage")}
+          subtext={primaryDisk ? `${formatBytes(primaryDisk.freeBytes)} libre / ${formatBytes(primaryDisk.totalBytes)}` : undefined}
         />
       </div>
 

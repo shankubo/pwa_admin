@@ -3,6 +3,36 @@ import { runCommand } from "../../utils/exec.js";
 import { env } from "../../config/env.js";
 import type { SystemStatsSnapshot, SystemAlert } from "@pwa-admin/shared";
 
+// Pseudo-filesystems systeminformation's fsSize() reports alongside real
+// storage — EFI variable storage, kernel/device tmpfs, etc. They're
+// meaningless as "disk usage" (efivars is typically a few hundred KB with a
+// misleadingly high use%) and must never be picked as the Dashboard's
+// "primary disk" via disks[0].
+const PSEUDO_FS_TYPES = new Set([
+  "efivarfs",
+  "tmpfs",
+  "devtmpfs",
+  "proc",
+  "sysfs",
+  "cgroup",
+  "cgroup2",
+  "overlay",
+  "squashfs",
+  "devpts",
+  "mqueue",
+  "debugfs",
+  "tracefs",
+  "securityfs",
+  "pstore",
+  "bpf",
+  "autofs",
+  "binfmt_misc",
+  "hugetlbfs",
+  "fusectl",
+  "configfs",
+  "rpc_pipefs",
+]);
+
 async function readThrottled(): Promise<SystemStatsSnapshot["cpu"]["throttled"]> {
   try {
     const { stdout } = await runCommand("vcgencmd", ["get_throttled"], { timeoutMs: 2000 });
@@ -44,12 +74,19 @@ export const SystemService = {
         usedBytes: mem.active,
         usedPercent: Math.round((mem.active / mem.total) * 1000) / 10,
       },
-      disks: fsSize.map((d) => ({
-        mount: d.mount,
-        totalBytes: d.size,
-        usedBytes: d.used,
-        usedPercent: Math.round(d.use * 10) / 10,
-      })),
+      disks: fsSize
+        .filter((d) => d.size > 0 && !PSEUDO_FS_TYPES.has(d.type))
+        .map((d) => ({
+          mount: d.mount,
+          totalBytes: d.size,
+          usedBytes: d.used,
+          freeBytes: d.available ?? d.size - d.used,
+          usedPercent: Math.round(d.use * 10) / 10,
+        }))
+        // Root filesystem first, so Dashboard's disks[0] "primary disk" card
+        // is always the meaningful one instead of whatever fsSize() happened
+        // to list first.
+        .sort((a, b) => (a.mount === "/" ? -1 : b.mount === "/" ? 1 : 0)),
       network: networkStats.map((n) => ({
         iface: n.iface,
         rxBytesPerSec: n.rx_sec ?? 0,

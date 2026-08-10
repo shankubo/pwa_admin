@@ -18,6 +18,7 @@ export interface SystemStatsSnapshot {
     mount: string;
     totalBytes: number;
     usedBytes: number;
+    freeBytes: number;
     usedPercent: number;
   }>;
   network: Array<{
