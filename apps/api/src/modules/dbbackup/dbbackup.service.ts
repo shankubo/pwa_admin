@@ -592,7 +592,7 @@ export const DbBackupService = {
           AttachStdout: true,
           AttachStderr: true,
         });
-        await runDockerExecToCompletion(createExec);
+        await runDockerExecToCompletion(container, createExec);
 
         const restoreExec = await container.exec({
           Cmd: ["pg_restore", "-U", envVars.POSTGRES_USER ?? "postgres", "-d", targetDbName],
@@ -616,7 +616,7 @@ export const DbBackupService = {
           AttachStdout: true,
           AttachStderr: true,
         });
-        await runDockerExecToCompletion(createExec);
+        await runDockerExecToCompletion(container, createExec);
 
         const restoreExec = await container.exec({
           Cmd: ["mysql", "-u", "root", `-p${pw}`, targetDbName],
@@ -657,12 +657,22 @@ export const DbBackupService = {
   },
 };
 
-async function runDockerExecToCompletion(exec: { start: (opts: any) => Promise<NodeJS.ReadWriteStream> }): Promise<void> {
+/** Runs a docker exec to completion, discarding its output — a hijacked exec
+ * stream is Docker's multiplexed stdout/stderr format, not plain text, so it
+ * must go through demuxStream (like dumpDocker's real dump path does) even
+ * when the output itself isn't needed, or `end` never reliably fires and the
+ * caller hangs waiting on a promise that never resolves. */
+async function runDockerExecToCompletion(
+  container: { modem: { demuxStream: (stream: NodeJS.ReadableStream, stdout: any, stderr: any) => void } },
+  exec: { start: (opts: any) => Promise<NodeJS.ReadWriteStream> }
+): Promise<void> {
+  const { Writable } = await import("node:stream");
   const stream = await exec.start({ hijack: true, stdin: false });
+  const sink = new Writable({ write(_chunk, _enc, cb) { cb(); } });
   await new Promise<void>((resolve, reject) => {
+    container.modem.demuxStream(stream, sink, sink);
     stream.on("end", resolve);
     stream.on("error", reject);
-    stream.resume();
   });
 }
 

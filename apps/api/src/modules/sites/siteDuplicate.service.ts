@@ -240,19 +240,39 @@ export const SiteDuplicateService = {
   },
 };
 
+function parseDockerEnv(envList: string[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const entry of envList) {
+    const idx = entry.indexOf("=");
+    if (idx > 0) result[entry.slice(0, idx)] = entry.slice(idx + 1);
+  }
+  return result;
+}
+
 async function dropDuplicateDatabase(location: "docker" | "native", ref: string, dbName: string): Promise<void> {
   if (location === "docker") {
     const container = docker.getContainer(ref);
     const info = await container.inspect();
+    const envVars = parseDockerEnv(info.Config.Env ?? []);
     const isPostgres = /postgres/i.test(info.Config.Image);
     const cmd = isPostgres
-      ? ["psql", "-U", "postgres", "-c", `DROP DATABASE IF EXISTS "${dbName}";`]
-      : ["mysql", "-u", "root", "-e", `DROP DATABASE IF EXISTS \`${dbName}\`;`];
+      ? ["psql", "-U", envVars.POSTGRES_USER ?? "postgres", "-c", `DROP DATABASE IF EXISTS "${dbName}";`]
+      : [
+          "mysql",
+          "-u",
+          "root",
+          `-p${envVars.MARIADB_ROOT_PASSWORD ?? envVars.MYSQL_ROOT_PASSWORD ?? ""}`,
+          "-e",
+          `DROP DATABASE IF EXISTS \`${dbName}\`;`,
+        ];
     const exec = await container.exec({ Cmd: cmd, AttachStdout: true, AttachStderr: true });
+    const { Writable } = await import("node:stream");
+    const sink = new Writable({ write(_chunk, _enc, cb) { cb(); } });
     const stream = await exec.start({ hijack: true, stdin: false });
-    await new Promise<void>((resolve) => {
+    await new Promise<void>((resolve, reject) => {
+      container.modem.demuxStream(stream, sink, sink);
       stream.on("end", resolve);
-      stream.resume();
+      stream.on("error", reject);
     });
     return;
   }
