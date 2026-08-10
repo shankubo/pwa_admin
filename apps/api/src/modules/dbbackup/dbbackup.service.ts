@@ -1,5 +1,5 @@
 import { createWriteStream, createReadStream } from "node:fs";
-import { mkdir, stat, readFile } from "node:fs/promises";
+import { mkdir, stat, readFile, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { createGzip, createGunzip } from "node:zlib";
@@ -520,16 +520,33 @@ export const DbBackupService = {
       const exec = await container.exec({ Cmd: cmd, AttachStdout: true, AttachStderr: true });
       const stream = await exec.start({ hijack: true, stdin: false });
 
+      // stdout (the actual dump bytes) and stderr (error messages) MUST go to
+      // separate sinks — demuxing both into the same gzip stream would splice
+      // any stderr text (e.g. "database does not exist") into the binary dump
+      // file itself, silently corrupting it instead of surfacing the error.
       const gzip = createGzip();
       const out = createWriteStream(filePath);
+      let stderrOutput = "";
+      const stderrSink = new (await import("node:stream")).Writable({
+        write(chunk, _enc, cb) {
+          stderrOutput += chunk.toString();
+          cb();
+        },
+      });
       await new Promise<void>((resolve, reject) => {
-        container.modem.demuxStream(stream, gzip as any, gzip as any);
+        container.modem.demuxStream(stream, gzip as any, stderrSink);
         stream.on("end", () => gzip.end());
         gzip.pipe(out);
         out.on("finish", resolve);
         out.on("error", reject);
         stream.on("error", reject);
       });
+
+      const inspection = await exec.inspect();
+      if (inspection.ExitCode !== 0) {
+        await unlink(filePath).catch(() => {});
+        throw new Error(stderrOutput.trim() || `dump command exited with code ${inspection.ExitCode}`);
+      }
       return filePath;
     }
 
@@ -601,7 +618,7 @@ export const DbBackupService = {
           AttachStderr: true,
         });
         const stream = await restoreExec.start({ hijack: true, stdin: true });
-        await pipeGunzippedFileToDockerStream(dumpFilePath, stream);
+        await pipeGunzippedFileToDockerStream(dumpFilePath, stream, restoreExec);
         return;
       }
 
@@ -625,7 +642,7 @@ export const DbBackupService = {
           AttachStderr: true,
         });
         const stream = await restoreExec.start({ hijack: true, stdin: true });
-        await pipeGunzippedFileToDockerStream(dumpFilePath, stream);
+        await pipeGunzippedFileToDockerStream(dumpFilePath, stream, restoreExec);
         return;
       }
 
@@ -676,13 +693,25 @@ async function runDockerExecToCompletion(
   });
 }
 
-async function pipeGunzippedFileToDockerStream(filePath: string, stream: NodeJS.ReadWriteStream): Promise<void> {
+async function pipeGunzippedFileToDockerStream(
+  filePath: string,
+  stream: NodeJS.ReadWriteStream,
+  exec: { inspect: () => Promise<{ ExitCode: number | null }> }
+): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const gunzip = createGunzip();
     createReadStream(filePath).pipe(gunzip).pipe(stream as any);
     stream.on("end", resolve);
     stream.on("error", reject);
   });
+
+  // The hijacked stream itself carries no exit status — check it via the
+  // exec handle so a failed restore (bad dump, permission error, etc.)
+  // surfaces as a real error instead of silently "succeeding".
+  const inspection = await exec.inspect();
+  if (inspection.ExitCode !== 0) {
+    throw new Error(`restore command exited with code ${inspection.ExitCode}`);
+  }
 }
 
 async function pipeGunzippedFileToChildStdin(

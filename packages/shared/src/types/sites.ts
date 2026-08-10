@@ -16,7 +16,12 @@ export interface SiteDuplicateStatus {
   duplicateContainerId: string | null;
   duplicateContainerName: string | null;
   duplicatePort: number | null;
-  status: "ready" | "stale" | "refreshing";
+  status: "ready" | "stale" | "refreshing" | "failed";
+  /** Human-readable step label while status is "refreshing", e.g. "Copie des
+   * fichiers…" — polled by the frontend to show live progress. */
+  progressStep: string | null;
+  /** Set when status is "failed" — the error from the last attempt. */
+  error: string | null;
   sizeBytes: number | null;
   lastSyncedAt: string;
   createdAt: string;

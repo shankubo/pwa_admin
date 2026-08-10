@@ -255,6 +255,16 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    id: 11,
+    name: "site_duplicates_progress",
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE site_duplicates ADD COLUMN progress_step TEXT;
+        ALTER TABLE site_duplicates ADD COLUMN error TEXT;
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

@@ -24,6 +24,8 @@ interface SiteDuplicateRow {
   duplicate_container_name: string | null;
   duplicate_port: number | null;
   status: string;
+  progress_step: string | null;
+  error: string | null;
   last_synced_at: string;
   created_at: string;
 }
@@ -40,10 +42,20 @@ function rowToStatus(row: SiteDuplicateRow, sizeBytes: number | null): SiteDupli
     duplicateContainerName: row.duplicate_container_name,
     duplicatePort: row.duplicate_port,
     status: row.status as SiteDuplicateStatus["status"],
+    progressStep: row.progress_step,
+    error: row.error,
     sizeBytes,
     lastSyncedAt: row.last_synced_at,
     createdAt: row.created_at,
   };
+}
+
+function setProgress(vhostName: string, step: string): void {
+  db.prepare(
+    `INSERT INTO site_duplicates (vhost_name, status, progress_step, error, last_synced_at)
+     VALUES (?, 'refreshing', ?, NULL, datetime('now'))
+     ON CONFLICT(vhost_name) DO UPDATE SET status = 'refreshing', progress_step = excluded.progress_step, error = NULL`
+  ).run(vhostName, step);
 }
 
 function getRow(vhostName: string): SiteDuplicateRow | undefined {
@@ -131,6 +143,13 @@ export const SiteDuplicateService = {
     return rowToStatus(row, sizeBytes);
   },
 
+  /**
+   * Kicks off duplicate creation/refresh in the background and returns
+   * immediately with a "refreshing" status — the actual rsync/container
+   * clone/DB dump+restore can take a while (large sites, big databases), so
+   * the frontend polls getDuplicateStatus() for progressStep updates rather
+   * than holding one long-lived HTTP request open.
+   */
   async createDuplicate(
     vhostName: string,
     opts: { dbLocation?: "docker" | "native"; dbRef?: string; dbName?: string }
@@ -139,77 +158,13 @@ export const SiteDuplicateService = {
       throw new Error("cannot_refresh_while_failover_active");
     }
 
-    const vhost = await NginxService.getVhostDetail(vhostName);
-
-    let contentPath: string | null = null;
-    if (vhost.root) {
-      // Site roots are only ever supposed to live under /var/www/ on this
-      // server (confirmed against real vhost configs) — matches the sudoers
-      // rsync/rm rule's scope, so refuse to touch anything outside it rather
-      // than silently attempting an rsync/rm -rf a stray root value might
-      // otherwise trigger against an unexpected path.
-      const normalizedRoot = resolve(vhost.root);
-      if (!normalizedRoot.startsWith(SITE_ROOTS_PARENT + sep)) {
-        throw new Error("site_root_outside_allowed_parent");
-      }
-      contentPath = join(dirname(normalizedRoot), `${basename(normalizedRoot)}__duplicate`);
-      await mkdir(contentPath, { recursive: true });
-      // sudo: site roots are frequently owned by www-data or another service
-      // user the admin service account can't read/write directly, same
-      // rationale as the existing rsync rules in application.service.ts.
-      await runCommand("sudo", ["rsync", "-a", `${normalizedRoot}/`, contentPath], { timeoutMs: 600_000 });
-    }
-
-    let duplicateContainerId: string | null = null;
-    let duplicateContainerName: string | null = null;
-    let duplicatePort: number | null = null;
-    if (vhost.proxyPassTarget) {
-      const linkedContainer = await findLinkedContainer(vhost.proxyPassTarget);
-      if (linkedContainer) {
-        const cloned = await cloneContainerAsDuplicate(linkedContainer.id);
-        duplicateContainerId = cloned.id;
-        duplicateContainerName = cloned.name;
-        duplicatePort = cloned.port;
-      }
-    }
-
-    let duplicateDbName: string | null = null;
-    if (opts.dbLocation && opts.dbRef && opts.dbName) {
-      if (!DbBackupService.validateDbName(opts.dbName)) throw new Error("invalid_db_name");
-      duplicateDbName = `${opts.dbName}__duplicate`;
-      if (!DbBackupService.validateDbName(duplicateDbName)) throw new Error("db_name_too_long_to_duplicate");
-
-      const dumpPath = await DbBackupService.dumpSingleDatabase(opts.dbLocation, opts.dbRef, opts.dbName);
-      await DbBackupService.restoreSingleDatabaseAs(opts.dbLocation, opts.dbRef, dumpPath, duplicateDbName);
-    }
-
-    db.prepare(
-      `INSERT INTO site_duplicates (
-        vhost_name, content_path, db_location, db_ref, db_name, duplicate_db_name,
-        duplicate_container_id, duplicate_container_name, duplicate_port, status, last_synced_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready', datetime('now'))
-      ON CONFLICT(vhost_name) DO UPDATE SET
-        content_path = excluded.content_path,
-        db_location = excluded.db_location,
-        db_ref = excluded.db_ref,
-        db_name = excluded.db_name,
-        duplicate_db_name = excluded.duplicate_db_name,
-        duplicate_container_id = excluded.duplicate_container_id,
-        duplicate_container_name = excluded.duplicate_container_name,
-        duplicate_port = excluded.duplicate_port,
-        status = 'ready',
-        last_synced_at = datetime('now')`
-    ).run(
-      vhostName,
-      contentPath,
-      opts.dbLocation ?? null,
-      opts.dbRef ?? null,
-      opts.dbName ?? null,
-      duplicateDbName,
-      duplicateContainerId,
-      duplicateContainerName,
-      duplicatePort
-    );
+    setProgress(vhostName, "Préparation…");
+    runCreateDuplicate(vhostName, opts).catch((err) => {
+      db.prepare("UPDATE site_duplicates SET status = 'failed', progress_step = NULL, error = ? WHERE vhost_name = ?").run(
+        (err as Error).message,
+        vhostName
+      );
+    });
 
     const status = await this.getDuplicateStatus(vhostName);
     return status!;
@@ -239,6 +194,88 @@ export const SiteDuplicateService = {
     db.prepare("DELETE FROM site_duplicates WHERE vhost_name = ?").run(vhostName);
   },
 };
+
+async function runCreateDuplicate(
+  vhostName: string,
+  opts: { dbLocation?: "docker" | "native"; dbRef?: string; dbName?: string }
+): Promise<void> {
+  const vhost = await NginxService.getVhostDetail(vhostName);
+
+  let contentPath: string | null = null;
+  if (vhost.root) {
+    // Site roots are only ever supposed to live under /var/www/ on this
+    // server (confirmed against real vhost configs) — matches the sudoers
+    // rsync/rm rule's scope, so refuse to touch anything outside it rather
+    // than silently attempting an rsync/rm -rf a stray root value might
+    // otherwise trigger against an unexpected path.
+    const normalizedRoot = resolve(vhost.root);
+    if (!normalizedRoot.startsWith(SITE_ROOTS_PARENT + sep)) {
+      throw new Error("site_root_outside_allowed_parent");
+    }
+    setProgress(vhostName, "Copie des fichiers…");
+    contentPath = join(dirname(normalizedRoot), `${basename(normalizedRoot)}__duplicate`);
+    await mkdir(contentPath, { recursive: true });
+    // sudo: site roots are frequently owned by www-data or another service
+    // user the admin service account can't read/write directly, same
+    // rationale as the existing rsync rules in application.service.ts.
+    await runCommand("sudo", ["rsync", "-a", `${normalizedRoot}/`, contentPath], { timeoutMs: 600_000 });
+  }
+
+  let duplicateContainerId: string | null = null;
+  let duplicateContainerName: string | null = null;
+  let duplicatePort: number | null = null;
+  if (vhost.proxyPassTarget) {
+    const linkedContainer = await findLinkedContainer(vhost.proxyPassTarget);
+    if (linkedContainer) {
+      setProgress(vhostName, "Clonage du conteneur…");
+      const cloned = await cloneContainerAsDuplicate(linkedContainer.id);
+      duplicateContainerId = cloned.id;
+      duplicateContainerName = cloned.name;
+      duplicatePort = cloned.port;
+    }
+  }
+
+  let duplicateDbName: string | null = null;
+  if (opts.dbLocation && opts.dbRef && opts.dbName) {
+    if (!DbBackupService.validateDbName(opts.dbName)) throw new Error("invalid_db_name");
+    duplicateDbName = `${opts.dbName}__duplicate`;
+    if (!DbBackupService.validateDbName(duplicateDbName)) throw new Error("db_name_too_long_to_duplicate");
+
+    setProgress(vhostName, "Duplication de la base de données…");
+    const dumpPath = await DbBackupService.dumpSingleDatabase(opts.dbLocation, opts.dbRef, opts.dbName);
+    await DbBackupService.restoreSingleDatabaseAs(opts.dbLocation, opts.dbRef, dumpPath, duplicateDbName);
+  }
+
+  db.prepare(
+    `INSERT INTO site_duplicates (
+      vhost_name, content_path, db_location, db_ref, db_name, duplicate_db_name,
+      duplicate_container_id, duplicate_container_name, duplicate_port, status, progress_step, error, last_synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready', NULL, NULL, datetime('now'))
+    ON CONFLICT(vhost_name) DO UPDATE SET
+      content_path = excluded.content_path,
+      db_location = excluded.db_location,
+      db_ref = excluded.db_ref,
+      db_name = excluded.db_name,
+      duplicate_db_name = excluded.duplicate_db_name,
+      duplicate_container_id = excluded.duplicate_container_id,
+      duplicate_container_name = excluded.duplicate_container_name,
+      duplicate_port = excluded.duplicate_port,
+      status = 'ready',
+      progress_step = NULL,
+      error = NULL,
+      last_synced_at = datetime('now')`
+  ).run(
+    vhostName,
+    contentPath,
+    opts.dbLocation ?? null,
+    opts.dbRef ?? null,
+    opts.dbName ?? null,
+    duplicateDbName,
+    duplicateContainerId,
+    duplicateContainerName,
+    duplicatePort
+  );
+}
 
 function parseDockerEnv(envList: string[]): Record<string, string> {
   const result: Record<string, string> = {};

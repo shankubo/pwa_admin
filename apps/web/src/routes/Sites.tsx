@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LiveLogPanel } from "@/components/LiveLogPanel";
 import { formatBytes } from "./Docker";
-import { ChevronDown, ChevronUp, Globe, ExternalLink, Copy } from "lucide-react";
+import { ChevronDown, ChevronUp, Globe, ExternalLink, Copy, Loader2 } from "lucide-react";
 
 function siteUrl(s: SiteSummary): string | null {
   const host = s.serverNames.find((n) => n !== "_");
@@ -283,8 +283,18 @@ function SiteDuplicateSection({
   onChanged: () => void;
 }) {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const isRefreshing = detail.duplicate?.status === "refreshing";
+
+  // While a create/refresh job is running in the background, poll for its
+  // progressStep every 2s so the UI shows live status instead of looking
+  // frozen for however long the rsync/container-clone/DB-dump takes.
+  useEffect(() => {
+    if (!isRefreshing) return;
+    const interval = setInterval(onChanged, 2000);
+    return () => clearInterval(interval);
+  }, [isRefreshing, onChanged]);
 
   async function deleteDuplicate() {
     setDeleting(true);
@@ -296,6 +306,11 @@ function SiteDuplicateSection({
     }
   }
 
+  async function startRefresh() {
+    await apiJson(`/sites/${name}/duplicate`, { method: "POST", body: JSON.stringify({}) });
+    onChanged();
+  }
+
   if (!detail.vhost.root && !detail.linkedContainer) {
     // Nothing to duplicate — no content root and no linked container.
     return null;
@@ -304,8 +319,16 @@ function SiteDuplicateSection({
   return (
     <div className="border-t border-border pt-3">
       <CardTitle>Duplicata</CardTitle>
-      {detail.duplicate ? (
+      {isRefreshing ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          {detail.duplicate?.progressStep ?? "Traitement…"}
+        </div>
+      ) : detail.duplicate ? (
         <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+          {detail.duplicate.status === "failed" && detail.duplicate.error && (
+            <p className="text-destructive">Échec : {detail.duplicate.error}</p>
+          )}
           {detail.duplicate.contentPath && <p>Contenu : {detail.duplicate.contentPath}</p>}
           {detail.duplicate.sizeBytes != null && <p>Taille : {formatBytes(detail.duplicate.sizeBytes)}</p>}
           {detail.duplicate.duplicateContainerName && (
@@ -317,21 +340,8 @@ function SiteDuplicateSection({
           <p>Dernière synchro : {new Date(detail.duplicate.lastSyncedAt).toLocaleString()}</p>
 
           <div className="mt-2 flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={refreshing || detail.failoverActive}
-              onClick={async () => {
-                setRefreshing(true);
-                try {
-                  await apiJson(`/sites/${name}/duplicate`, { method: "POST", body: JSON.stringify({}) });
-                  onChanged();
-                } finally {
-                  setRefreshing(false);
-                }
-              }}
-            >
-              {refreshing ? "Rafraîchissement…" : "Rafraîchir"}
+            <Button size="sm" variant="outline" disabled={detail.failoverActive} onClick={startRefresh}>
+              Rafraîchir
             </Button>
             <ConfirmDialog
               trigger={
