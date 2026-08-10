@@ -73,14 +73,47 @@ function splitServerBlocks(rawConfig: string): { start: number; end: number; tex
 }
 
 /**
- * Replaces every top-level `location` block inside HTTPS/443 `server {}`
- * blocks with a single maintenance-page location, leaving `listen`,
- * `server_name`, and `ssl_*` directives (and any plain-HTTP redirect
- * blocks) untouched — those still need to keep serving the site's own
- * certificate for TLS to terminate correctly. Server-level directives that
- * apply to every location by inheritance (auth_basic, etc.) are explicitly
- * turned off in the maintenance location so visitors aren't blocked from
- * seeing the maintenance page itself.
+ * A server block whose only job is bouncing HTTP to HTTPS (or to another
+ * host/path) — swapping its location for the maintenance page would be a
+ * no-op for visitors anyway (they'd just get redirected again), so it's
+ * left untouched.
+ */
+function isRedirectOnlyBlock(blockText: string): boolean {
+  const withoutLocations = stripLocationBlocks(blockText);
+  // Whatever remains outside location{} blocks must contain no directive
+  // besides the handful that are safe on a bare server{} (listen,
+  // server_name, comments, braces) — a real content-serving directive
+  // (root/proxy_pass/return inside a location) only shows up inside those
+  // location blocks we already stripped, EXCEPT a server-level `return`,
+  // which is exactly the redirect-only pattern this function detects.
+  const hasServerLevelReturn = /^\s*return\s+30[12378]\s+https?:\/\//im.test(withoutLocations);
+  const hasServerLevelRewrite = /^\s*rewrite\s+.*\bhttps:\/\//im.test(withoutLocations);
+  if (!hasServerLevelReturn && !hasServerLevelRewrite) return false;
+
+  // If there's also a real location block serving content, this isn't a
+  // pure redirect vhost — don't misclassify it.
+  const locationMatches = blockText.matchAll(/location\s+[^{]*\{([^{}]|\{[^{}]*\})*\}/g);
+  for (const loc of locationMatches) {
+    if (/proxy_pass|root\s+|try_files/.test(loc[0]) && !/return\s+30[12378]/.test(loc[0])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Replaces every top-level `location` block inside content-serving `server
+ * {}` blocks with a single maintenance-page location, leaving `listen`,
+ * `server_name`, and `ssl_*` directives untouched — those still need to
+ * keep serving the site's own certificate for TLS to terminate correctly
+ * when present. A block is skipped only if it's a pure HTTP->HTTPS (or
+ * similar) redirect with no content of its own — TLS-terminated blocks
+ * (443/ssl) AND plain-HTTP blocks that actually serve the site directly
+ * (e.g. TLS terminated upstream by a proxy/tunnel in front of this host)
+ * are both eligible. Server-level directives that apply to every location
+ * by inheritance (auth_basic, etc.) are explicitly turned off in the
+ * maintenance location so visitors aren't blocked from seeing the
+ * maintenance page itself.
  */
 export function applyMaintenanceMode(rawConfig: string, maintenanceRoot: string): string {
   const blocks = splitServerBlocks(rawConfig);
@@ -88,10 +121,10 @@ export function applyMaintenanceMode(rawConfig: string, maintenanceRoot: string)
   let cursor = 0;
 
   for (const block of blocks) {
-    const isTls = /listen\s+[^;]*(443|ssl)/i.test(block.text);
+    const redirectOnly = isRedirectOnlyBlock(block.text);
     result += rawConfig.slice(cursor, block.start);
 
-    if (!isTls) {
+    if (redirectOnly) {
       result += block.text;
     } else {
       const withoutLocations = stripLocationBlocks(block.text);
