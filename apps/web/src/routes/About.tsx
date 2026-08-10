@@ -50,6 +50,7 @@ export function About() {
           </div>
           <div>
             <h1 className="text-lg font-semibold">Server Admin PWA</h1>
+            <p className="text-xs font-medium text-primary">Gestion des serveurs · Admin tools</p>
             <p className="text-xs text-muted-foreground">Version {APP_VERSION}</p>
           </div>
         </div>

@@ -65,8 +65,14 @@ const SECTIONS: HelpSection[] = [
   {
     icon: Globe,
     title: "Sites",
-    summary: "Vue combinée d'un site : sa config Nginx et son conteneur Docker associé.",
-    details: ["Utile pour retrouver rapidement tout ce qui concerne un site sans naviguer entre deux écrans."],
+    summary: "Vue combinée d'un site : sa config Nginx, son conteneur Docker associé, et duplication pour bascule de secours.",
+    details: [
+      "Utile pour retrouver rapidement tout ce qui concerne un site sans naviguer entre deux écrans.",
+      "Bouton « Cloner » : crée un duplicata complet du site (dossier de contenu, base de données si sélectionnée, et un second conteneur sur un port différent si le site utilise un conteneur Docker) — une copie de secours prête à prendre le relais.",
+      "Bouton « Basculer vers le duplicata » : redirige tout le trafic du site vers cette copie en un clic, utile en cas de panne ou d'erreur système sur le site principal. L'action est réversible via « Revenir au site principal ».",
+      "Le duplicata est une photo figée au moment de sa création — les modifications faites sur l'original ensuite ne s'y reflètent pas automatiquement. Utilisez « Mettre à jour depuis l'original » pour le resynchroniser.",
+      "Impossible de basculer un site actuellement en mode maintenance (quittez la maintenance d'abord) — les deux états ne peuvent pas être actifs en même temps.",
+    ],
   },
   {
     icon: Package,
@@ -232,7 +238,8 @@ export function Help() {
         <CardTitle className="flex items-center gap-1">
           <HelpCircle className="h-4 w-4" /> Aide
         </CardTitle>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-xs font-medium text-primary">Gestion des serveurs · Admin tools</p>
+        <p className="mt-1 text-sm text-muted-foreground">
           Guide rapide de chaque menu de l'application, et liste des dépendances système nécessaires au bon
           fonctionnement de l'outil sur le Raspberry Pi.
         </p>
