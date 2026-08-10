@@ -38,7 +38,7 @@ const envSchema = z.object({
   NGINX_LOG_DIR: z.string().default("/var/log/nginx"),
   NGINX_BINARY_PATH: z.string().default("/usr/sbin/nginx"),
   NGINX_CONFIG_BACKUP_DIR: z.string().default("./data/nginx-config-history"),
-  NGINX_MAINTENANCE_ROOT: z.string().default("/var/www/pi-admin-maintenance"),
+  NGINX_MAINTENANCE_ROOT: z.string().default("/var/www/server-admin-maintenance"),
   CERTBOT_LIVE_DIR: z.string().default("/etc/letsencrypt/live"),
 
   OS_MODULE_ENABLED: z.coerce.boolean().default(true),

@@ -23,7 +23,7 @@ Chaque module suit le pattern `*.routes.ts` (endpoints Fastify) + `*.service.ts`
 - **auth** — login, 2FA (TOTP via otplib), JWT access+refresh, rate limiting sur login
 - **system** — snapshot CPU/RAM/disque/température, stream WS `sys.stats`/`sys.alerts`
 - **docker** — containers/images/volumes/networks, logs/stats live (WS `docker.logs`/`docker.stats`), export/import d'images (.tar), backup one-off de volumes
-- **nginx** — vhosts (liste/détail/enable/disable), édition config validée (`nginx -t` avant application, historique de versions), reload/restart, logs (WS `nginx.logs`), statut certificat SSL, test d'accessibilité HTTP réel, sauvegarde de la config complète, mode maintenance par site (bascule `location` vers une page statique `/var/www/pi-admin-maintenance`, cf. `applyMaintenanceMode` dans `nginx.parser.ts`)
+- **nginx** — vhosts (liste/détail/enable/disable), édition config validée (`nginx -t` avant application, historique de versions), reload/restart, logs (WS `nginx.logs`), statut certificat SSL, test d'accessibilité HTTP réel, sauvegarde de la config complète, mode maintenance par site (bascule `location` vers une page statique `/var/www/server-admin-maintenance`, cf. `applyMaintenanceMode` dans `nginx.parser.ts`)
 - **sites** — vue agrégée Nginx + Docker par site
 - **network** — ports ouverts (`ss -tulpn`), analytics de trafic (top pages/visiteurs depuis les logs Nginx), fail2ban (statut/ban/unban)
 - **os** — info système, paquets installés/upgradables, jobs async update/upgrade avec suivi live (WS `os.upgrade`), paquets held

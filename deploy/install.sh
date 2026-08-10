@@ -29,9 +29,9 @@ sed "s#/home/shan/pwa_admin#${APP_DIR}#g; s/User=shan/User=${SERVICE_USER}/; s/G
   "$(dirname "$0")/pwa-admin.service" | sudo tee /etc/systemd/system/pwa-admin.service > /dev/null
 sudo systemctl daemon-reload
 
-echo "== Installing maintenance-mode page (NGINX_MAINTENANCE_ROOT default: /var/www/pi-admin-maintenance) =="
-sudo mkdir -p /var/www/pi-admin-maintenance
-sudo cp "$(dirname "$0")/maintenance-page/index.html" /var/www/pi-admin-maintenance/index.html
+echo "== Installing maintenance-mode page (NGINX_MAINTENANCE_ROOT default: /var/www/server-admin-maintenance) =="
+sudo mkdir -p /var/www/server-admin-maintenance
+sudo cp "$(dirname "$0")/maintenance-page/index.html" /var/www/server-admin-maintenance/index.html
 
 echo "== Done. Next steps =="
 echo "1. Copy deploy/env.server.example to ${APP_DIR}/.env and fill in the JWT secrets (openssl rand -base64 48)"
