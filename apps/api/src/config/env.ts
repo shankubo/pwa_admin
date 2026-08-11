@@ -90,6 +90,7 @@ if (!parsed.success) {
 
 export const env = {
   ...parsed.data,
+  APP_DIR: REPO_ROOT,
   SQLITE_PATH: resolveFromRoot(parsed.data.SQLITE_PATH),
   NGINX_CONFIG_BACKUP_DIR: resolveFromRoot(parsed.data.NGINX_CONFIG_BACKUP_DIR),
   APT_JOB_LOG_DIR: resolveFromRoot(parsed.data.APT_JOB_LOG_DIR),

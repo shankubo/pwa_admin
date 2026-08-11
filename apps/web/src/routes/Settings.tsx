@@ -1,12 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { AccessTokenSummary, CreateAccessTokenResponse, CurrentUser } from "@pwa-admin/shared";
+import type {
+  AccessTokenSummary,
+  AppUpdateStatus,
+  CreateAccessTokenResponse,
+  CurrentUser,
+} from "@pwa-admin/shared";
 import { apiFetch, apiJson } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth.store";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { ShieldCheck, ShieldOff, LogOut, KeyRound, Trash2, RefreshCw } from "lucide-react";
+import { ShieldCheck, ShieldOff, LogOut, KeyRound, Trash2, RefreshCw, DownloadCloud } from "lucide-react";
 import { APP_VERSION } from "@/lib/appVersion";
 
 // No shared type exists for audit log rows — these are raw sqlite columns (snake_case).
@@ -79,6 +84,48 @@ export function Settings() {
 
 function AppUpdateCard() {
   const [clearing, setClearing] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | null>(null);
+  const [checking, setChecking] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
+
+  useEffect(() => stopPolling, []);
+
+  // The final step of deploy/auto-update.sh is `sudo systemctl restart
+  // pwa-admin`, which kills this very request mid-flight along with every
+  // other in-flight connection — so failed polls while a check is running
+  // are expected, not an error state, and must not stop the poll loop.
+  async function pollStatus() {
+    try {
+      const status = await apiJson<AppUpdateStatus>("/app-update/status");
+      setUpdateStatus(status);
+      if (status.status !== "running") {
+        stopPolling();
+        setChecking(false);
+      }
+    } catch {
+      // Service likely mid-restart — keep polling silently.
+    }
+  }
+
+  async function checkForUpdate() {
+    setChecking(true);
+    try {
+      const status = await apiJson<AppUpdateStatus>("/app-update/check", { method: "POST" });
+      setUpdateStatus(status);
+    } catch {
+      // Still start polling — the check may have started successfully server-side
+      // even if this response was lost to the restart.
+    }
+    stopPolling();
+    pollRef.current = setInterval(pollStatus, 3000);
+  }
 
   // Full reset for cases the update banner can't fix on its own (e.g. iOS
   // where the service worker may not have woken up in a long time and no
@@ -98,10 +145,34 @@ function AppUpdateCard() {
     }
   }
 
+  const updateStatusLabel: Record<NonNullable<AppUpdateStatus>["status"], string> = {
+    idle: "",
+    running: "Vérification et déploiement en cours…",
+    up_to_date: "Déjà à jour.",
+    succeeded: `Déployé : ${updateStatus?.deployedCommit ?? ""} — rechargez la page.`,
+    failed: "Échec — voir le journal ci-dessous.",
+  };
+
   return (
     <Card>
       <CardTitle>Application</CardTitle>
       <p className="text-xs text-muted-foreground">{APP_VERSION}</p>
+
+      <Button size="sm" variant="outline" className="mt-2" disabled={checking} onClick={checkForUpdate}>
+        <DownloadCloud className="h-3.5 w-3.5" />
+        {checking ? "Vérification…" : "Vérifier les mises à jour"}
+      </Button>
+      {updateStatus && updateStatus.status !== "idle" && (
+        <p
+          className={`mt-1 text-xs ${updateStatus.status === "failed" ? "text-destructive" : "text-muted-foreground"}`}
+        >
+          {updateStatusLabel[updateStatus.status]}
+        </p>
+      )}
+      {updateStatus?.status === "failed" && updateStatus.log && (
+        <pre className="mt-2 max-h-48 overflow-auto rounded-md bg-muted p-2 text-xs">{updateStatus.log}</pre>
+      )}
+
       <p className="mt-2 text-xs text-muted-foreground">
         Si l'application semble bloquée sur une ancienne version malgré le bandeau de mise à jour (fréquent sur
         iOS, qui réveille rarement le service worker de son propre chef), ce bouton force un nettoyage complet du

@@ -33,6 +33,7 @@ import "./modules/pm2/pm2.ws.js";
 import hardwareRoutes from "./modules/hardware/hardware.routes.js";
 import securityRoutes from "./modules/security/security.routes.js";
 import servicesRoutes from "./modules/services/services.routes.js";
+import appUpdateRoutes from "./modules/appUpdate/appUpdate.routes.js";
 import auditRoutes from "./modules/audit/audit.routes.js";
 import { registerExternalModules } from "./modules/_external/index.js";
 import { SchedulerService } from "./services/scheduler.js";
@@ -87,6 +88,7 @@ await app.register(async (api) => {
   await api.register(hardwareRoutes);
   await api.register(securityRoutes);
   await api.register(servicesRoutes);
+  await api.register(appUpdateRoutes);
   await api.register(auditRoutes);
   await registerExternalModules(api);
   await api.register(wsRoutePlugin);
