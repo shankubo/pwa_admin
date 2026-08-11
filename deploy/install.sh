@@ -8,7 +8,7 @@ set -euo pipefail
 #   1. Default (no --create-user): runs as an EXISTING low-privilege admin
 #      user (already in the `docker` group, and `adm` if nginx logs are
 #      group-owned by adm) — the model used by the two current production
-#      servers (shan@ubuntu_ext, the Pi). Simpler when you're the sole admin
+#      servers. Simpler when you're the sole admin
 #      of the box and don't need account isolation.
 #   2. --create-user: creates a dedicated system service account (no login
 #      shell, system UID range) and runs pwa-admin under that instead of a
@@ -73,7 +73,7 @@ sudo chmod 440 /etc/sudoers.d/pwa-admin
 sudo visudo -c -f /etc/sudoers.d/pwa-admin
 
 echo "== Installing systemd unit =="
-sed "s#/home/shan/pwa_admin#${APP_DIR}#g; s/User=shan/User=${SERVICE_USER}/; s/Group=shan/Group=${SERVICE_USER}/" \
+sed "s#__PWA_ADMIN_USER__#${SERVICE_USER}#g; s#__PWA_ADMIN_APP_DIR__#${APP_DIR}#g" \
   "${DEPLOY_DIR}/pwa-admin.service" | sudo tee /etc/systemd/system/pwa-admin.service > /dev/null
 sudo systemctl daemon-reload
 

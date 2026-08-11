@@ -7,7 +7,7 @@ import { execSync } from "node:child_process";
 // Captured at build time (not runtime) so the version shown in About always
 // reflects exactly what was deployed — no manual bump to forget, no drift
 // between what's running and what's displayed. Works identically whether the
-// build ran via the RPi's auto-update.sh or a manual deploy on ubuntu_ext,
+// build ran via auto-update.sh's cron polling or a manual deploy,
 // since both just run `npm run build:web` against whatever commit is checked
 // out. Falls back to "unknown" if git isn't available (shouldn't happen in
 // this repo's deploy flow, but never fail the build over a version string).

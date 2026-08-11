@@ -10,10 +10,10 @@ Type=simple
 # logs are group-owned by adm, as is common on Debian). Do NOT run as root —
 # elevated operations (nginx/apt/fail2ban) go through the scoped sudoers.d
 # rules in this directory instead.
-User=shan
-Group=shan
-WorkingDirectory=/home/shan/pwa_admin
-EnvironmentFile=/home/shan/pwa_admin/.env
+User=__PWA_ADMIN_USER__
+Group=__PWA_ADMIN_USER__
+WorkingDirectory=__PWA_ADMIN_APP_DIR__
+EnvironmentFile=__PWA_ADMIN_APP_DIR__/.env
 ExecStart=/usr/bin/node apps/api/dist/server.js
 Restart=on-failure
 RestartSec=5

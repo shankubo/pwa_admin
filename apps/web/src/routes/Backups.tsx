@@ -550,7 +550,7 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
                       ? "Chargement…"
                       : sourceType === "volume"
                         ? "Référence source (nom du volume)"
-                        : "Chemin absolu (ex: /home/shan/docker-data/pwa-asso)"
+                        : "Chemin absolu (ex: /opt/docker-data/mon-app)"
                   }
                   value={sourceRef}
                   onChange={(e) => setSourceRef(e.target.value)}

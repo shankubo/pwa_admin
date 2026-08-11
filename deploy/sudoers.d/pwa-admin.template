@@ -7,17 +7,14 @@
 #   __PWA_ADMIN_USER__     -> the service account (install.sh's SERVICE_USER)
 #   __PWA_ADMIN_APP_DIR__  -> the app's install directory (install.sh's APP_DIR)
 #
-# install.sh installs this as:
+# This is the ONLY sudoers source of truth in this repo — there is no
+# separate literal file to keep in sync. install.sh installs this as:
 #   sed "s#__PWA_ADMIN_USER__#${SERVICE_USER}#g; s#__PWA_ADMIN_APP_DIR__#${APP_DIR}#g" \
 #     deploy/sudoers.d/pwa-admin.template | sudo tee /etc/sudoers.d/pwa-admin
 #   sudo chmod 440 /etc/sudoers.d/pwa-admin
 #   sudo visudo -c -f /etc/sudoers.d/pwa-admin
-#
-# The sibling file `deploy/sudoers.d/pwa-admin` (literal `shan` user) is a
-# separate, hand-maintained file used by the two existing shan-based
-# production servers' manual update procedure — this template must be kept
-# in sync with it when adding/changing rules (see CLAUDE.md), but is not a
-# generator for it.
+# Any already-deployed server picks up a rule change by re-running install.sh
+# (or reproducing the substitution above manually), then reloading sudo.
 
 # --- Nginx module ---
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/sbin/nginx -t
@@ -90,8 +87,7 @@ __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/rsync -a --itemize-changes --li
 # plain fnmatch() globs (*, ?, [...]) — no negation/exclusion syntax exists
 # (bash extglob's `!(...)` is NOT valid here and fails `visudo -c`) — so a
 # true denylist of system roots isn't expressible in one rule. Scoped to
-# /home/* (broadened from the shan-based file's /home/shan/* to any home
-# dir) rather than the whole filesystem, matching the original rule's
+# /home/* rather than the whole filesystem, matching the original rule's
 # intent: bind-mount sources under an operator's home directory, never
 # system paths like /etc or /boot.
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/rsync -a --delete * /home/*

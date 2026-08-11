@@ -29,34 +29,15 @@ npm run dev:web   # démarre le frontend Vite (proxy /api vers le backend)
 Le déploiement se fait en syncant le code source puis en buildant **sur la machine cible elle-même** (les modules natifs comme `better-sqlite3` doivent compiler sur l'architecture cible — cross-compiler depuis Windows serait fragile).
 
 ```bash
-./deploy/deploy-to-pi.sh shan@ubuntu_ext
-# puis, sur le serveur :
-ssh ubuntu_ext
-cd ~/pwa_admin
-cp deploy/env.server.example .env    # puis remplir les secrets JWT
-./deploy/install.sh                   # installe sudoers.d + unit systemd
-npm run create-admin --workspace=apps/api -- <username> <password>
-sudo systemctl enable --now pwa-admin
-sudo journalctl -u pwa-admin -f
-```
+./deploy/deploy-to-pi.sh votre_compte@votre-serveur /opt/pwa-admin pwa-admin-svc
 
-Le service tourne sous l'utilisateur admin existant (pas de compte système séparé), avec des permissions élevées strictement scoped via `deploy/sudoers.d/pwa-admin` (nginx reload/restart, apt update/upgrade, fail2ban ban/unban, `ss` — jamais un accès root complet ni le service lancé en root). C'est le modèle utilisé aujourd'hui par les 2 serveurs de production existants (`shan@ubuntu_ext`, le Raspberry Pi).
-
-### Compte dédié (recommandé pour une nouvelle installation)
-
-Pour une **nouvelle** installation, `install.sh` peut créer et utiliser un vrai compte système dédié (sans connexion interactive, UID dans la plage système) plutôt que votre compte admin personnel — évite de mélanger le compte technique de l'app avec votre propre compte, et isole le blast radius si l'app est un jour compromise. Ceci ne concerne que les nouvelles installations : les 2 serveurs existants restent sous `shan`, aucune migration n'est prévue ni nécessaire.
-
-```bash
-# 1. Synchroniser + builder en tant que compte dédié (une fois install.sh a créé le compte, voir étape 2)
-./deploy/deploy-to-pi.sh votre_compte@nouveau-serveur /opt/pwa-admin pwa-admin-svc
-
-# 2. Sur le serveur : créer le compte + installer sudoers/systemd/USB/cert-renew
-ssh votre_compte@nouveau-serveur
+# Sur le serveur : créer le compte + installer sudoers/systemd/USB/cert-renew
+ssh votre_compte@votre-serveur
 cd /opt/pwa-admin
-./deploy/install.sh /opt/pwa-admin pwa-admin-svc --create-user
+sudo ./deploy/install.sh /opt/pwa-admin pwa-admin-svc --create-user
 
-# 3. Config + premier admin (compte nologin, passe par sudo -u)
-cp deploy/env.server.example .env    # puis remplir les secrets JWT
+# Config + premier admin (compte nologin, passe par sudo -u)
+sudo -u pwa-admin-svc cp deploy/env.server.example .env    # puis remplir les secrets JWT
 sudo -u pwa-admin-svc -H npm run create-admin --workspace=apps/api -- <username> <password>
 sudo systemctl enable --now pwa-admin
 sudo journalctl -u pwa-admin -f
@@ -66,11 +47,15 @@ sudo journalctl -u pwa-admin -f
 
 - crée `pwa-admin-svc` (`useradd --system --create-home --home-dir /opt/pwa-admin --shell /usr/sbin/nologin`) — home du compte = répertoire de l'app, pas de connexion interactive possible ;
 - l'ajoute aux groupes `docker` (et `adm` si les logs nginx y sont rattachés) ;
-- installe les règles sudoers depuis `deploy/sudoers.d/pwa-admin.template` (substitué avec le vrai compte/répertoire — `deploy/sudoers.d/pwa-admin`, le fichier littéral `shan`, reste inchangé et sert uniquement à la procédure manuelle des 2 serveurs existants) ;
+- installe les règles sudoers depuis `deploy/sudoers.d/pwa-admin.template` (seule source de vérité pour sudoers dans ce repo, substituée avec le vrai compte/répertoire) ;
 - installe le timer de renouvellement de certificat Tailscale (`pwa-admin-cert-renew.service`/`.timer`), à activer manuellement (`sudo systemctl enable --now pwa-admin-cert-renew.timer`) une fois Tailscale configuré ;
 - installe le montage auto USB (`backup-usb-mount.sh`, règle udev, service systemd) avec l'UID/GID réel du compte créé — un compte système n'a **pas** l'UID 1000 conventionnel des comptes humains, donc ce script doit être substitué pour que le point de montage soit accessible en écriture par le service.
 
 Comme le compte n'a pas de shell interactif, `deploy-to-pi.sh` prend un 3ᵉ argument optionnel `build_as_user` : la synchronisation se fait toujours via votre propre connexion SSH, mais chaque étape de build (`npm install`, `tsc`, compilation native `better-sqlite3`) s'exécute via `sudo -u pwa-admin-svc` pour que les fichiers produits appartiennent au compte de service, pas à vous.
+
+### Chemin alternatif : compte admin personnel existant
+
+`./deploy/install.sh` (sans `--create-user`, avec votre propre nom d'utilisateur en second argument) installe pwa-admin sous un compte admin personnel déjà existant plutôt qu'un compte système dédié — plus simple sur un serveur mono-admin, mais mélange le compte technique de l'app avec votre propre compte. Le compte doit déjà être dans le groupe `docker`. Reste utile pour un déploiement existant qui n'a pas encore migré vers un compte dédié.
 
 ## État actuel
 
@@ -97,7 +82,7 @@ Toutes les phases du plan sont implémentées :
 
 Cette app a un contrôle total sur Docker/Nginx/apt/pare-feu — elle ne doit **jamais** être exposée publiquement (pas de route Cloudflare Tunnel, pas de reverse-proxy public vers le port 8443). L'accès admin passe exclusivement par [Tailscale](https://tailscale.com), qui crée un VPN mesh privé où le port n'est joignable que depuis les appareils déjà authentifiés sur le tailnet — aucun paquet d'un attaquant sur Internet n'atteint même le port.
 
-**Mise en place (déjà faite sur `shan@ubuntu_ext` / fr01pc999)** :
+**Mise en place** :
 
 1. **Pare-feu (UFW)** : le port 8443 est explicitement `DENY` depuis le LAN (`192.168.1.0/24`) et le VPN WireGuard existant (`10.66.66.0/24`), et `ALLOW` uniquement depuis la plage Tailscale (`100.64.0.0/10`). Toute autre IP reste bloquée par la politique par défaut (`deny incoming`). Règles dans `sudo ufw status numbered`.
 2. **HTTPS via certificat Tailscale** : `tailscale cert <machine>.<tailnet>.ts.net` génère un vrai certificat Let's Encrypt (validé par les navigateurs, pas d'avertissement) stocké dans `secrets/tailscale-cert/` et référencé par `TLS_CERT_PATH`/`TLS_KEY_PATH` dans `.env`. Le serveur Fastify écoute alors en HTTPS natif.

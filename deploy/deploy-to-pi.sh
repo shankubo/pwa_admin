@@ -13,7 +13,7 @@ set -euo pipefail
 # by build_as_user, prepared by install.sh's chgrp/chmod 2775 step), then run
 # every build command as build_as_user via `sudo -u`, so node_modules/dist/
 # the compiled better-sqlite3 binary end up owned by the service account
-# instead of your own login. Omit for the existing shan-based servers, where
+# instead of your own login. Omit for a server using an existing personal-account install, where
 # the SSH login already IS the service account.
 
 REMOTE="${1:?Usage: deploy-to-pi.sh user@host [remote_dir] [build_as_user]}"

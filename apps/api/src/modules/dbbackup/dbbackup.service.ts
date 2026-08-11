@@ -126,8 +126,8 @@ async function listDockerDatabases(
   const cmd =
     engine === "postgres"
       ? // -d postgres: psql with no -d defaults to a database named after the
-        // connecting user (envVars.POSTGRES_USER, e.g. "shan"), which usually
-        // doesn't exist — the "postgres" maintenance database always does.
+        // connecting user (envVars.POSTGRES_USER), which usually doesn't
+        // exist — the "postgres" maintenance database always does.
         [
           "psql",
           "-U",
