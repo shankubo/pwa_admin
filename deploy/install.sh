@@ -82,7 +82,7 @@ sudo mkdir -p /var/www/server-admin-maintenance
 sudo cp "${DEPLOY_DIR}/maintenance-page/index.html" /var/www/server-admin-maintenance/index.html
 
 echo "== Preparing data/secrets directories =="
-mkdir -p "${APP_DIR}/data" "${APP_DIR}/secrets"
+sudo mkdir -p "${APP_DIR}/data" "${APP_DIR}/secrets"
 sudo chown "${SERVICE_USER}:${SERVICE_USER}" "${APP_DIR}/data" "${APP_DIR}/secrets"
 
 echo "== Ensuring SERVICE_USER is set in ${APP_DIR}/.env =="
