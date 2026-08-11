@@ -335,9 +335,7 @@ export const ApplicationService = {
           timeoutMs: 600_000,
         });
         // Ownership handoff so the Node process can stream the archive itself.
-        await runCommand("sudo", ["chown", process.env.USER ?? "shan", archivePath], { timeoutMs: 5_000 }).catch(
-          () => {}
-        );
+        await runCommand("sudo", ["chown", env.SERVICE_USER, archivePath], { timeoutMs: 5_000 }).catch(() => {});
 
         const pathProgressSpan = 100 / paths.length;
         AppBackupRunModel.setDriveUploadStatus(runId, "uploading", { progressPct: pathBaseProgress });
@@ -402,9 +400,7 @@ export const ApplicationService = {
         await runCommand("sudo", ["tar", "czf", archivePath, "-C", snapshotPathDir, "."], {
           timeoutMs: 600_000,
         });
-        await runCommand("sudo", ["chown", process.env.USER ?? "shan", archivePath], { timeoutMs: 5_000 }).catch(
-          () => {}
-        );
+        await runCommand("sudo", ["chown", env.SERVICE_USER, archivePath], { timeoutMs: 5_000 }).catch(() => {});
 
         AppBackupRunModel.setUsbCopyStatus(runId, "uploading", { progressPct: pathBaseProgress });
         const copied = await UsbBackupService.copyBackupFile(archivePath, "paths", `${app.name}-${label}`);

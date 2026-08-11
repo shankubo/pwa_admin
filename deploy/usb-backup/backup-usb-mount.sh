@@ -9,8 +9,13 @@ set -euo pipefail
 DEVNAME="$1"  # e.g. sda1, from udev's %k
 DEVPATH="/dev/${DEVNAME}"
 MOUNTPOINT="/media/backup-usb"
-BACKUP_UID=1000
-BACKUP_GID=1000
+# Substituted by install.sh at install time with the pwa-admin service
+# account's real uid/gid (`id -u`/`id -g`) — a dedicated system account does
+# NOT get uid/gid 1000 (that's the conventional first-human-user id on
+# Debian/Ubuntu), so a literal 1000 here would mount the drive owned by the
+# wrong account and the service couldn't write to it.
+BACKUP_UID=__PWA_ADMIN_UID__
+BACKUP_GID=__PWA_ADMIN_GID__
 
 mkdir -p "$MOUNTPOINT"
 

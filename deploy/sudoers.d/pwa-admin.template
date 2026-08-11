@@ -1,0 +1,153 @@
+# Sudoers rules template for the pwa-admin service account.
+# NOT directly installable — contains placeholders substituted by
+# `install.sh` (see the sed invocation below). Scoped NOPASSWD entries only —
+# never grant broad sudo access.
+#
+# Placeholders:
+#   __PWA_ADMIN_USER__     -> the service account (install.sh's SERVICE_USER)
+#   __PWA_ADMIN_APP_DIR__  -> the app's install directory (install.sh's APP_DIR)
+#
+# install.sh installs this as:
+#   sed "s#__PWA_ADMIN_USER__#${SERVICE_USER}#g; s#__PWA_ADMIN_APP_DIR__#${APP_DIR}#g" \
+#     deploy/sudoers.d/pwa-admin.template | sudo tee /etc/sudoers.d/pwa-admin
+#   sudo chmod 440 /etc/sudoers.d/pwa-admin
+#   sudo visudo -c -f /etc/sudoers.d/pwa-admin
+#
+# The sibling file `deploy/sudoers.d/pwa-admin` (literal `shan` user) is a
+# separate, hand-maintained file used by the two existing shan-based
+# production servers' manual update procedure — this template must be kept
+# in sync with it when adding/changing rules (see CLAUDE.md), but is not a
+# generator for it.
+
+# --- Nginx module ---
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/sbin/nginx -t
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/sbin/nginx -s reload
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /bin/systemctl reload nginx
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /bin/systemctl restart nginx
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /bin/systemctl is-active nginx
+# /etc/nginx is root-owned; enable/disable (symlink) and config writes go through these.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/ln -s /etc/nginx/sites-available/*, /etc/nginx/sites-enabled/*
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/rm -f /etc/nginx/sites-enabled/*
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/cp __PWA_ADMIN_APP_DIR__/data/nginx-config-history/*, /etc/nginx/sites-available/*
+# Full config backup (sites-available + nginx.conf), scoped to its own staging dir.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tar czf __PWA_ADMIN_APP_DIR__/data/backups/nginx-config/*.tar.gz -C /etc/nginx sites-available
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tar czf __PWA_ADMIN_APP_DIR__/data/backups/nginx-config/*.tar.gz -C /etc/nginx sites-available nginx.conf
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/chown __PWA_ADMIN_USER__ __PWA_ADMIN_APP_DIR__/data/backups/nginx-config/*.tar.gz
+# Cert files referenced by ssl_certificate are frequently root-only (e.g. /etc/ssl/private), same rationale as `nginx -t`.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/openssl x509 -in * -noout -enddate -issuer -subject
+
+# --- OS / apt module ---
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/apt-get update
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/apt-get upgrade -y
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/apt-get full-upgrade -y
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/apt-mark hold *
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/apt-mark unhold *
+
+# --- Hardware / système module ---
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/nmcli device wifi connect * password *
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/nmcli device disconnect *
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/cat /etc/ssh/sshd_config
+
+# --- Network / Security module ---
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/fail2ban-client status
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/fail2ban-client status *
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/fail2ban-client set * banip *
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/fail2ban-client set * unbanip *
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/ss -tulpn
+
+# --- Security overview module: UFW, unattended-upgrades ---
+# systemctl is-active on a timer is a public read, no sudo needed.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/sbin/ufw status verbose
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/cat /etc/apt/apt.conf.d/50unattended-upgrades
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tail -n * /var/log/unattended-upgrades/unattended-upgrades.log
+
+# --- Backups module: native (host OS) database dump/restore ---
+# Debian's default MariaDB/MySQL setup trusts root via unix_socket auth, and
+# postgres uses OS peer auth for the `postgres` user — sudo is how the service
+# reaches that trust without ever storing DB credentials itself.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/mysql
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/mysql -N -e *
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/mysqldump --all-databases
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/systemctl is-active mariadb, /usr/bin/systemctl is-active mysql, /usr/bin/systemctl is-active postgresql, /usr/bin/systemctl is-active redis-server
+__PWA_ADMIN_USER__ ALL=(postgres) NOPASSWD: /usr/bin/psql, /usr/bin/pg_dumpall
+
+# --- Backups module: bind-mount (host directory) backup/restore ---
+# Bind-mount sources are frequently owned by container-internal uids/gids the
+# admin service user can't read directly; sudo tar is scoped to exactly this
+# archive/extract shape, never a broader filesystem-write grant.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tar czf __PWA_ADMIN_APP_DIR__/data/backups/paths/* -C * .
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tar xzf __PWA_ADMIN_APP_DIR__/data/backups/paths/*/*.tar.gz -C *
+
+# --- Applications module: rsync --link-dest snapshots + retention cleanup ---
+# Same rationale as the tar rules above (bind-mount ownership), plus rm -rf
+# scoped strictly to this app's own snapshot storage tree, never a broader path.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/rsync -a --itemize-changes *
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/rsync -a --itemize-changes --link-dest=* *
+# Restore target (sourcePath in application.service.ts's restoreApp) is
+# whatever bind-mount path the admin configured for an Application — can be
+# anywhere on disk, not necessarily under this app's own install dir.
+# Deliberately NOT anchored to __PWA_ADMIN_APP_DIR__. sudoers wildcards are
+# plain fnmatch() globs (*, ?, [...]) — no negation/exclusion syntax exists
+# (bash extglob's `!(...)` is NOT valid here and fails `visudo -c`) — so a
+# true denylist of system roots isn't expressible in one rule. Scoped to
+# /home/* (broadened from the shan-based file's /home/shan/* to any home
+# dir) rather than the whole filesystem, matching the original rule's
+# intent: bind-mount sources under an operator's home directory, never
+# system paths like /etc or /boot.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/rsync -a --delete * /home/*
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/rm -rf __PWA_ADMIN_APP_DIR__/data/backups/apps/*
+
+# --- Applications module: Drive upload staging (tar the snapshot, hand ownership back) ---
+# The snapshot dir may contain files with container-internal ownership; tar
+# them into a Node-writable staging file, then chown so Node can stream/delete
+# it without further sudo calls per upload.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tar czf __PWA_ADMIN_APP_DIR__/data/backups/_tmp-drive-upload/*.tar.gz -C * .
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/chown __PWA_ADMIN_USER__ __PWA_ADMIN_APP_DIR__/data/backups/_tmp-drive-upload/*.tar.gz
+
+# --- Services module: status/update for Tailscale, Docker, PM2 ---
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tailscale update
+# Weekly cert-renew timer (renew-tailscale-cert.sh) runs non-interactively,
+# so it needs this scoped to the single machine domain `tailscale status` reports.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tailscale cert *
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/apt-get install --only-upgrade -y docker-ce docker-ce-cli containerd.io
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /bin/systemctl restart docker
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /bin/systemctl is-active docker
+
+# --- Auto-update: deliberate, narrow exception to "never self-restart" ---
+# deploy/auto-update.sh (cron-polled, pulls+rebuilds+restarts on new commits)
+# is the one human-approved automated path allowed to restart pwa-admin
+# without an interactive password. Every OTHER restart of this service must
+# stay password-gated — do not broaden this rule beyond this exact command.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /bin/systemctl restart pwa-admin
+
+# --- Sites module: site duplication (content + DB clone for manual failover) ---
+# Site roots live under /var/www/ (confirmed via `root` directives across real
+# vhosts on both deployed servers — see GET /nginx/vhosts), outside this app's
+# own data dir, so the existing rsync rules (scoped to backups/apps dirs) don't
+# cover this. Scoped to /var/www/* so a duplicate can only be written as a
+# sibling of an actual site root, never an arbitrary destination.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/rsync -a /var/www/*
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/rm -rf /var/www/*__duplicate
+# Single-database dump/restore for site duplication — the existing mysqldump
+# rule only covers --all-databases, and pg_dump/pg_restore aren't covered at
+# all (only pg_dumpall is), since duplication needs one specific database
+# cloned under a new name, not the whole instance.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/mysqldump *
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/pg_dump -Fc *
+# pg_restore runs as the postgres OS user (peer auth), same as psql/pg_dumpall
+# above — not (root) like the rest of this block.
+__PWA_ADMIN_USER__ ALL=(postgres) NOPASSWD: /usr/bin/pg_restore -d *
+# CREATE/DROP DATABASE (mysql -e) and restoring a dump piped into stdin
+# (mysql <dbname>) both need mysql callable with any args — the existing
+# `mysql -N -e *` rule (read-only listing) only matches that exact shape,
+# since sudoers matches the argv literally.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/mysql *
+# CREATE/DROP DATABASE via psql -c — the existing `psql` rule (no args, used
+# interactively by pg_dumpall's sibling calls) doesn't match this argv shape.
+__PWA_ADMIN_USER__ ALL=(postgres) NOPASSWD: /usr/bin/psql -c *
+
+# The system-wide sudoers `Defaults` sets `use_pty`, which makes sudo require
+# an allocated pseudo-terminal — fine for interactive SSH use, but the
+# pwa-admin service invokes sudo via execFile with no TTY at all, so every
+# scoped command here needs both `!requiretty` and `!use_pty` to run non-interactively.
+Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/bin/systemctl,/usr/bin/fail2ban-client,/usr/bin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/pg_dump,/usr/bin/pg_restore,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat,/usr/sbin/ufw,/usr/bin/tail,/usr/bin/tailscale !requiretty,!use_pty

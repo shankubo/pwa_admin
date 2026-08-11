@@ -40,7 +40,37 @@ sudo systemctl enable --now pwa-admin
 sudo journalctl -u pwa-admin -f
 ```
 
-Le service tourne sous l'utilisateur admin existant (pas de compte système séparé sur un serveur mono-admin), avec des permissions élevées strictement scoped via `deploy/sudoers.d/pwa-admin` (nginx reload/restart, apt update/upgrade, fail2ban ban/unban, `ss` — jamais un accès root complet ni le service lancé en root).
+Le service tourne sous l'utilisateur admin existant (pas de compte système séparé), avec des permissions élevées strictement scoped via `deploy/sudoers.d/pwa-admin` (nginx reload/restart, apt update/upgrade, fail2ban ban/unban, `ss` — jamais un accès root complet ni le service lancé en root). C'est le modèle utilisé aujourd'hui par les 2 serveurs de production existants (`shan@ubuntu_ext`, le Raspberry Pi).
+
+### Compte dédié (recommandé pour une nouvelle installation)
+
+Pour une **nouvelle** installation, `install.sh` peut créer et utiliser un vrai compte système dédié (sans connexion interactive, UID dans la plage système) plutôt que votre compte admin personnel — évite de mélanger le compte technique de l'app avec votre propre compte, et isole le blast radius si l'app est un jour compromise. Ceci ne concerne que les nouvelles installations : les 2 serveurs existants restent sous `shan`, aucune migration n'est prévue ni nécessaire.
+
+```bash
+# 1. Synchroniser + builder en tant que compte dédié (une fois install.sh a créé le compte, voir étape 2)
+./deploy/deploy-to-pi.sh votre_compte@nouveau-serveur /opt/pwa-admin pwa-admin-svc
+
+# 2. Sur le serveur : créer le compte + installer sudoers/systemd/USB/cert-renew
+ssh votre_compte@nouveau-serveur
+cd /opt/pwa-admin
+./deploy/install.sh /opt/pwa-admin pwa-admin-svc --create-user
+
+# 3. Config + premier admin (compte nologin, passe par sudo -u)
+cp deploy/env.server.example .env    # puis remplir les secrets JWT
+sudo -u pwa-admin-svc -H npm run create-admin --workspace=apps/api -- <username> <password>
+sudo systemctl enable --now pwa-admin
+sudo journalctl -u pwa-admin -f
+```
+
+`install.sh --create-user` :
+
+- crée `pwa-admin-svc` (`useradd --system --create-home --home-dir /opt/pwa-admin --shell /usr/sbin/nologin`) — home du compte = répertoire de l'app, pas de connexion interactive possible ;
+- l'ajoute aux groupes `docker` (et `adm` si les logs nginx y sont rattachés) ;
+- installe les règles sudoers depuis `deploy/sudoers.d/pwa-admin.template` (substitué avec le vrai compte/répertoire — `deploy/sudoers.d/pwa-admin`, le fichier littéral `shan`, reste inchangé et sert uniquement à la procédure manuelle des 2 serveurs existants) ;
+- installe le timer de renouvellement de certificat Tailscale (`pwa-admin-cert-renew.service`/`.timer`), à activer manuellement (`sudo systemctl enable --now pwa-admin-cert-renew.timer`) une fois Tailscale configuré ;
+- installe le montage auto USB (`backup-usb-mount.sh`, règle udev, service systemd) avec l'UID/GID réel du compte créé — un compte système n'a **pas** l'UID 1000 conventionnel des comptes humains, donc ce script doit être substitué pour que le point de montage soit accessible en écriture par le service.
+
+Comme le compte n'a pas de shell interactif, `deploy-to-pi.sh` prend un 3ᵉ argument optionnel `build_as_user` : la synchronisation se fait toujours via votre propre connexion SSH, mais chaque étape de build (`npm install`, `tsc`, compilation native `better-sqlite3`) s'exécute via `sudo -u pwa-admin-svc` pour que les fichiers produits appartiennent au compte de service, pas à vous.
 
 ## État actuel
 

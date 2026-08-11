@@ -3,5 +3,5 @@ Description=Renew Tailscale HTTPS cert for pwa-admin
 
 [Service]
 Type=oneshot
-User=shan
-ExecStart=/home/shan/pwa_admin/deploy/renew-tailscale-cert.sh /home/shan/pwa_admin
+User=__PWA_ADMIN_USER__
+ExecStart=__PWA_ADMIN_APP_DIR__/deploy/renew-tailscale-cert.sh __PWA_ADMIN_APP_DIR__

@@ -625,7 +625,7 @@ export const NginxService = {
       if (existsSync(nginxConfPath)) tarArgs.push("nginx.conf");
 
       await runCommand("sudo", tarArgs, { timeoutMs: 60_000 });
-      await runCommand("sudo", ["chown", process.env.USER ?? "shan", archivePath], { timeoutMs: 5000 }).catch(() => {});
+      await runCommand("sudo", ["chown", env.SERVICE_USER, archivePath], { timeoutMs: 5000 }).catch(() => {});
 
       const stats = await stat(archivePath);
 

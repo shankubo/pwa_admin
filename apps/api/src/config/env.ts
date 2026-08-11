@@ -31,6 +31,14 @@ const envSchema = z.object({
 
   DOCKER_SOCKET_PATH: z.string().default("/var/run/docker.sock"),
 
+  // The OS account this service runs as — read explicitly rather than
+  // process.env.USER, which systemd's Type=simple + User= never populates
+  // (that's a login-shell/PAM convention). Must match the sudoers "chown
+  // ${SERVICE_USER} ..." rules exactly. "shan" as a default only matches the
+  // two existing shan-based servers; a --create-user install sets this via
+  // install.sh, and must not silently fall back to this default.
+  SERVICE_USER: z.string().default("shan"),
+
   PROXY_TYPE: z.enum(["nginx", "traefik"]).default("nginx"),
   NGINX_SITES_AVAILABLE: z.string().default("/etc/nginx/sites-available"),
   NGINX_SITES_ENABLED: z.string().default("/etc/nginx/sites-enabled"),
