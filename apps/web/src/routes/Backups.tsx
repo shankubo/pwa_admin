@@ -840,6 +840,8 @@ function UsbConnection() {
   const [showArchives, setShowArchives] = useState(false);
   const [loadingArchives, setLoadingArchives] = useState(false);
   const [enabling, setEnabling] = useState<string | null>(null);
+  const [ejecting, setEjecting] = useState<string | null>(null);
+  const [ejected, setEjected] = useState<string | null>(null);
 
   function loadStatus() {
     apiJson<UsbStatus>("/backups/usb/status")
@@ -856,6 +858,17 @@ function UsbConnection() {
       loadStatus();
     } finally {
       setEnabling(null);
+    }
+  }
+
+  async function ejectDrive(mountpoint: string) {
+    setEjecting(mountpoint);
+    try {
+      await apiJson("/backups/usb/eject", { method: "POST", body: JSON.stringify({ mountpoint }) });
+      setEjected(mountpoint);
+      loadStatus();
+    } finally {
+      setEjecting(null);
     }
   }
 
@@ -883,6 +896,12 @@ function UsbConnection() {
         </Button>
       </div>
 
+      {ejected && (
+        <p className="flex items-center gap-1 text-sm text-primary">
+          <CheckCircle2 className="h-4 w-4" /> Disque démonté, débranchement possible en toute sécurité.
+        </p>
+      )}
+
       {!status ? (
         <p className="text-sm text-muted-foreground">Chargement…</p>
       ) : !status.available ? (
@@ -902,6 +921,17 @@ function UsbConnection() {
                   {d.totalBytes != null ? ` / ${formatBytes(d.totalBytes)}` : ""}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">{d.backupRoot}</p>
+                <ConfirmDialog
+                  trigger={
+                    <Button size="sm" variant="outline" className="mt-2" disabled={ejecting === d.mountpoint}>
+                      {ejecting === d.mountpoint ? "Éjection…" : "Éjecter"}
+                    </Button>
+                  }
+                  title="Éjecter ce disque ?"
+                  description="Le disque sera démonté proprement. Attendez la confirmation avant de le débrancher physiquement, sinon une sauvegarde en cours pourrait être corrompue."
+                  confirmLabel="Éjecter"
+                  onConfirm={() => ejectDrive(d.mountpoint)}
+                />
               </div>
             ) : (
               <div key={d.mountpoint} className="rounded-md border border-warning/40 bg-warning/10 p-2 text-sm">

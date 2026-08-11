@@ -100,6 +100,13 @@ __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/rm -rf __PWA_ADMIN_APP_DIR__/da
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tar czf __PWA_ADMIN_APP_DIR__/data/backups/_tmp-drive-upload/*.tar.gz -C * .
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/chown __PWA_ADMIN_USER__ __PWA_ADMIN_APP_DIR__/data/backups/_tmp-drive-upload/*.tar.gz
 
+# --- Backups module: eject a mounted USB/SSD backup drive ---
+# Reuses the exact mechanism udev/systemd already use to mount the drive
+# (deploy/usb-backup/backup-usb-mount@.service's ExecStop is the umount) —
+# pwa-admin deliberately never calls mount/umount itself, only requests the
+# unit be stopped, scoped to that one unit template.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /bin/systemctl stop backup-usb-mount@*.service
+
 # --- Services module: status/update for Tailscale, Docker, PM2 ---
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tailscale update
 # Weekly cert-renew timer (renew-tailscale-cert.sh) runs non-interactively,

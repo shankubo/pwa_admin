@@ -351,6 +351,27 @@ export default async function backupRoutes(app: FastifyInstance) {
     }
   );
 
+  // Stops the systemd unit that mounted the drive so it's safe to unplug —
+  // see UsbBackupService.eject for why this isn't a direct umount call.
+  app.post(
+    "/backups/usb/eject",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("backup.usb-drive.eject")],
+      schema: {
+        body: { type: "object", required: ["mountpoint"], properties: { mountpoint: { type: "string" } } },
+      },
+    },
+    async (req, reply) => {
+      const { mountpoint } = req.body as { mountpoint: string };
+      try {
+        await UsbBackupService.eject(mountpoint);
+        reply.send({ ok: true });
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      }
+    }
+  );
+
   // Uploads an archive from the admin's PC and registers it as a real
   // backup_history row (status "success", target "local") so it becomes
   // restorable through the existing /backups/restore and

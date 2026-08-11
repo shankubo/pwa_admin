@@ -91,6 +91,12 @@ export interface UsbStatus {
   available: boolean;
   hostname: string;
   drives: UsbDriveInfo[];
+  /** Mountpoints lsblk reports as USB-attached (tran=usb/rm) but excluded
+   * from `drives` because they're the machine's own system mounts — e.g. a
+   * server booting its rootfs off an external USB/SSD once the SD card is
+   * retired. Surfaced separately so the Dashboard can flag it without ever
+   * treating it as a backup-drive candidate. */
+  systemMountpointsOnUsb: string[];
 }
 
 /** An archive found under a USB drive's BACKUP/<hostname>/<category>/<sourceRef>/

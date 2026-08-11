@@ -162,6 +162,12 @@ export function Dashboard() {
         ) : (
           <p className="text-sm text-muted-foreground">Aucun disque USB connecté</p>
         )}
+        {usb?.systemMountpointsOnUsb && usb.systemMountpointsOnUsb.length > 0 && (
+          <p className="mt-1 flex items-center gap-1 text-sm text-warning">
+            <AlertTriangle className="h-4 w-4" /> Système démarré depuis un disque USB/SSD externe (
+            {usb.systemMountpointsOnUsb.join(", ")}) — ne pas débrancher
+          </p>
+        )}
       </Card>
 
       <Card>

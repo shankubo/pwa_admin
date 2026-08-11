@@ -55,6 +55,23 @@ function collectUsbMountedPartitions(devices: LsblkDevice[]): LsblkDevice[] {
   return result;
 }
 
+/** The counterpart exclusion collectUsbMountedPartitions applies — mountpoints
+ * that ARE USB-attached but were dropped because they're this machine's own
+ * system mounts (see SYSTEM_MOUNTPOINTS). Surfaced so the UI can warn "this
+ * server's rootfs lives on external USB/SSD storage" instead of staying silent. */
+function collectSystemMountpointsOnUsb(devices: LsblkDevice[]): string[] {
+  const result: string[] = [];
+  for (const dev of devices) {
+    const devIsUsb = dev.tran === "usb" || dev.rm === true;
+    if (devIsUsb && dev.mountpoint && SYSTEM_MOUNTPOINTS.has(dev.mountpoint)) result.push(dev.mountpoint);
+    for (const child of dev.children ?? []) {
+      const childIsUsb = devIsUsb || child.tran === "usb" || child.rm === true;
+      if (childIsUsb && child.mountpoint && SYSTEM_MOUNTPOINTS.has(child.mountpoint)) result.push(child.mountpoint);
+    }
+  }
+  return result;
+}
+
 async function freeSpace(mountpoint: string): Promise<{ totalBytes: number | null; freeBytes: number | null }> {
   try {
     const s = await statfs(mountpoint);
@@ -64,21 +81,23 @@ async function freeSpace(mountpoint: string): Promise<{ totalBytes: number | nul
   }
 }
 
+async function lsblkDevices(): Promise<LsblkDevice[]> {
+  try {
+    const { stdout } = await runCommand(
+      "lsblk",
+      ["-J", "-o", "NAME,MOUNTPOINT,FSTYPE,LABEL,TRAN,RM,HOTPLUG"],
+      { timeoutMs: 5000 }
+    );
+    return (JSON.parse(stdout) as LsblkOutput).blockdevices ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export const UsbBackupService = {
   async detectDrives(): Promise<UsbDriveInfo[]> {
-    let parsed: LsblkOutput;
-    try {
-      const { stdout } = await runCommand(
-        "lsblk",
-        ["-J", "-o", "NAME,MOUNTPOINT,FSTYPE,LABEL,TRAN,RM,HOTPLUG"],
-        { timeoutMs: 5000 }
-      );
-      parsed = JSON.parse(stdout);
-    } catch {
-      return [];
-    }
-
-    const mounted = collectUsbMountedPartitions(parsed.blockdevices ?? []);
+    const devices = await lsblkDevices();
+    const mounted = collectUsbMountedPartitions(devices);
     const hostSlug = currentHostnameSlug();
     const drives: UsbDriveInfo[] = [];
     for (const dev of mounted) {
@@ -115,8 +134,13 @@ export const UsbBackupService = {
   },
 
   async status(): Promise<UsbStatus> {
-    const drives = await this.detectDrives();
-    return { available: drives.length > 0, hostname: currentHostnameSlug(), drives };
+    const [drives, devices] = await Promise.all([this.detectDrives(), lsblkDevices()]);
+    return {
+      available: drives.length > 0,
+      hostname: currentHostnameSlug(),
+      drives,
+      systemMountpointsOnUsb: collectSystemMountpointsOnUsb(devices),
+    };
   },
 
   async isAvailable(): Promise<boolean> {
@@ -210,5 +234,22 @@ export const UsbBackupService = {
     const drives = await this.detectDrives();
     const resolved = resolve(candidatePath);
     return drives.some((d) => resolved.startsWith(resolve(d.backupRoot) + sep));
+  },
+
+  /** Releases a currently-mounted USB/SSD drive so it can be unplugged
+   * without risking corruption from writes still in the kernel's page cache.
+   * Stops the same systemd unit that mounted it (backup-usb-mount@<dev>.service,
+   * see deploy/usb-backup/) rather than calling umount directly — that unit's
+   * ExecStop already does the umount, and pwa-admin deliberately never
+   * touches mount/umount itself. Only a mountpoint lsblk currently reports as
+   * USB-attached is accepted, so this can't target a system mount. */
+  async eject(mountpoint: string): Promise<void> {
+    const drives = await this.detectDrives();
+    const drive = drives.find((d) => d.mountpoint === mountpoint);
+    if (!drive) throw new Error("usb_drive_not_found");
+    const devName = basename(drive.device);
+    await runCommand("sudo", ["/bin/systemctl", "stop", `backup-usb-mount@${devName}.service`], {
+      timeoutMs: 15000,
+    });
   },
 };
