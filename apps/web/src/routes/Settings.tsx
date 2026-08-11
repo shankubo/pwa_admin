@@ -6,7 +6,8 @@ import { useAuthStore } from "@/stores/auth.store";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { ShieldCheck, ShieldOff, LogOut, KeyRound, Trash2 } from "lucide-react";
+import { ShieldCheck, ShieldOff, LogOut, KeyRound, Trash2, RefreshCw } from "lucide-react";
+import { APP_VERSION } from "@/lib/appVersion";
 
 // No shared type exists for audit log rows — these are raw sqlite columns (snake_case).
 interface AuditLogRow {
@@ -67,10 +68,49 @@ export function Settings() {
 
       <AuditLogCard />
 
+      <AppUpdateCard />
+
       <Button variant="destructive" onClick={logout}>
         <LogOut className="h-4 w-4" /> Se déconnecter
       </Button>
     </div>
+  );
+}
+
+function AppUpdateCard() {
+  const [clearing, setClearing] = useState(false);
+
+  // Full reset for cases the update banner can't fix on its own (e.g. iOS
+  // where the service worker may not have woken up in a long time and no
+  // "new version" event has fired at all yet): unregister every service
+  // worker, wipe every Cache Storage entry, then hard-reload — the same end
+  // state as manually clearing site data in browser settings, but reachable
+  // from inside the app.
+  async function forceFullUpdate() {
+    setClearing(true);
+    try {
+      const registrations = await navigator.serviceWorker?.getRegistrations();
+      await Promise.all((registrations ?? []).map((r) => r.unregister()));
+      const cacheKeys = await caches?.keys();
+      await Promise.all((cacheKeys ?? []).map((k) => caches.delete(k)));
+    } finally {
+      window.location.reload();
+    }
+  }
+
+  return (
+    <Card>
+      <CardTitle>Application</CardTitle>
+      <p className="text-xs text-muted-foreground">{APP_VERSION}</p>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Si l'application semble bloquée sur une ancienne version malgré le bandeau de mise à jour (fréquent sur
+        iOS, qui réveille rarement le service worker de son propre chef), ce bouton force un nettoyage complet du
+        cache et recharge l'application.
+      </p>
+      <Button size="sm" variant="outline" className="mt-2" disabled={clearing} onClick={forceFullUpdate}>
+        <RefreshCw className="h-3.5 w-3.5" /> {clearing ? "Nettoyage…" : "Forcer la mise à jour complète"}
+      </Button>
+    </Card>
   );
 }
 

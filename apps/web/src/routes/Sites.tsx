@@ -137,7 +137,7 @@ export function Sites() {
             </div>
           </div>
 
-          <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
+          <div className="mt-3 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
             {s.enabled ? (
               <ConfirmDialog
                 trigger={
