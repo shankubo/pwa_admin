@@ -45,6 +45,16 @@ export function spawnCommand(bin: string, args: string[]): ChildProcess {
   return spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
 }
 
+/**
+ * Like spawnCommand, but with a writable stdin — for commands a dump gets
+ * piped INTO (mysql/psql/pg_restore restoring from a gunzipped file), where
+ * spawnCommand's stdin: "ignore" would leave child.stdin null and crash any
+ * .pipe(child.stdin) call.
+ */
+export function spawnCommandWithStdin(bin: string, args: string[]): ChildProcess {
+  return spawn(bin, args, { stdio: ["pipe", "pipe", "pipe"] });
+}
+
 const IPV4_RE = /^(\d{1,3}\.){3}\d{1,3}$/;
 const IPV6_RE = /^[0-9a-fA-F:]+$/;
 

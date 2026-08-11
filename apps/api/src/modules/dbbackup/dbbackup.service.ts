@@ -9,7 +9,7 @@ import { BackupHistoryModel } from "../../db/models/backup.js";
 import { BackupService } from "../backup/backup.service.js";
 import { GDriveService } from "../../services/gdrive.client.js";
 import { UsbBackupService } from "../../services/usbBackup.client.js";
-import { runCommand, spawnCommand } from "../../utils/exec.js";
+import { runCommand, spawnCommand, spawnCommandWithStdin } from "../../utils/exec.js";
 import type { DetectedDatabase, DbEngine, BackupTarget } from "@pwa-admin/shared";
 
 const DB_NAME_RE = /^[a-zA-Z0-9_-]+$/;
@@ -519,7 +519,7 @@ export const DbBackupService = {
               throw new Error("restore_not_supported_for_native_engine");
             })();
 
-    const child = spawnCommand(bin, args);
+    const child = spawnCommandWithStdin(bin, args);
     let stderrOutput = "";
     child.stderr?.on("data", (chunk) => (stderrOutput += chunk.toString()));
 
@@ -717,7 +717,7 @@ export const DbBackupService = {
       await runCommand("sudo", ["-u", "postgres", "psql", "-c", `CREATE DATABASE "${targetDbName}";`], {
         timeoutMs: 10_000,
       });
-      const child = spawnCommand("sudo", ["-u", "postgres", "pg_restore", "-d", targetDbName]);
+      const child = spawnCommandWithStdin("sudo", ["-u", "postgres", "pg_restore", "-d", targetDbName]);
       await pipeGunzippedFileToChildStdin(dumpFilePath, child);
       return;
     }
@@ -726,7 +726,7 @@ export const DbBackupService = {
       await runCommand("sudo", ["mysql", "-e", `CREATE DATABASE IF NOT EXISTS \`${targetDbName}\`;`], {
         timeoutMs: 10_000,
       });
-      const child = spawnCommand("sudo", ["mysql", targetDbName]);
+      const child = spawnCommandWithStdin("sudo", ["mysql", targetDbName]);
       await pipeGunzippedFileToChildStdin(dumpFilePath, child);
       return;
     }
