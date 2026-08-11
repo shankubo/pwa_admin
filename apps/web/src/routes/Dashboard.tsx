@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import type { SystemStatsSnapshot, SystemAlert, UsbStatus, SiteSummary } from "@pwa-admin/shared";
 import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useWsChannel } from "@/lib/ws";
 import { formatBytes } from "./Docker";
 import { useHostname } from "@/lib/useHostname";
@@ -51,20 +53,37 @@ export function Dashboard() {
   const [alerts, setAlerts] = useState<SystemAlert[]>([]);
   const [usb, setUsb] = useState<UsbStatus | null>(null);
   const [sites, setSites] = useState<SiteSummary[] | null>(null);
+  const [ejecting, setEjecting] = useState<string | null>(null);
+  const [ejected, setEjected] = useState<string | null>(null);
   const hostname = useHostname();
   const navigate = useNavigate();
 
   useWsChannel("sys.stats", (frame) => setStats(frame.data as SystemStatsSnapshot));
   useWsChannel("sys.alerts", (frame) => setAlerts(frame.data as SystemAlert[]));
 
-  useEffect(() => {
+  function loadUsb() {
     apiJson<UsbStatus>("/backups/usb/status")
       .then(setUsb)
       .catch(() => setUsb(null));
+  }
+
+  useEffect(() => {
+    loadUsb();
     apiJson<SiteSummary[]>("/sites")
       .then(setSites)
       .catch(() => setSites(null));
   }, []);
+
+  async function ejectDrive(mountpoint: string) {
+    setEjecting(mountpoint);
+    try {
+      await apiJson("/backups/usb/eject", { method: "POST", body: JSON.stringify({ mountpoint }) });
+      setEjected(mountpoint);
+      loadUsb();
+    } finally {
+      setEjecting(null);
+    }
+  }
 
   const flaggedSites = (sites ?? []).filter((s) => s.maintenanceMode || s.failoverActive);
 
@@ -155,12 +174,32 @@ export function Dashboard() {
           <Usb className="h-4 w-4" /> Disque USB / SSD
         </CardTitle>
         {usb?.available ? (
-          <p className="flex items-center gap-1 text-sm text-primary">
-            <CheckCircle2 className="h-4 w-4" /> Connecté — {usb.drives[0].label}
-            {usb.drives[0].freeBytes != null ? ` · ${formatBytes(usb.drives[0].freeBytes)} libre` : ""}
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="flex items-center gap-1 text-sm text-primary">
+              <CheckCircle2 className="h-4 w-4" /> Connecté — {usb.drives[0].label}
+              {usb.drives[0].freeBytes != null ? ` · ${formatBytes(usb.drives[0].freeBytes)} libre` : ""}
+            </p>
+            {usb.drives[0].isBackupConfigured && (
+              <ConfirmDialog
+                trigger={
+                  <Button size="sm" variant="outline" disabled={ejecting === usb.drives[0].mountpoint}>
+                    {ejecting === usb.drives[0].mountpoint ? "Éjection…" : "Éjecter"}
+                  </Button>
+                }
+                title="Éjecter ce disque ?"
+                description="Le disque sera démonté proprement. Attendez la confirmation avant de le débrancher physiquement, sinon une sauvegarde en cours pourrait être corrompue."
+                confirmLabel="Éjecter"
+                onConfirm={() => ejectDrive(usb.drives[0].mountpoint)}
+              />
+            )}
+          </div>
         ) : (
           <p className="text-sm text-muted-foreground">Aucun disque USB connecté</p>
+        )}
+        {ejected && (
+          <p className="mt-1 flex items-center gap-1 text-sm text-primary">
+            <CheckCircle2 className="h-4 w-4" /> Disque démonté, débranchement possible en toute sécurité.
+          </p>
         )}
         {usb?.systemMountpointsOnUsb && usb.systemMountpointsOnUsb.length > 0 && (
           <p className="mt-1 flex items-center gap-1 text-sm text-warning">
