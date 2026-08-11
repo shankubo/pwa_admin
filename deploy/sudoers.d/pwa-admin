@@ -107,7 +107,17 @@ shan ALL=(root) NOPASSWD: /usr/bin/rm -rf /var/www/*__duplicate
 # cloned under a new name, not the whole instance.
 shan ALL=(root) NOPASSWD: /usr/bin/mysqldump *
 shan ALL=(root) NOPASSWD: /usr/bin/pg_dump -Fc *
-shan ALL=(root) NOPASSWD: /usr/bin/pg_restore -d *
+# pg_restore runs as the postgres OS user (peer auth), same as psql/pg_dumpall
+# above — not (root) like the rest of this block.
+shan ALL=(postgres) NOPASSWD: /usr/bin/pg_restore -d *
+# CREATE/DROP DATABASE (mysql -e) and restoring a dump piped into stdin
+# (mysql <dbname>) both need mysql callable with any args — the existing
+# `mysql -N -e *` rule (read-only listing) only matches that exact shape,
+# since sudoers matches the argv literally.
+shan ALL=(root) NOPASSWD: /usr/bin/mysql *
+# CREATE/DROP DATABASE via psql -c — the existing `psql` rule (no args, used
+# interactively by pg_dumpall's sibling calls) doesn't match this argv shape.
+shan ALL=(postgres) NOPASSWD: /usr/bin/psql -c *
 
 # The system-wide sudoers `Defaults` sets `use_pty`, which makes sudo require
 # an allocated pseudo-terminal — fine for interactive SSH use, but the
