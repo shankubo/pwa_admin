@@ -8,6 +8,7 @@ import { db } from "../../db/index.js";
 import { env } from "../../config/env.js";
 import { runCommand, ExecError } from "../../utils/exec.js";
 import { GDriveService } from "../../services/gdrive.client.js";
+import { docker } from "../../services/docker.client.js";
 import { parseVhostSummary, applyMaintenanceMode, applyFailoverRewrite } from "./nginx.parser.js";
 import type {
   NginxStatus,
@@ -276,11 +277,29 @@ export const NginxService = {
 
     const duplicateRow = db
       .prepare(
-        "SELECT content_path as contentPath, duplicate_port as duplicatePort, status FROM site_duplicates WHERE vhost_name = ?"
+        "SELECT content_path as contentPath, duplicate_port as duplicatePort, duplicate_container_id as duplicateContainerId, status FROM site_duplicates WHERE vhost_name = ?"
       )
-      .get(name) as { contentPath: string | null; duplicatePort: number | null; status: string } | undefined;
+      .get(name) as
+      | { contentPath: string | null; duplicatePort: number | null; duplicateContainerId: string | null; status: string }
+      | undefined;
     if (!duplicateRow) throw new Error("no_duplicate_found");
     if (duplicateRow.status !== "ready") throw new Error("duplicate_not_ready");
+
+    // Traffic is about to be pointed at this container — make sure it's
+    // actually up first, rather than assuming the state from creation time
+    // still holds (it may have been stopped/removed since, e.g. from the
+    // Docker screen). Failing closed here (not switching nginx) is
+    // deliberate: routing live traffic to a dead port would be worse than
+    // refusing the switch.
+    if (duplicateRow.duplicateContainerId) {
+      try {
+        const container = docker.getContainer(duplicateRow.duplicateContainerId);
+        const info = await container.inspect();
+        if (!info.State.Running) await container.start();
+      } catch (err) {
+        throw new Error(`duplicate_container_unavailable: ${(err as Error).message}`);
+      }
+    }
 
     const path = await resolveActiveVhostPath(name);
     if (!existsSync(path)) throw new Error("vhost_not_found");

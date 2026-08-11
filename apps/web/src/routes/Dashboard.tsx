@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import type { SystemStatsSnapshot, SystemAlert, UsbStatus } from "@pwa-admin/shared";
+import { useNavigate } from "react-router-dom";
+import type { SystemStatsSnapshot, SystemAlert, UsbStatus, SiteSummary } from "@pwa-admin/shared";
 import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { useWsChannel } from "@/lib/ws";
 import { formatBytes } from "./Docker";
 import { useHostname } from "@/lib/useHostname";
-import { AlertTriangle, Cpu, Thermometer, HardDrive, MemoryStick, Usb, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, Cpu, Thermometer, HardDrive, MemoryStick, Usb, CheckCircle2, Globe } from "lucide-react";
 
 function GaugeCard({
   icon: Icon,
@@ -49,7 +50,9 @@ export function Dashboard() {
   const [stats, setStats] = useState<SystemStatsSnapshot | null>(null);
   const [alerts, setAlerts] = useState<SystemAlert[]>([]);
   const [usb, setUsb] = useState<UsbStatus | null>(null);
+  const [sites, setSites] = useState<SiteSummary[] | null>(null);
   const hostname = useHostname();
+  const navigate = useNavigate();
 
   useWsChannel("sys.stats", (frame) => setStats(frame.data as SystemStatsSnapshot));
   useWsChannel("sys.alerts", (frame) => setAlerts(frame.data as SystemAlert[]));
@@ -58,7 +61,12 @@ export function Dashboard() {
     apiJson<UsbStatus>("/backups/usb/status")
       .then(setUsb)
       .catch(() => setUsb(null));
+    apiJson<SiteSummary[]>("/sites")
+      .then(setSites)
+      .catch(() => setSites(null));
   }, []);
+
+  const flaggedSites = (sites ?? []).filter((s) => s.maintenanceMode || s.failoverActive);
 
   const alertFor = (type: string) => alerts.find((a) => a.type === type)?.severity;
   const primaryDisk = stats?.disks[0];
@@ -70,6 +78,37 @@ export function Dashboard() {
           <AlertTriangle className="h-5 w-5 shrink-0" />
           <span>{alerts.length} alerte(s) active(s) — voir System pour le détail.</span>
         </div>
+      )}
+
+      {flaggedSites.length > 0 && (
+        <Card>
+          <CardTitle className="flex items-center gap-1">
+            <Globe className="h-4 w-4" /> Sites à surveiller
+          </CardTitle>
+          <div className="flex flex-col gap-1">
+            {flaggedSites.map((s) => (
+              <button
+                key={s.name}
+                onClick={() => navigate(`/sites?site=${encodeURIComponent(s.name)}`)}
+                className="flex items-center justify-between gap-2 rounded-md p-2 text-left text-sm hover:bg-muted"
+              >
+                <span className="truncate font-medium">{s.name}</span>
+                <span className="flex shrink-0 gap-1.5">
+                  {s.failoverActive && (
+                    <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive">
+                      bascule active
+                    </span>
+                  )}
+                  {s.maintenanceMode && (
+                    <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
+                      maintenance
+                    </span>
+                  )}
+                </span>
+              </button>
+            ))}
+          </div>
+        </Card>
       )}
 
       <div className="grid grid-cols-2 gap-3">

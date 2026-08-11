@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { SiteSummary, SiteDetail, DetectedDatabase } from "@pwa-admin/shared";
 import { apiFetch, apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
@@ -20,6 +21,7 @@ function translateFailoverError(message: string): string {
     vhost_in_maintenance: "Ce site est en mode maintenance — quittez la maintenance avant de basculer vers le duplicata.",
     no_duplicate_found: "Aucun duplicata n'existe pour ce site.",
     duplicate_not_ready: "Le duplicata n'est pas encore prêt (création ou rafraîchissement en cours).",
+    duplicate_container_unavailable: "Le conteneur du duplicata n'a pas pu être démarré — vérifiez son état dans l'écran Docker.",
     vhost_not_switched_to_duplicate: "Ce site n'est pas actuellement basculé vers son duplicata.",
     snapshot_not_found: "L'ancienne configuration du site est introuvable — impossible de revenir en arrière automatiquement.",
   };
@@ -36,10 +38,12 @@ function certBadgeClass(daysRemaining: number | null) {
 
 export function Sites() {
   const [sites, setSites] = useState<SiteSummary[] | null>(null);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [expanded, setExpanded] = useState<string | null>(searchParams.get("site"));
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [cloningFor, setCloningFor] = useState<string | null>(null);
+  const scrolledToTarget = useRef(false);
 
   async function load() {
     try {
@@ -52,6 +56,17 @@ export function Sites() {
   useEffect(() => {
     load();
   }, []);
+
+  // Deep-link from Dashboard (?site=<name>): scroll the target card into
+  // view once, then drop the query param so it doesn't re-trigger on every
+  // re-render or stick around after the operator navigates around manually.
+  useEffect(() => {
+    const target = searchParams.get("site");
+    if (!target || !sites || scrolledToTarget.current) return;
+    scrolledToTarget.current = true;
+    document.getElementById(`site-${target}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setSearchParams({}, { replace: true });
+  }, [sites, searchParams, setSearchParams]);
 
   async function toggle(name: string, enabled: boolean) {
     await apiJson(`/sites/${name}/${enabled ? "disable" : "enable"}`, { method: "POST" });
@@ -81,7 +96,7 @@ export function Sites() {
     <div className="flex flex-col gap-3">
       {actionError && <Card className="text-sm text-destructive">{actionError}</Card>}
       {sites.map((s) => (
-        <Card key={s.name}>
+        <Card key={s.name} id={`site-${s.name}`}>
           <div
             className="flex cursor-pointer items-start justify-between gap-2"
             onClick={() => setExpanded(expanded === s.name ? null : s.name)}
