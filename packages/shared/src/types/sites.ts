@@ -23,6 +23,10 @@ export interface SiteDuplicateStatus {
   /** Set when status is "failed" — the error from the last attempt. */
   error: string | null;
   sizeBytes: number | null;
+  /** Size of the duplicated database itself (bytes) — separate from sizeBytes
+   * (file content), since a duplicate can be DB-only (no content root, e.g. a
+   * reverse-proxied site) and still occupy real disk space. */
+  dbSizeBytes: number | null;
   lastSyncedAt: string;
   createdAt: string;
 }

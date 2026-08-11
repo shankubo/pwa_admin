@@ -645,6 +645,104 @@ export const DbBackupService = {
   },
 
   /**
+   * Reports one database's on-disk size in bytes, for display next to a
+   * duplicate's file-content size — a duplicate can be DB-only (reverse-proxied
+   * site, no content root), so file size alone would show nothing. Returns
+   * null on any failure (e.g. DB or container gone) rather than throwing,
+   * since this backs a status display, not an operation that must succeed.
+   */
+  async getDatabaseSizeBytes(location: "docker" | "native", ref: string, dbName: string): Promise<number | null> {
+    if (!this.validateDbName(dbName)) return null;
+    try {
+      if (location === "docker") {
+        const container = docker.getContainer(ref);
+        const info = await container.inspect();
+        const engineConfig = DOCKER_ENGINES.find((e) => e.imageMatch.test(info.Config.Image));
+        if (!engineConfig) return null;
+        const envVars = parseEnv(info.Config.Env ?? []);
+
+        const cmd =
+          engineConfig.engine === "postgres"
+            ? [
+                "psql",
+                "-U",
+                envVars.POSTGRES_USER ?? "postgres",
+                "-d",
+                "postgres",
+                "-t",
+                "-A",
+                "-c",
+                `SELECT pg_database_size('${dbName}');`,
+              ]
+            : engineConfig.engine === "mysql" || engineConfig.engine === "mariadb"
+              ? [
+                  "mysql",
+                  "-u",
+                  "root",
+                  `-p${envVars.MYSQL_ROOT_PASSWORD ?? envVars.MARIADB_ROOT_PASSWORD ?? ""}`,
+                  "-N",
+                  "-e",
+                  `SELECT COALESCE(SUM(data_length + index_length), 0) FROM information_schema.tables WHERE table_schema = '${dbName}';`,
+                ]
+              : null;
+        if (!cmd) return null;
+
+        const exec = await container.exec({ Cmd: cmd, AttachStdout: true, AttachStderr: true });
+        const stream = await exec.start({ hijack: true, stdin: false });
+        if (!stream) return null;
+        let stdout = "";
+        const { Writable } = await import("node:stream");
+        const stdoutSink = new Writable({
+          write(chunk, _enc, cb) {
+            stdout += chunk.toString();
+            cb();
+          },
+        });
+        const stderrSink = new Writable({ write(_chunk, _enc, cb) { cb(); } });
+        await new Promise<void>((resolve, reject) => {
+          container.modem.demuxStream(stream, stdoutSink, stderrSink);
+          stream.on("end", resolve);
+          stream.on("error", reject);
+        });
+        const inspection = await exec.inspect();
+        if (inspection.ExitCode !== 0) return null;
+        const parsed = Number(stdout.trim());
+        return Number.isFinite(parsed) ? parsed : null;
+      }
+
+      const engineEntry = NATIVE_SERVICES.find((s) => s.service === ref);
+      if (!engineEntry) return null;
+
+      if (engineEntry.engine === "postgres") {
+        const { stdout } = await runCommand(
+          "sudo",
+          ["-u", "postgres", "psql", "-t", "-A", "-c", `SELECT pg_database_size('${dbName}');`],
+          { timeoutMs: 5000 }
+        );
+        const parsed = Number(stdout.trim());
+        return Number.isFinite(parsed) ? parsed : null;
+      }
+      if (engineEntry.engine === "mariadb" || engineEntry.engine === "mysql") {
+        const { stdout } = await runCommand(
+          "sudo",
+          [
+            "mysql",
+            "-N",
+            "-e",
+            `SELECT COALESCE(SUM(data_length + index_length), 0) FROM information_schema.tables WHERE table_schema = '${dbName}';`,
+          ],
+          { timeoutMs: 5000 }
+        );
+        const parsed = Number(stdout.trim());
+        return Number.isFinite(parsed) ? parsed : null;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
    * Restores a single-database dump (from dumpSingleDatabase) into a NEW
    * database name — unlike restore()/restoreDocker()/restoreNative(), which
    * always overwrite the same instance/DB names captured in the dump. Creates

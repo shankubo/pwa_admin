@@ -30,7 +30,7 @@ interface SiteDuplicateRow {
   created_at: string;
 }
 
-function rowToStatus(row: SiteDuplicateRow, sizeBytes: number | null): SiteDuplicateStatus {
+function rowToStatus(row: SiteDuplicateRow, sizeBytes: number | null, dbSizeBytes: number | null): SiteDuplicateStatus {
   return {
     vhostName: row.vhost_name,
     contentPath: row.content_path,
@@ -45,6 +45,7 @@ function rowToStatus(row: SiteDuplicateRow, sizeBytes: number | null): SiteDupli
     progressStep: row.progress_step,
     error: row.error,
     sizeBytes,
+    dbSizeBytes,
     lastSyncedAt: row.last_synced_at,
     createdAt: row.created_at,
   };
@@ -159,7 +160,11 @@ export const SiteDuplicateService = {
     const row = getRow(vhostName);
     if (!row) return null;
     const sizeBytes = row.content_path ? await dirSize(row.content_path) : null;
-    return rowToStatus(row, sizeBytes);
+    const dbSizeBytes =
+      row.duplicate_db_name && row.db_location && row.db_ref
+        ? await DbBackupService.getDatabaseSizeBytes(row.db_location, row.db_ref, row.duplicate_db_name)
+        : null;
+    return rowToStatus(row, sizeBytes, dbSizeBytes);
   },
 
   /**

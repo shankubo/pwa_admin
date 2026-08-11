@@ -381,13 +381,18 @@ function SiteDuplicateSection({
             <p className="text-destructive">Échec : {detail.duplicate.error}</p>
           )}
           {detail.duplicate.contentPath && <p>Contenu : {detail.duplicate.contentPath}</p>}
-          {detail.duplicate.sizeBytes != null && <p>Taille : {formatBytes(detail.duplicate.sizeBytes)}</p>}
+          {detail.duplicate.sizeBytes != null && <p>Taille (fichiers) : {formatBytes(detail.duplicate.sizeBytes)}</p>}
           {detail.duplicate.duplicateContainerName && (
             <p>
               Conteneur : {detail.duplicate.duplicateContainerName} (port {detail.duplicate.duplicatePort})
             </p>
           )}
-          {detail.duplicate.duplicateDbName && <p>Base de données : {detail.duplicate.duplicateDbName}</p>}
+          {detail.duplicate.duplicateDbName && (
+            <p>
+              Base de données : {detail.duplicate.duplicateDbName}
+              {detail.duplicate.dbSizeBytes != null && ` (${formatBytes(detail.duplicate.dbSizeBytes)})`}
+            </p>
+          )}
           <p>Dernière synchro : {new Date(detail.duplicate.lastSyncedAt).toLocaleString()}</p>
           <p className="mt-1">
             Le duplicata est figé au moment de sa création — les modifications faites sur l'original depuis ne s'y
