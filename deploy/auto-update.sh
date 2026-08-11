@@ -39,6 +39,24 @@ if ! git pull --ff-only origin master >>"$LOG_FILE" 2>&1; then
   exit 1
 fi
 
+# Any external plugin (e.g. pwa-admin-plugin-imanote) rewrites the no-op
+# extension-point files (_external/index.ts, externalNavItems.ts, etc.) in
+# place; the pull above just reset them to their tracked no-op content. Its
+# own install.sh is the only source of truth for those files (see that
+# plugin's install.sh comment) — re-run it now, before the build, or the
+# build fails on stale imports (a route file the plugin dropped outside this
+# repo's git tree, like ImaNote.tsx, still references types the reset just
+# removed). Convention: plugin repos are cloned as siblings of this repo's
+# own directory, named pwa-admin-plugin-*.
+for plugin_dir in "$(dirname "$APP_DIR")"/pwa-admin-plugin-*/; do
+  [ -f "${plugin_dir}install.sh" ] || continue
+  log "Re-running plugin installer: ${plugin_dir}install.sh"
+  if ! bash "${plugin_dir}install.sh" "$APP_DIR" >>"$LOG_FILE" 2>&1; then
+    log "ERROR: plugin install failed (${plugin_dir}install.sh), aborting"
+    exit 1
+  fi
+done
+
 if ! npm install >>"$LOG_FILE" 2>&1; then
   log "ERROR: npm install failed, aborting"
   exit 1
