@@ -34,6 +34,7 @@ import hardwareRoutes from "./modules/hardware/hardware.routes.js";
 import securityRoutes from "./modules/security/security.routes.js";
 import servicesRoutes from "./modules/services/services.routes.js";
 import auditRoutes from "./modules/audit/audit.routes.js";
+import { registerExternalModules } from "./modules/_external/index.js";
 import { SchedulerService } from "./services/scheduler.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -87,6 +88,7 @@ await app.register(async (api) => {
   await api.register(securityRoutes);
   await api.register(servicesRoutes);
   await api.register(auditRoutes);
+  await registerExternalModules(api);
   await api.register(wsRoutePlugin);
 }, { prefix: "/api" });
 

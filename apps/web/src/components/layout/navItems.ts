@@ -17,6 +17,7 @@ import {
   RotateCcw,
   Wrench,
 } from "lucide-react";
+import { externalNavItems } from "./externalNavItems";
 
 export interface NavItem {
   to: string;
@@ -42,4 +43,5 @@ export const navItems: NavItem[] = [
   { to: "/help", label: "Aide", icon: HelpCircle, group: "bottom" },
   { to: "/about", label: "À propos", icon: Info, group: "bottom" },
   { to: "/settings", label: "Settings", icon: Settings, group: "bottom" },
+  ...externalNavItems,
 ];

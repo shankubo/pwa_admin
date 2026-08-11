@@ -18,6 +18,7 @@ import { Services } from "@/routes/Services";
 import { Settings } from "@/routes/Settings";
 import { About } from "@/routes/About";
 import { Help } from "@/routes/Help";
+import { externalRoutes } from "@/routes/external";
 
 export default function App() {
   return (
@@ -47,6 +48,9 @@ export default function App() {
           <Route path="/help" element={<Help />} />
           <Route path="/about" element={<About />} />
           <Route path="/settings" element={<Settings />} />
+          {externalRoutes.map((r) => (
+            <Route key={r.path} path={r.path} element={r.element} />
+          ))}
         </Route>
       </Routes>
     </BrowserRouter>
