@@ -144,6 +144,7 @@ async function listDockerDatabases(
   try {
     const exec = await container.exec({ Cmd: cmd, AttachStdout: true, AttachStderr: true });
     const stream = await exec.start({ hijack: true, stdin: false });
+    if (!stream) throw new Error("docker_exec_stream_null — le conteneur est-il démarré ?");
     let stdout = "";
     const { Writable } = await import("node:stream");
     const stdoutSink = new Writable({
@@ -290,6 +291,7 @@ export const DbBackupService = {
       // Argv-array Cmd, executed via dockerode exec — never a shell string.
       const exec = await container.exec({ Cmd: cmd, AttachStdout: true, AttachStderr: true });
       const stream = await exec.start({ hijack: true, stdin: false });
+      if (!stream) throw new Error("docker_exec_stream_null — le conteneur est-il démarré ?");
 
       const gzip = createGzip();
       const out = createWriteStream(filePath);
@@ -483,6 +485,7 @@ export const DbBackupService = {
 
     const exec = await container.exec({ Cmd: restoreCmd, AttachStdin: true, AttachStdout: true, AttachStderr: true });
     const stream = await exec.start({ hijack: true, stdin: true });
+    if (!stream) throw new Error("docker_exec_stream_null — le conteneur est-il démarré ?");
 
     await new Promise<void>((resolve, reject) => {
       const gunzip = createGunzip();
@@ -578,6 +581,7 @@ export const DbBackupService = {
       const filePath = join(destDir, `${dbName}.${engineConfig.extension}.gz`);
       const exec = await container.exec({ Cmd: cmd, AttachStdout: true, AttachStderr: true });
       const stream = await exec.start({ hijack: true, stdin: false });
+      if (!stream) throw new Error("docker_exec_stream_null — le conteneur est-il démarré ?");
 
       // stdout (the actual dump bytes) and stderr (error messages) MUST go to
       // separate sinks — demuxing both into the same gzip stream would splice
@@ -679,6 +683,7 @@ export const DbBackupService = {
           AttachStderr: true,
         });
         const stream = await restoreExec.start({ hijack: true, stdin: true });
+        if (!stream) throw new Error("docker_exec_stream_null — le conteneur est-il démarré ?");
         await pipeGunzippedFileToDockerStream(dumpFilePath, stream, restoreExec);
         return;
       }
@@ -703,6 +708,7 @@ export const DbBackupService = {
           AttachStderr: true,
         });
         const stream = await restoreExec.start({ hijack: true, stdin: true });
+        if (!stream) throw new Error("docker_exec_stream_null — le conteneur est-il démarré ?");
         await pipeGunzippedFileToDockerStream(dumpFilePath, stream, restoreExec);
         return;
       }
@@ -746,6 +752,7 @@ async function runDockerExecToCompletion(
 ): Promise<void> {
   const { Writable } = await import("node:stream");
   const stream = await exec.start({ hijack: true, stdin: false });
+  if (!stream) throw new Error("docker_exec_stream_null — le conteneur est-il démarré ?");
   const sink = new Writable({ write(_chunk, _enc, cb) { cb(); } });
   await new Promise<void>((resolve, reject) => {
     container.modem.demuxStream(stream, sink, sink);

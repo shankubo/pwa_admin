@@ -333,6 +333,7 @@ async function dropDuplicateDatabase(location: "docker" | "native", ref: string,
     const { Writable } = await import("node:stream");
     const sink = new Writable({ write(_chunk, _enc, cb) { cb(); } });
     const stream = await exec.start({ hijack: true, stdin: false });
+    if (!stream) throw new Error("docker_exec_stream_null — le conteneur est-il démarré ?");
     await new Promise<void>((resolve, reject) => {
       container.modem.demuxStream(stream, sink, sink);
       stream.on("end", resolve);
