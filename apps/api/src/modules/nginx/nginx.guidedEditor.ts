@@ -24,13 +24,29 @@ const HEADER_DIRECTIVES: { key: keyof NginxGuidedHeaders; name: string; value: s
   { key: "hsts", name: "Strict-Transport-Security", value: '"max-age=31536000; includeSubDomains"' },
 ];
 
-/** Picks the first content-serving server{} block — same "not a pure
- * redirect" filter applyMaintenanceMode/applyFailoverRewrite already use to
- * decide which blocks are worth touching. A vhost file with only a
- * redirect-only block (no real content-serving block at all) has nothing
- * for the guided editor to parse/edit. */
+/**
+ * Picks the server{} block the guided editor should read/write — the real
+ * site config, not an HTTP→HTTPS redirect shim. Reuses isRedirectOnlyBlock
+ * (the same filter applyMaintenanceMode/applyFailoverRewrite already use)
+ * as a first pass, but that heuristic alone is NOT reliable here: a
+ * `:80` block whose only real job is redirecting to HTTPS commonly still
+ * carries a `location /.well-known/acme-challenge/ { root ...; }` for
+ * Let's Encrypt HTTP-01 validation — a legitimate `root` directive inside a
+ * location block, which makes isRedirectOnlyBlock's "any location serving
+ * real content disqualifies this as redirect-only" check (correctly, for
+ * ITS purpose) call the block content-serving. For THIS purpose the intent
+ * is different: among several non-"pure redirect" blocks, prefer the one
+ * that's actually the site's own config — a block declaring `listen ...
+ * ssl`/`443` or an `ssl_certificate` directive is a strong, unambiguous
+ * signal of that, checked BEFORE falling back to isRedirectOnlyBlock's
+ * first-match behavior (which is what a single-block, plain-HTTP vhost
+ * still needs).
+ */
 function findEditableBlock(rawConfig: string): { start: number; end: number; text: string } | null {
-  return splitServerBlocks(rawConfig).find((b) => !isRedirectOnlyBlock(b.text)) ?? null;
+  const blocks = splitServerBlocks(rawConfig);
+  const tlsBlock = blocks.find((b) => /^\s*listen\s+[^;]*(ssl|443)/im.test(b.text) || /^\s*ssl_certificate\s+/im.test(b.text));
+  if (tlsBlock) return tlsBlock;
+  return blocks.find((b) => !isRedirectOnlyBlock(b.text)) ?? null;
 }
 
 export function parseGuidedFields(rawConfig: string): NginxGuidedFormModel {
