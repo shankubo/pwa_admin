@@ -121,8 +121,10 @@ function ContainersTab() {
 
   return (
     <div className="flex flex-col gap-3">
-      {containers.map((c) => (
-        <Card key={c.id}>
+      {containers.map((c) => {
+        const isDuplicate = c.name.endsWith("-duplicate");
+        return (
+        <Card key={c.id} className={isDuplicate ? "border-warning/50 bg-warning/5" : undefined}>
           <div
             className="flex cursor-pointer items-start justify-between gap-2"
             onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
@@ -131,7 +133,7 @@ function ContainersTab() {
               <div className="flex items-center gap-2">
                 <ContainerIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="truncate font-medium">{c.name}</span>
-                {c.name.endsWith("-duplicate") && (
+                {isDuplicate && (
                   <span className="shrink-0 rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
                     duplicata
                   </span>
@@ -139,6 +141,14 @@ function ContainersTab() {
               </div>
               <p className="mt-0.5 truncate text-xs text-muted-foreground">{c.image}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">{c.status}</p>
+              {c.ports.length > 0 && (
+                <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+                  {c.ports
+                    .filter((p) => p.publicPort != null)
+                    .map((p) => `${p.publicPort}→${p.privatePort}/${p.type}`)
+                    .join(", ")}
+                </p>
+              )}
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${stateBadgeClass(c.state)}`}>
@@ -200,7 +210,8 @@ function ContainersTab() {
 
           {expandedId === c.id && <ContainerDetailPanel id={c.id} />}
         </Card>
-      ))}
+        );
+      })}
     </div>
   );
 }

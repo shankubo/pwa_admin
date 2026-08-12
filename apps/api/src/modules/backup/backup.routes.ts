@@ -13,6 +13,7 @@ import { SchedulerService } from "../../services/scheduler.js";
 import { GDriveAuthService, GDriveService } from "../../services/gdrive.client.js";
 import { UsbBackupService, sanitizeSegment } from "../../services/usbBackup.client.js";
 import { env } from "../../config/env.js";
+import { updateEnvKeys } from "../../config/envFile.js";
 import type { BackupSourceType, BackupTarget, BackupUploadSourceKind } from "@pwa-admin/shared";
 
 async function sha256OfFile(path: string): Promise<string> {
@@ -531,6 +532,65 @@ export default async function backupRoutes(app: FastifyInstance) {
       rootFolderId: env.GDRIVE_ROOT_FOLDER_ID || null,
     });
   });
+
+  // --- Google Drive config (Settings screen) — reads/writes .env directly.
+  // Never returns the actual secret value, only whether one is set, same
+  // "write-only from the UI's perspective" convention as a password field —
+  // .env is the single most sensitive file in the deployment (also holds
+  // the JWT signing secrets), so this deliberately never round-trips a
+  // secret back to the browser.
+  app.get("/backups/gdrive/env-config", auth, async (_req, reply) => {
+    reply.send({
+      enabled: env.GDRIVE_ENABLED,
+      clientId: env.GDRIVE_OAUTH_CLIENT_ID ?? "",
+      clientSecretSet: !!env.GDRIVE_OAUTH_CLIENT_SECRET,
+      rootFolderId: env.GDRIVE_ROOT_FOLDER_ID || "",
+    });
+  });
+
+  app.post(
+    "/backups/gdrive/env-config",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("backup.gdrive.config.write")],
+      schema: {
+        body: {
+          type: "object",
+          required: ["enabled", "clientId"],
+          properties: {
+            enabled: { type: "boolean" },
+            clientId: { type: "string", maxLength: 500 },
+            // Optional: omitted/empty means "keep the existing secret" —
+            // only rewritten when the admin actually types a new one.
+            clientSecret: { type: "string", maxLength: 500 },
+            rootFolderId: { type: "string", maxLength: 200 },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { enabled, clientId, clientSecret, rootFolderId } = req.body as {
+        enabled: boolean;
+        clientId: string;
+        clientSecret?: string;
+        rootFolderId?: string;
+      };
+      // .env is line-based (one KEY=value per line) — a value containing a
+      // real newline would corrupt the file structure. Google OAuth client
+      // IDs/secrets and Drive folder IDs never legitimately contain one, so
+      // this only ever strips something that would otherwise break the file.
+      const stripNewlines = (v: string) => v.replace(/[\r\n]+/g, "").trim();
+      const updates: Record<string, string> = {
+        GDRIVE_ENABLED: enabled ? "true" : "false",
+        GDRIVE_OAUTH_CLIENT_ID: stripNewlines(clientId),
+        GDRIVE_ROOT_FOLDER_ID: stripNewlines(rootFolderId ?? ""),
+      };
+      if (clientSecret && clientSecret.trim()) {
+        updates.GDRIVE_OAUTH_CLIENT_SECRET = stripNewlines(clientSecret);
+      }
+      await updateEnvKeys(updates);
+      reply.send({ ok: true, restartRequired: true });
+    }
+  );
 
   app.get("/backups/gdrive/auth-url", auth, async (_req, reply) => {
     try {

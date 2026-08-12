@@ -15,12 +15,13 @@ export default async function migrationRoutes(app: FastifyInstance) {
         body: {
           type: "object",
           required: ["confirm"],
-          properties: { confirm: { type: "boolean", const: true } },
+          properties: { confirm: { type: "boolean", const: true }, includeDuplicates: { type: "boolean" } },
         },
       },
     },
-    async (_req, reply) => {
-      const result = await MigrationService.captureSnapshot();
+    async (req, reply) => {
+      const { includeDuplicates } = req.body as { includeDuplicates?: boolean };
+      const result = await MigrationService.captureSnapshot(includeDuplicates ?? false);
       reply.send(result);
     }
   );

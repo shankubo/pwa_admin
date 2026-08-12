@@ -95,6 +95,21 @@ __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/sbin/ufw status verbose
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/cat /etc/apt/apt.conf.d/50unattended-upgrades
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tail -n * /var/log/unattended-upgrades/unattended-upgrades.log
 
+# --- Network module: block/unblock a port (NetworkService.blockPort/
+# unblockPort), stop the process listening on it (killPort) ---
+# ufw deny/delete deny take a fixed "<port>/<protocol>" token — app-side
+# already validates port range and protocol enum before this ever runs.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/sbin/ufw deny *
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/sbin/ufw delete deny *
+# kill -TERM only (never -9/-KILL) — app-side (killPort) re-verifies the
+# pid/port pair against a FRESH `ss -tulpn` read and refuses on a fixed
+# list of protected process names (node/sshd/systemd*) before this ever
+# runs, so this rule itself stays a plain, unscoped "kill any PID with
+# SIGTERM" the same way apt-get/rsync rules elsewhere in this file rely on
+# app-side validation rather than trying to encode the restriction in
+# sudoers argv (a PID number can't be scoped by a glob pattern).
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/kill -TERM *
+
 # --- Backups module: native (host OS) database dump/restore ---
 # Debian's default MariaDB/MySQL setup trusts root via unix_socket auth, and
 # postgres uses OS peer auth for the `postgres` user — sudo is how the service
@@ -237,4 +252,4 @@ __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/mkdir -p /home/*
 # an allocated pseudo-terminal — fine for interactive SSH use, but the
 # pwa-admin service invokes sudo via execFile with no TTY at all, so every
 # scoped command here needs both `!requiretty` and `!use_pty` to run non-interactively.
-Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/bin/systemctl,/usr/bin/fail2ban-client,/usr/bin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/pg_dump,/usr/bin/pg_restore,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat,/usr/sbin/ufw,/usr/bin/tail,/usr/bin/tailscale,/usr/sbin/useradd,/usr/bin/mkdir,/usr/bin/test !requiretty,!use_pty
+Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/bin/systemctl,/usr/bin/fail2ban-client,/usr/bin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/pg_dump,/usr/bin/pg_restore,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat,/usr/sbin/ufw,/usr/bin/tail,/usr/bin/tailscale,/usr/sbin/useradd,/usr/bin/mkdir,/usr/bin/test,/usr/bin/kill !requiretty,!use_pty

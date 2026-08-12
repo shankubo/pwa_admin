@@ -333,13 +333,22 @@ export const MigrationService = {
    * immediately — capturing every container image, volume, database, and app
    * can take a long time, so the frontend polls/subscribes rather than
    * holding one HTTP request open (same shape as SiteDuplicateService).
+   *
+   * includeDuplicates (default false): a `<name>-duplicate` container is a
+   * manual-failover clone SiteDuplicateService keeps running permanently
+   * alongside its original (see siteDuplicate.service.ts) — capturing BOTH
+   * by default would double the image/volume/DB work for content that's
+   * already identical to its original at snapshot time, for a container
+   * whose only purpose is a same-server fallback, not something a restore
+   * onto a NEW server needs a second copy of. Left as an explicit opt-in
+   * per admin request rather than silently excluded with no way back in.
    */
-  async captureSnapshot(): Promise<{ manifestId: string }> {
+  async captureSnapshot(includeDuplicates = false): Promise<{ manifestId: string }> {
     const manifestId = randomUUID();
     const scope: MigrationManifestScope = { type: "server" };
     MigrationSnapshotModel.createRun(manifestId, scope);
 
-    runCaptureSnapshot(manifestId, scope).catch((err) => {
+    runCaptureSnapshot(manifestId, scope, { includeDuplicates }).catch((err) => {
       MigrationSnapshotModel.complete(manifestId, { status: "failed", error: (err as Error).message });
       publishProgress(manifestId, { done: true, status: "failed", error: (err as Error).message });
     });
@@ -359,7 +368,12 @@ export const MigrationService = {
     const scope: MigrationManifestScope = { type: "site", siteName: vhostName };
     MigrationSnapshotModel.createRun(manifestId, scope);
 
-    runCaptureSnapshot(manifestId, scope).catch((err) => {
+    // includeDuplicates is a server-wide-scan concern (see captureSnapshot's
+    // own doc comment) — a site-scoped capture already targets one specific
+    // vhost's linked container explicitly via findLinkedContainer, never
+    // sweeping every container on the box, so there's nothing for this flag
+    // to opt in or out of here.
+    runCaptureSnapshot(manifestId, scope, { includeDuplicates: false }).catch((err) => {
       MigrationSnapshotModel.complete(manifestId, { status: "failed", error: (err as Error).message });
       publishProgress(manifestId, { done: true, status: "failed", error: (err as Error).message });
     });
@@ -651,7 +665,11 @@ async function planReplaceLine(
   };
 }
 
-async function captureServerItems(manifestId: string, usbRoot: string): Promise<MigrationManifestItem[]> {
+async function captureServerItems(
+  manifestId: string,
+  usbRoot: string,
+  includeDuplicates: boolean
+): Promise<MigrationManifestItem[]> {
   const items: MigrationManifestItem[] = [];
 
   items.push(await captureOsPackages(manifestId, usbRoot));
@@ -659,6 +677,13 @@ async function captureServerItems(manifestId: string, usbRoot: string): Promise<
   const containers = await docker.listContainers({ all: false });
   for (const c of containers) {
     const containerName = c.Names[0]?.replace(/^\//, "") ?? c.Id.slice(0, 12);
+    // A "<name>-duplicate" container is SiteDuplicateService's permanent
+    // manual-failover clone (see captureSnapshot's own doc comment) — its
+    // image/config is identical to its original at snapshot time, so
+    // skipping it here (unless the admin explicitly opted in) avoids
+    // doubling capture time/USB space for a same-server-only fallback
+    // artifact a fresh-server restore has no use for.
+    if (!includeDuplicates && containerName.endsWith("-duplicate")) continue;
     items.push(
       await captureItem(manifestId, "docker-image", `Image du conteneur ${containerName}`, async () => {
         const [runId, containerConfig] = await Promise.all([
@@ -845,13 +870,17 @@ async function captureSiteItems(manifestId: string, usbRoot: string, vhostName: 
   return items;
 }
 
-async function runCaptureSnapshot(manifestId: string, scope: MigrationManifestScope): Promise<void> {
+async function runCaptureSnapshot(
+  manifestId: string,
+  scope: MigrationManifestScope,
+  options: { includeDuplicates: boolean }
+): Promise<void> {
   const usbRoot = await usbRootFor(manifestId);
   await mkdir(usbRoot, { recursive: true });
 
   const items: MigrationManifestItem[] =
     scope.type === "server"
-      ? await captureServerItems(manifestId, usbRoot)
+      ? await captureServerItems(manifestId, usbRoot, options.includeDuplicates)
       : await captureSiteItems(manifestId, usbRoot, scope.siteName);
 
   const osInfo = await si.osInfo();

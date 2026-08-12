@@ -84,6 +84,8 @@ export function Settings() {
 
       <AccessTokensCard />
 
+      <GDriveConfigCard />
+
       <GDriveConnectionCard />
 
       <AuditLogCard />
@@ -447,6 +449,153 @@ function AccessTokensCard() {
         ))}
         {loaded && tokens.length === 0 && <p className="text-sm text-muted-foreground">Aucun jeton actif.</p>}
       </div>
+    </Card>
+  );
+}
+
+interface GDriveEnvConfig {
+  enabled: boolean;
+  clientId: string;
+  clientSecretSet: boolean;
+  rootFolderId: string;
+}
+
+/**
+ * Édite directement les clés GDRIVE_* de .env (activer/désactiver,
+ * client_id/client_secret OAuth, dossier racine) — jusqu'ici uniquement
+ * modifiable à la main via SSH. Le secret n'est jamais renvoyé au
+ * navigateur (seulement "défini ou non"), et une modification ne prend
+ * effet qu'après un redémarrage manuel du service (comme tout changement
+ * de .env dans ce projet — voir CLAUDE.md) : le formulaire prévient
+ * explicitement plutôt que de laisser croire que c'est appliqué à chaud.
+ */
+function GDriveConfigCard() {
+  const [expanded, setExpanded] = useState(false);
+  const [config, setConfig] = useState<GDriveEnvConfig | null>(null);
+  const [enabled, setEnabled] = useState(false);
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [rootFolderId, setRootFolderId] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+
+  function loadConfig() {
+    apiJson<GDriveEnvConfig>("/backups/gdrive/env-config")
+      .then((c) => {
+        setConfig(c);
+        setEnabled(c.enabled);
+        setClientId(c.clientId);
+        setRootFolderId(c.rootFolderId);
+      })
+      .catch(() => setConfig(null));
+  }
+
+  function toggle() {
+    setExpanded((v) => {
+      const next = !v;
+      if (next && !config) loadConfig();
+      return next;
+    });
+  }
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setMessage(null);
+    try {
+      await apiJson("/backups/gdrive/env-config", {
+        method: "POST",
+        body: JSON.stringify({
+          enabled,
+          clientId: clientId.trim(),
+          clientSecret: clientSecret.trim() || undefined,
+          rootFolderId: rootFolderId.trim(),
+        }),
+      });
+      setClientSecret("");
+      setMessage({
+        type: "ok",
+        text: "Enregistré dans .env — redémarrez le service (sudo systemctl restart pwa-admin) pour appliquer.",
+      });
+      loadConfig();
+    } catch (err) {
+      setMessage({ type: "error", text: (err as Error).message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <button type="button" onClick={toggle} className="flex w-full items-center justify-between">
+        <CardTitle className="mb-0 flex items-center gap-1">
+          <Cloud className="h-4 w-4" /> Configuration Google Drive
+        </CardTitle>
+        {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+      </button>
+
+      {expanded && (
+        <>
+          {!config ? (
+            <p className="mt-2 text-sm text-muted-foreground">Chargement…</p>
+          ) : (
+            <form onSubmit={save} className="mt-3 flex flex-col gap-3">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+                Activer l'intégration Google Drive
+              </label>
+
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">Client ID OAuth</label>
+                <input
+                  type="text"
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                  placeholder="xxxxx.apps.googleusercontent.com"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">
+                  Client Secret OAuth {config.clientSecretSet && <span className="text-primary">(déjà défini)</span>}
+                </label>
+                <input
+                  type="password"
+                  value={clientSecret}
+                  onChange={(e) => setClientSecret(e.target.value)}
+                  placeholder={config.clientSecretSet ? "Laisser vide pour conserver l'actuel" : "Non défini"}
+                  autoComplete="off"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">
+                  ID du dossier racine Drive (créé manuellement dans votre Drive)
+                </label>
+                <input
+                  type="text"
+                  value={rootFolderId}
+                  onChange={(e) => setRootFolderId(e.target.value)}
+                  placeholder="1AbCdEfGhIjKlMnOpQrStUvWxYz"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              {message && (
+                <p className={`text-xs ${message.type === "ok" ? "text-primary" : "text-destructive"}`}>
+                  {message.text}
+                </p>
+              )}
+
+              <Button type="submit" size="sm" disabled={saving}>
+                {saving ? "Enregistrement…" : "Enregistrer"}
+              </Button>
+            </form>
+          )}
+        </>
+      )}
     </Card>
   );
 }

@@ -1044,6 +1044,12 @@ function MigrationSnapshotCard() {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeManifestId, setActiveManifestId] = useState<string | null>(null);
+  // Décoché par défaut — un conteneur "-duplicate" est un clone de bascule
+  // manuelle permanent (voir Sites > Dupliquer), identique à son original
+  // au moment de la capture ; l'inclure double le temps/l'espace USB pour
+  // un artefact qui n'a de sens que sur CE serveur, pas pour une
+  // restauration sur une machine neuve.
+  const [includeDuplicates, setIncludeDuplicates] = useState(false);
 
   function loadSnapshots() {
     apiJson<MigrationSnapshotRun[]>("/migration/snapshots")
@@ -1080,7 +1086,7 @@ function MigrationSnapshotCard() {
     try {
       const { manifestId } = await apiJson<{ manifestId: string }>("/migration/snapshot", {
         method: "POST",
-        body: JSON.stringify({ confirm: true }),
+        body: JSON.stringify({ confirm: true, includeDuplicates }),
       });
       setActiveManifestId(manifestId);
       loadSnapshots();
@@ -1111,15 +1117,27 @@ function MigrationSnapshotCard() {
           ci-dessus).
         </p>
       ) : (
-        <Button size="sm" variant="outline" className="mt-2" onClick={startSnapshot} disabled={starting || !!activeManifestId}>
-          {starting || activeManifestId ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Capture en cours…
-            </>
-          ) : (
-            "Prendre un instantané de migration"
-          )}
-        </Button>
+        <>
+          <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={includeDuplicates}
+              onChange={(e) => setIncludeDuplicates(e.target.checked)}
+              disabled={starting || !!activeManifestId}
+            />
+            Inclure les conteneurs "-duplicate" (clones de bascule manuelle — généralement inutiles pour une
+            migration vers un nouveau serveur)
+          </label>
+          <Button size="sm" variant="outline" className="mt-2" onClick={startSnapshot} disabled={starting || !!activeManifestId}>
+            {starting || activeManifestId ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Capture en cours…
+              </>
+            ) : (
+              "Prendre un instantané de migration"
+            )}
+          </Button>
+        </>
       )}
 
       {snapshots && snapshots.length > 0 && (

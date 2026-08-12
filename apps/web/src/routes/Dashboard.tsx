@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { SystemStatsSnapshot, SystemAlert, UsbStatus, SiteSummary } from "@pwa-admin/shared";
+import type { SystemStatsSnapshot, SystemAlert, UsbStatus, SiteSummary, HardwareOverview } from "@pwa-admin/shared";
 import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -8,7 +8,18 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useWsChannel } from "@/lib/ws";
 import { formatBytes } from "./Docker";
 import { useHostname } from "@/lib/useHostname";
-import { AlertTriangle, Cpu, Thermometer, HardDrive, MemoryStick, Usb, CheckCircle2, Globe } from "lucide-react";
+import {
+  AlertTriangle,
+  Cpu,
+  Thermometer,
+  HardDrive,
+  MemoryStick,
+  Usb,
+  CheckCircle2,
+  Globe,
+  Wifi,
+  Network,
+} from "lucide-react";
 
 function GaugeCard({
   icon: Icon,
@@ -53,6 +64,7 @@ export function Dashboard() {
   const [alerts, setAlerts] = useState<SystemAlert[]>([]);
   const [usb, setUsb] = useState<UsbStatus | null>(null);
   const [sites, setSites] = useState<SiteSummary[] | null>(null);
+  const [hardware, setHardware] = useState<HardwareOverview | null>(null);
   const [ejecting, setEjecting] = useState<string | null>(null);
   const [ejected, setEjected] = useState<string | null>(null);
   const hostname = useHostname();
@@ -72,6 +84,12 @@ export function Dashboard() {
     apiJson<SiteSummary[]>("/sites")
       .then(setSites)
       .catch(() => setSites(null));
+    // Réutilise l'aperçu déjà calculé par le module Hardware (interfaces
+    // réseau + statut Wi-Fi) plutôt que de dupliquer cette collecte ici —
+    // le Dashboard n'en affiche qu'un résumé, l'écran Hardware garde le détail.
+    apiJson<HardwareOverview>("/hardware/overview")
+      .then(setHardware)
+      .catch(() => setHardware(null));
   }, []);
 
   async function ejectDrive(mountpoint: string) {
@@ -206,6 +224,42 @@ export function Dashboard() {
             <AlertTriangle className="h-4 w-4" /> Système démarré depuis un disque USB/SSD externe (
             {usb.systemMountpointsOnUsb.join(", ")}) — ne pas débrancher
           </p>
+        )}
+      </Card>
+
+      <Card>
+        <CardTitle className="flex items-center gap-1">
+          <Network className="h-4 w-4" /> Réseau
+        </CardTitle>
+        {!hardware ? (
+          <p className="text-sm text-muted-foreground">…</p>
+        ) : (
+          <div className="flex flex-col gap-1 text-sm">
+            {hardware.interfaces
+              .filter((i) => i.isDefault || i.addresses.length > 0)
+              .map((i) => (
+                <p key={i.name} className="flex items-center justify-between text-muted-foreground">
+                  <span className="font-medium text-foreground">{i.addresses[0] ?? "—"}</span>
+                  <span className="text-xs">
+                    {i.name}
+                    {i.isDefault ? " (défaut)" : ""}
+                  </span>
+                </p>
+              ))}
+            {hardware.wifi.available && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                <Wifi className="h-3.5 w-3.5" />
+                {hardware.wifi.connected
+                  ? `Wi-Fi connecté — ${hardware.wifi.currentSsid ?? "réseau inconnu"}${
+                      hardware.wifi.signal != null ? ` · ${hardware.wifi.signal}%` : ""
+                    }`
+                  : "Wi-Fi disponible, non connecté"}
+              </p>
+            )}
+            {hardware.interfaces.length === 0 && (
+              <p className="text-sm text-muted-foreground">Aucune interface réseau détectée.</p>
+            )}
+          </div>
         )}
       </Card>
 
