@@ -593,10 +593,21 @@ const DEFAULT_GUIDED_MODEL: NginxGuidedFormModel = {
   certPath: null,
   certKeyPath: null,
   clientMaxBodySize: null,
-  headers: { frameOptions: false, contentTypeOptions: false, referrerPolicy: false, hsts: false },
+  headers: {
+    frameOptions: false,
+    contentTypeOptions: false,
+    referrerPolicy: false,
+    hsts: false,
+    xssProtection: false,
+    permissionsPolicy: false,
+    contentSecurityPolicy: false,
+  },
   mode: "root",
   rootPath: null,
   proxyPassTarget: null,
+  tls: { protocols: null, ciphers: null, sessionCache: null, sessionTimeout: null },
+  gzip: { enabled: false, types: null },
+  locations: { blockDotfiles: false, cacheStaticAssets: false, spaFallback: false },
 };
 
 type GuidedConfigEditorDialogProps =
@@ -624,6 +635,28 @@ type GuidedConfigEditorDialogProps =
  * it calls POST /nginx/vhosts directly since there's no existing file/save
  * button to defer to.
  */
+function HeaderCheckbox({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="flex items-start gap-2">
+      <input type="checkbox" className="mt-0.5" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span>
+        <span className="block">{label}</span>
+        <span className="block text-xs text-muted-foreground">{description}</span>
+      </span>
+    </label>
+  );
+}
+
 function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
   const [open, setOpen] = useState(false);
   const [model, setModel] = useState<NginxGuidedFormModel>(DEFAULT_GUIDED_MODEL);
@@ -826,19 +859,153 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
             <div>
               <p className="mb-1 font-medium">En-têtes de sécurité</p>
               <div className="flex flex-col gap-2">
+                <HeaderCheckbox
+                  label="X-Frame-Options"
+                  description="Empêche le site d'être affiché dans un iframe sur un autre domaine (anti-clickjacking)."
+                  checked={model.headers.frameOptions}
+                  onChange={(v) => setModel((m) => ({ ...m, headers: { ...m.headers, frameOptions: v } }))}
+                />
+                <HeaderCheckbox
+                  label="X-Content-Type-Options"
+                  description="Empêche le navigateur de deviner le type d'un fichier différemment de ce que déclare le serveur."
+                  checked={model.headers.contentTypeOptions}
+                  onChange={(v) => setModel((m) => ({ ...m, headers: { ...m.headers, contentTypeOptions: v } }))}
+                />
+                <HeaderCheckbox
+                  label="Referrer-Policy"
+                  description="Limite les informations envoyées aux autres sites quand un visiteur clique sur un lien sortant."
+                  checked={model.headers.referrerPolicy}
+                  onChange={(v) => setModel((m) => ({ ...m, headers: { ...m.headers, referrerPolicy: v } }))}
+                />
+                <HeaderCheckbox
+                  label="Strict-Transport-Security (HSTS)"
+                  description="Force les navigateurs à toujours utiliser HTTPS pour ce site. À activer seulement si SSL est bien configuré."
+                  checked={model.headers.hsts}
+                  onChange={(v) => setModel((m) => ({ ...m, headers: { ...m.headers, hsts: v } }))}
+                />
+                <HeaderCheckbox
+                  label="X-XSS-Protection"
+                  description="Ancienne protection navigateur contre les attaques XSS réfléchies (dépréciée mais encore acceptée)."
+                  checked={model.headers.xssProtection}
+                  onChange={(v) => setModel((m) => ({ ...m, headers: { ...m.headers, xssProtection: v } }))}
+                />
+                <HeaderCheckbox
+                  label="Permissions-Policy"
+                  description="Désactive l'accès à la caméra, au micro, à la géolocalisation, etc. pour ce site."
+                  checked={model.headers.permissionsPolicy}
+                  onChange={(v) => setModel((m) => ({ ...m, headers: { ...m.headers, permissionsPolicy: v } }))}
+                />
+                <HeaderCheckbox
+                  label="Content-Security-Policy"
+                  description="Restreint les sources de scripts/styles autorisées (protection XSS avancée). Valeur générique de base — à adapter si le site charge des ressources externes (polices, CDN, etc.)."
+                  checked={model.headers.contentSecurityPolicy}
+                  onChange={(v) => setModel((m) => ({ ...m, headers: { ...m.headers, contentSecurityPolicy: v } }))}
+                />
+              </div>
+            </div>
+
+            {model.sslEnabled && (
+              <div>
+                <p className="mb-1 font-medium">TLS avancé</p>
+                <p className="mb-1 text-xs text-muted-foreground">
+                  Réglages optionnels pour durcir/aligner la configuration TLS. Laisser vide pour garder les valeurs
+                  par défaut de Nginx. Les valeurs se collent généralement depuis un générateur externe (ex :
+                  Mozilla SSL Config Generator).
+                </p>
+                <div className="flex flex-col gap-2">
+                  <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Protocoles (ssl_protocols)</label>
+                    <input
+                      type="text"
+                      value={model.tls.protocols ?? ""}
+                      onChange={(e) => setModel((m) => ({ ...m, tls: { ...m.tls, protocols: e.target.value || null } }))}
+                      placeholder="TLSv1.2 TLSv1.3"
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Suites de chiffrement (ssl_ciphers)</label>
+                    <input
+                      type="text"
+                      value={model.tls.ciphers ?? ""}
+                      onChange={(e) => setModel((m) => ({ ...m, tls: { ...m.tls, ciphers: e.target.value || null } }))}
+                      placeholder="ECDHE-ECDSA-AES128-GCM-SHA256:..."
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="mb-1 block text-xs text-muted-foreground">Cache de session</label>
+                      <input
+                        type="text"
+                        value={model.tls.sessionCache ?? ""}
+                        onChange={(e) =>
+                          setModel((m) => ({ ...m, tls: { ...m.tls, sessionCache: e.target.value || null } }))
+                        }
+                        placeholder="shared:SSL:10m"
+                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="mb-1 block text-xs text-muted-foreground">Durée de session</label>
+                      <input
+                        type="text"
+                        value={model.tls.sessionTimeout ?? ""}
+                        onChange={(e) =>
+                          setModel((m) => ({ ...m, tls: { ...m.tls, sessionTimeout: e.target.value || null } }))
+                        }
+                        placeholder="1d"
+                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="flex items-center gap-2 font-medium">
+                <input
+                  type="checkbox"
+                  checked={model.gzip.enabled}
+                  onChange={(e) => setModel((m) => ({ ...m, gzip: { ...m.gzip, enabled: e.target.checked } }))}
+                />
+                Compression Gzip
+              </label>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Compresse les réponses avant envoi pour accélérer le chargement (texte, CSS, JS, JSON...).
+              </p>
+              {model.gzip.enabled && (
+                <input
+                  type="text"
+                  value={model.gzip.types ?? ""}
+                  onChange={(e) => setModel((m) => ({ ...m, gzip: { ...m.gzip, types: e.target.value || null } }))}
+                  placeholder="text/plain text/css application/javascript application/json"
+                  className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
+                />
+              )}
+            </div>
+
+            <div>
+              <p className="mb-1 font-medium">Blocs de contenu prédéfinis</p>
+              <p className="mb-1 text-xs text-muted-foreground">
+                Modèles courants prêts à l'emploi — pas de saisie libre, pour éviter une erreur de syntaxe dans un
+                bloc <span className="font-mono">location</span>.
+              </p>
+              <div className="flex flex-col gap-2">
                 <label className="flex items-start gap-2">
                   <input
                     type="checkbox"
                     className="mt-0.5"
-                    checked={model.headers.frameOptions}
+                    checked={model.locations.blockDotfiles}
                     onChange={(e) =>
-                      setModel((m) => ({ ...m, headers: { ...m.headers, frameOptions: e.target.checked } }))
+                      setModel((m) => ({ ...m, locations: { ...m.locations, blockDotfiles: e.target.checked } }))
                     }
                   />
                   <span>
-                    <span className="block">X-Frame-Options</span>
+                    <span className="block">Bloquer les fichiers cachés (.git, .htaccess...)</span>
                     <span className="block text-xs text-muted-foreground">
-                      Empêche le site d'être affiché dans un iframe sur un autre domaine (anti-clickjacking).
+                      Interdit l'accès direct aux fichiers/dossiers sensibles commençant par un point.
                     </span>
                   </span>
                 </label>
@@ -846,16 +1013,16 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                   <input
                     type="checkbox"
                     className="mt-0.5"
-                    checked={model.headers.contentTypeOptions}
+                    checked={model.locations.cacheStaticAssets}
                     onChange={(e) =>
-                      setModel((m) => ({ ...m, headers: { ...m.headers, contentTypeOptions: e.target.checked } }))
+                      setModel((m) => ({ ...m, locations: { ...m.locations, cacheStaticAssets: e.target.checked } }))
                     }
                   />
                   <span>
-                    <span className="block">X-Content-Type-Options</span>
+                    <span className="block">Cache long pour /assets/</span>
                     <span className="block text-xs text-muted-foreground">
-                      Empêche le navigateur de deviner le type d'un fichier différemment de ce que déclare le
-                      serveur.
+                      Cache navigateur d'un an pour les fichiers statiques versionnés (JS/CSS avec hash dans le nom,
+                      généré par Vite/Webpack).
                     </span>
                   </span>
                 </label>
@@ -863,30 +1030,16 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                   <input
                     type="checkbox"
                     className="mt-0.5"
-                    checked={model.headers.referrerPolicy}
+                    checked={model.locations.spaFallback}
                     onChange={(e) =>
-                      setModel((m) => ({ ...m, headers: { ...m.headers, referrerPolicy: e.target.checked } }))
+                      setModel((m) => ({ ...m, locations: { ...m.locations, spaFallback: e.target.checked } }))
                     }
                   />
                   <span>
-                    <span className="block">Referrer-Policy</span>
+                    <span className="block">Fallback SPA (React/Vue/Vite)</span>
                     <span className="block text-xs text-muted-foreground">
-                      Limite les informations envoyées aux autres sites quand un visiteur clique sur un lien sortant.
-                    </span>
-                  </span>
-                </label>
-                <label className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5"
-                    checked={model.headers.hsts}
-                    onChange={(e) => setModel((m) => ({ ...m, headers: { ...m.headers, hsts: e.target.checked } }))}
-                  />
-                  <span>
-                    <span className="block">Strict-Transport-Security (HSTS)</span>
-                    <span className="block text-xs text-muted-foreground">
-                      Force les navigateurs à toujours utiliser HTTPS pour ce site. À activer seulement si SSL est
-                      bien configuré.
+                      Toutes les routes inconnues renvoient index.html — nécessaire pour une application une-page
+                      avec routage côté client.
                     </span>
                   </span>
                 </label>

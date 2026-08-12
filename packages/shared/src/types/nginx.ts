@@ -81,9 +81,44 @@ export interface NginxGuidedHeaders {
   contentTypeOptions: boolean;
   referrerPolicy: boolean;
   hsts: boolean;
+  xssProtection: boolean;
+  permissionsPolicy: boolean;
+  contentSecurityPolicy: boolean;
 }
 
 export type NginxGuidedMode = "root" | "proxy_pass" | "mixed" | "unknown";
+
+/** Free-text TLS tuning fields — deliberately plain strings (not
+ * checkboxes/dropdowns of "known good" values) since cipher suites and
+ * protocol lists are copy-pasted from external references (Mozilla SSL
+ * Config Generator, etc.) far more often than typed by hand; validating
+ * their contents is out of scope, same as clientMaxBodySize today. */
+export interface NginxGuidedTls {
+  protocols: string | null;
+  ciphers: string | null;
+  sessionCache: string | null;
+  sessionTimeout: string | null;
+}
+
+export interface NginxGuidedGzip {
+  enabled: boolean;
+  types: string | null;
+}
+
+/**
+ * One of a small, fixed library of pre-built `location {}` snippets — never
+ * a free-text location editor. Each key toggles a whole known-good block in
+ * or out; the guided editor only ever adds/removes an ENTIRE block it
+ * recognizes by a leading marker comment (see LOCATION_TEMPLATES in
+ * nginx.guidedEditor.ts), never edits inside one, so there's no risk of a
+ * malformed partial location{} — the highest-risk category of hand-edit
+ * this feature exists to avoid.
+ */
+export interface NginxGuidedLocations {
+  blockDotfiles: boolean;
+  cacheStaticAssets: boolean;
+  spaFallback: boolean;
+}
 
 export interface NginxGuidedFormModel {
   sslEnabled: boolean;
@@ -94,4 +129,7 @@ export interface NginxGuidedFormModel {
   mode: NginxGuidedMode;
   rootPath: string | null;
   proxyPassTarget: string | null;
+  tls: NginxGuidedTls;
+  gzip: NginxGuidedGzip;
+  locations: NginxGuidedLocations;
 }
