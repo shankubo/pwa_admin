@@ -36,6 +36,12 @@ function certBadgeClass(daysRemaining: number | null) {
   return "bg-primary/15 text-primary";
 }
 
+function siteCardClass(s: SiteSummary): string {
+  if (!s.enabled) return "border-muted-foreground/30 bg-muted/30";
+  if (s.maintenanceMode) return "border-warning/50 bg-warning/5";
+  return "border-primary/40 bg-primary/5";
+}
+
 export function Sites() {
   const [sites, setSites] = useState<SiteSummary[] | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -121,7 +127,7 @@ export function Sites() {
       {actionError && <Card className="text-sm text-destructive">{actionError}</Card>}
       {migrationMessage && <Card className="text-sm">{migrationMessage}</Card>}
       {sites.map((s) => (
-        <Card key={s.name} id={`site-${s.name}`}>
+        <Card key={s.name} id={`site-${s.name}`} className={siteCardClass(s)}>
           <div
             className="flex cursor-pointer items-start justify-between gap-2"
             onClick={() => setExpanded(expanded === s.name ? null : s.name)}

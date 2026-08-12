@@ -287,6 +287,9 @@ export function Restore() {
       {step === 3 && selected && selected.kind !== "migration" && (
         <StepConfirm
           selected={selected}
+          source={source}
+          usbConfigured={usbConfigured}
+          gdriveAuthorized={gdriveAuthorized}
           restoring={restoring}
           restored={restored}
           onRestore={doRestore}
@@ -887,12 +890,18 @@ function StepGDrive({
 
 function StepConfirm({
   selected,
+  source,
+  usbConfigured,
+  gdriveAuthorized,
   restoring,
   restored,
   onRestore,
   onReset,
 }: {
   selected: Exclude<SelectedItem, { kind: "migration" }>;
+  source: Source | null;
+  usbConfigured: boolean;
+  gdriveAuthorized: boolean;
   restoring: boolean;
   restored: boolean;
   onRestore: () => void;
@@ -930,6 +939,11 @@ function StepConfirm({
           {sizeBytes != null ? ` · ${formatBytes(sizeBytes)}` : ""}
         </p>
       </div>
+
+      {source === "local" && selected.kind === "generic" && (
+        <LocalRunActions run={selected.run} usbConfigured={usbConfigured} gdriveAuthorized={gdriveAuthorized} />
+      )}
+
       <ConfirmDialog
         trigger={
           <Button size="sm" variant="destructive" className="mt-3" disabled={restoring}>
@@ -943,6 +957,118 @@ function StepConfirm({
         onConfirm={onRestore}
       />
     </Card>
+  );
+}
+
+/**
+ * Extra actions only meaningful for a LOCAL source: the backup already lives
+ * on this server's disk, so it can also be pushed to USB / Google Drive
+ * after the fact, or pulled straight down to the admin's own PC — none of
+ * which apply when the selection already came FROM usb/gdrive/upload (those
+ * flows have their own "already there" semantics).
+ */
+function LocalRunActions({
+  run,
+  usbConfigured,
+  gdriveAuthorized,
+}: {
+  run: BackupHistoryEntry;
+  usbConfigured: boolean;
+  gdriveAuthorized: boolean;
+}) {
+  const [usbPath, setUsbPath] = useState(run.usbPath);
+  const [driveFileId, setDriveFileId] = useState(run.driveFileId);
+  const [busy, setBusy] = useState<"usb" | "gdrive" | "download" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function copyToUsb() {
+    setBusy("usb");
+    setError(null);
+    try {
+      const result = await apiJson<{ usbPath: string }>(`/backups/history/${run.runId}/copy-to-usb`, {
+        method: "POST",
+      });
+      setUsbPath(result.usbPath);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function copyToGDrive() {
+    setBusy("gdrive");
+    setError(null);
+    try {
+      const result = await apiJson<{ driveFileId: string }>(`/backups/history/${run.runId}/copy-to-gdrive`, {
+        method: "POST",
+      });
+      setDriveFileId(result.driveFileId);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function downloadLocal() {
+    setBusy("download");
+    setError(null);
+    try {
+      const { token } = await apiJson<{ token: string }>(`/backups/history/${run.runId}/download-token`, {
+        method: "POST",
+      });
+      window.location.href = `/api/backups/history/${run.runId}/download?token=${encodeURIComponent(token)}`;
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
+      <p className="text-xs font-medium text-muted-foreground">Autres actions sur cette sauvegarde locale</p>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" disabled={busy !== null} onClick={downloadLocal}>
+          {busy === "download" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+          Télécharger
+        </Button>
+        {usbPath ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-1 text-xs text-primary">
+            <CheckCircle2 className="h-3.5 w-3.5" /> Déjà sur USB
+          </span>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!usbConfigured || busy !== null}
+            title={usbConfigured ? "Copier vers le disque USB de sauvegarde" : "Aucun disque USB de sauvegarde configuré"}
+            onClick={copyToUsb}
+          >
+            {busy === "usb" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Usb className="h-3.5 w-3.5" />}
+            Envoyer sur USB
+          </Button>
+        )}
+        {driveFileId ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-1 text-xs text-primary">
+            <CheckCircle2 className="h-3.5 w-3.5" /> Déjà sur Google Drive
+          </span>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!gdriveAuthorized || busy !== null}
+            title={gdriveAuthorized ? "Envoyer vers Google Drive" : "Google Drive non connecté (voir Settings)"}
+            onClick={copyToGDrive}
+          >
+            {busy === "gdrive" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Cloud className="h-3.5 w-3.5" />}
+            Envoyer sur Drive
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
 

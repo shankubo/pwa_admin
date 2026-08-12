@@ -1,7 +1,7 @@
 import { readdir, readFile, writeFile, mkdir, copyFile, lstat, rm, stat } from "node:fs/promises";
 import { existsSync, createReadStream } from "node:fs";
 import { createInterface } from "node:readline";
-import { join, resolve, basename } from "node:path";
+import { join, resolve, basename, sep } from "node:path";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { db } from "../../db/index.js";
@@ -829,11 +829,50 @@ export const NginxService = {
    */
   async checkCertPathExists(path: string): Promise<boolean> {
     const resolved = resolve(path);
-    const allowedRoots = ["/etc/letsencrypt/", "/etc/ssl/"];
+    const allowedRoots = ["/etc/letsencrypt/", "/etc/ssl/", env.NGINX_MANAGED_CERTS_DIR + sep];
     if (!allowedRoots.some((root) => resolved.startsWith(root))) return false;
+    if (resolved.startsWith(env.NGINX_MANAGED_CERTS_DIR + sep)) return existsSync(resolved);
     return runCommand("sudo", ["test", "-f", resolved], { timeoutMs: 5000 }).then(
       () => true,
       () => false
     );
+  },
+
+  /**
+   * Writes an admin-supplied cert+key pair (pasted PEM text, or an uploaded
+   * file already staged to a tmp path by the route handler) into
+   * NGINX_MANAGED_CERTS_DIR/<vhostName>/ — a directory this service owns
+   * outright (see env.ts's doc comment), so no sudo/new sudoers rule is
+   * needed to write here, unlike /etc/ssl or /etc/letsencrypt. Validates
+   * both files are well-formed PEM via a plain (non-sudo) `openssl x509`/
+   * `openssl rsa|pkey` parse BEFORE overwriting any previous cert for this
+   * vhost, so a bad paste can't leave the vhost pointing at a broken pair —
+   * the caller (route handler) is expected to fill the returned paths into
+   * the guided editor's certPath/certKeyPath fields, not apply them blindly.
+   */
+  async saveManagedCert(
+    vhostName: string,
+    certPemPath: string,
+    keyPemPath: string
+  ): Promise<{ certPath: string; keyPath: string }> {
+    assertValidVhostName(vhostName);
+    await runCommand("openssl", ["x509", "-in", certPemPath, "-noout"], { timeoutMs: 5000 }).catch(() => {
+      throw new Error("invalid_certificate_pem");
+    });
+    await runCommand("openssl", ["pkey", "-in", keyPemPath, "-noout"], { timeoutMs: 5000 }).catch(async () => {
+      // Older/non-PKCS8 keys (e.g. plain RSA "BEGIN RSA PRIVATE KEY") aren't
+      // recognized by `openssl pkey` — fall back before rejecting outright.
+      await runCommand("openssl", ["rsa", "-in", keyPemPath, "-noout"], { timeoutMs: 5000 }).catch(() => {
+        throw new Error("invalid_private_key_pem");
+      });
+    });
+
+    const destDir = join(env.NGINX_MANAGED_CERTS_DIR, vhostName);
+    await mkdir(destDir, { recursive: true });
+    const certPath = join(destDir, "fullchain.pem");
+    const keyPath = join(destDir, "privkey.pem");
+    await copyFile(certPemPath, certPath);
+    await copyFile(keyPemPath, keyPath);
+    return { certPath, keyPath };
   },
 };

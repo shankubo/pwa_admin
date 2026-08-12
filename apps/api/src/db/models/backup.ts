@@ -160,6 +160,19 @@ export const BackupHistoryModel = {
     );
   },
 
+  /** Patches only the usb_path column on an existing run — unlike complete(),
+   * never touches status/file_path/etc, so it's safe to call on a run that's
+   * long since finished (e.g. "also copy this local backup to USB" from the
+   * Restore screen, well after the original backup completed). */
+  setUsbPath(runId: string, usbPath: string): void {
+    db.prepare("UPDATE backup_history SET usb_path = ? WHERE run_id = ?").run(usbPath, runId);
+  },
+
+  /** Same as setUsbPath but for drive_file_id — see its doc comment. */
+  setDriveFileId(runId: string, driveFileId: string): void {
+    db.prepare("UPDATE backup_history SET drive_file_id = ? WHERE run_id = ?").run(driveFileId, runId);
+  },
+
   findByRunId(runId: string): BackupHistoryRow | undefined {
     return db.prepare("SELECT * FROM backup_history WHERE run_id = ?").get(runId) as
       | BackupHistoryRow

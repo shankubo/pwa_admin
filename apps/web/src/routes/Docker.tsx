@@ -7,6 +7,8 @@ import type {
   VolumeSummary,
   NetworkSummary,
   BackupHistoryEntry,
+  SiteSummary,
+  NginxVhostAccessibility,
 } from "@pwa-admin/shared";
 import { apiJson, apiFetch } from "@/lib/api";
 import { useWsChannel } from "@/lib/ws";
@@ -74,12 +76,39 @@ function stateBadgeClass(state: string) {
   return "bg-destructive/15 text-destructive";
 }
 
+/**
+ * Card color scheme (per admin request): green = running AND (no linked
+ * site, e.g. a database container with nothing to check — OR the linked
+ * site is enabled/not-in-maintenance/HTTP-reachable); red = stopped/dead, OR
+ * running but its linked site is disabled/in-maintenance/unreachable;
+ * orange = "-duplicate" clone (handled by the caller, takes priority over
+ * this). While an accessibility probe for a linked site is still in flight,
+ * no color is applied yet rather than guessing.
+ */
+function siteLinkedCardClass(
+  state: string,
+  site: SiteSummary | undefined,
+  accessibility: NginxVhostAccessibility | null | undefined
+): string | undefined {
+  const s = state.toLowerCase();
+  if (s !== "running") return "border-destructive/50 bg-destructive/5";
+  if (!site) return "border-primary/40 bg-primary/5";
+  if (!site.enabled || site.maintenanceMode) return "border-destructive/50 bg-destructive/5";
+  if (accessibility === undefined) return undefined; // still checking
+  if (accessibility === null || !accessibility.reachable) return "border-destructive/50 bg-destructive/5";
+  return "border-primary/40 bg-primary/5";
+}
+
 function ContainersTab() {
   const navigate = useNavigate();
   const [containers, setContainers] = useState<ContainerSummary[] | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sitesByContainer, setSitesByContainer] = useState<Record<string, SiteSummary>>({});
+  const [accessibilityByContainer, setAccessibilityByContainer] = useState<
+    Record<string, NginxVhostAccessibility | null>
+  >({});
 
   async function load() {
     try {
@@ -90,8 +119,41 @@ function ContainersTab() {
     }
   }
 
+  async function loadSitesAndAccessibility() {
+    let sites: SiteSummary[];
+    try {
+      sites = await apiJson<SiteSummary[]>("/sites");
+    } catch {
+      return;
+    }
+    const byContainer: Record<string, SiteSummary> = {};
+    for (const s of sites) {
+      if (s.linkedContainer) byContainer[s.linkedContainer.name] = s;
+    }
+    setSitesByContainer(byContainer);
+
+    // Only probe sites that are actually up — a disabled/maintenance site is
+    // already known-red without spending an 8s-timeout HTTP request on it.
+    const toCheck = Object.values(byContainer).filter((s) => s.enabled && !s.maintenanceMode);
+    const results = await Promise.all(
+      toCheck.map((s) =>
+        apiJson<NginxVhostAccessibility>(`/nginx/vhosts/${encodeURIComponent(s.name)}/accessibility`).catch(
+          () => null
+        )
+      )
+    );
+    setAccessibilityByContainer((prev) => {
+      const next = { ...prev };
+      toCheck.forEach((s, i) => {
+        next[s.linkedContainer!.name] = results[i];
+      });
+      return next;
+    });
+  }
+
   useEffect(() => {
     load();
+    loadSitesAndAccessibility();
   }, []);
 
   async function runAction(id: string, action: "start" | "stop" | "restart") {
@@ -123,8 +185,13 @@ function ContainersTab() {
     <div className="flex flex-col gap-3">
       {containers.map((c) => {
         const isDuplicate = c.name.endsWith("-duplicate");
+        const linkedSite = sitesByContainer[c.name];
+        const accessibility = accessibilityByContainer[c.name];
+        const cardClass = isDuplicate
+          ? "border-warning/50 bg-warning/5"
+          : siteLinkedCardClass(c.state, linkedSite, accessibility);
         return (
-        <Card key={c.id} className={isDuplicate ? "border-warning/50 bg-warning/5" : undefined}>
+        <Card key={c.id} className={cardClass}>
           <div
             className="flex cursor-pointer items-start justify-between gap-2"
             onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
@@ -136,6 +203,11 @@ function ContainersTab() {
                 {isDuplicate && (
                   <span className="shrink-0 rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
                     duplicata
+                  </span>
+                )}
+                {linkedSite && (
+                  <span className="shrink-0 truncate rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                    site : {linkedSite.name}
                   </span>
                 )}
               </div>

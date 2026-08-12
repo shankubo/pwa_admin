@@ -1,7 +1,12 @@
+import { createWriteStream } from "node:fs";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { pipeline } from "node:stream/promises";
+import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { NginxService } from "./nginx.service.js";
 import { parseGuidedFields, applyGuidedFields, buildInitialVhostConfig } from "./nginx.guidedEditor.js";
 import { withAudit } from "../../middleware/auditLog.js";
+import { env } from "../../config/env.js";
 import type { NginxGuidedFormModel } from "@pwa-admin/shared";
 
 export default async function nginxRoutes(app: FastifyInstance) {
@@ -146,6 +151,88 @@ export default async function nginxRoutes(app: FastifyInstance) {
     if (!path) return reply.code(400).send({ error: "path_required" });
     reply.send({ exists: await NginxService.checkCertPathExists(path) });
   });
+
+  // Paste-PEM-text variant: writes both blocks to a tmp staging file each
+  // (same "write plain content, validate, then place" idiom as the upload
+  // route below) so NginxService.saveManagedCert's openssl validation runs
+  // against real files, then moves them into NGINX_MANAGED_CERTS_DIR.
+  app.post(
+    "/nginx/cert-paths/import-text",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("nginx.cert.import_text", (r) => (r.body as any)?.vhostName)],
+      schema: {
+        body: {
+          type: "object",
+          required: ["vhostName", "certPem", "keyPem"],
+          properties: {
+            vhostName: { type: "string", maxLength: 200 },
+            certPem: { type: "string", maxLength: 100_000 },
+            keyPem: { type: "string", maxLength: 100_000 },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { vhostName, certPem, keyPem } = req.body as { vhostName: string; certPem: string; keyPem: string };
+      const tmpDir = join(env.NGINX_MANAGED_CERTS_DIR, "_tmp-paste");
+      await mkdir(tmpDir, { recursive: true });
+      const certTmp = join(tmpDir, `${Date.now()}-cert.pem`);
+      const keyTmp = join(tmpDir, `${Date.now()}-key.pem`);
+      try {
+        await writeFile(certTmp, certPem);
+        await writeFile(keyTmp, keyPem);
+        const result = await NginxService.saveManagedCert(vhostName, certTmp, keyTmp);
+        reply.send(result);
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      } finally {
+        await unlink(certTmp).catch(() => {});
+        await unlink(keyTmp).catch(() => {});
+      }
+    }
+  );
+
+  // File-upload variant — same two-file idea, but the browser sends actual
+  // cert/key files as multipart fields instead of pasted text.
+  app.post(
+    "/nginx/cert-paths/import-file",
+    { preHandler: [(app as any).requireAuth, withAudit("nginx.cert.import_file")] },
+    async (req, reply) => {
+      const tmpDir = join(env.NGINX_MANAGED_CERTS_DIR, "_tmp-upload");
+      await mkdir(tmpDir, { recursive: true });
+      let vhostName: string | undefined;
+      let certTmp: string | undefined;
+      let keyTmp: string | undefined;
+      try {
+        for await (const part of (req as any).parts()) {
+          if (part.type === "field" && part.fieldname === "vhostName") {
+            vhostName = part.value as string;
+          } else if (part.type === "file" && part.fieldname === "cert") {
+            // Duplicate "cert"/"key" parts in one request would otherwise
+            // leak the earlier tmp file on disk (only the final reference
+            // gets cleaned up in `finally`) — unlink any prior one first.
+            if (certTmp) await unlink(certTmp).catch(() => {});
+            certTmp = join(tmpDir, `${Date.now()}-cert.pem`);
+            await pipeline(part.file, createWriteStream(certTmp));
+          } else if (part.type === "file" && part.fieldname === "key") {
+            if (keyTmp) await unlink(keyTmp).catch(() => {});
+            keyTmp = join(tmpDir, `${Date.now()}-key.pem`);
+            await pipeline(part.file, createWriteStream(keyTmp));
+          }
+        }
+        if (!vhostName || !certTmp || !keyTmp) {
+          return reply.code(400).send({ error: "vhostName_cert_and_key_required" });
+        }
+        const result = await NginxService.saveManagedCert(vhostName, certTmp, keyTmp);
+        reply.send(result);
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      } finally {
+        if (certTmp) await unlink(certTmp).catch(() => {});
+        if (keyTmp) await unlink(keyTmp).catch(() => {});
+      }
+    }
+  );
 
   app.post(
     "/nginx/vhosts",

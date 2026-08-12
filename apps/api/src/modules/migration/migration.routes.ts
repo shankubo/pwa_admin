@@ -184,9 +184,11 @@ export default async function migrationRoutes(app: FastifyInstance) {
     } catch {
       return reply.code(404).send({ error: "not_found" });
     }
+    const { createReadStream } = await import("node:fs");
+    const { stat } = await import("node:fs/promises");
+    const { size } = await stat(filePath);
     reply.header("Content-Disposition", `attachment; filename="${basename(filePath)}"`);
-    return reply.sendFile
-      ? reply.sendFile(filePath)
-      : reply.send((await import("node:fs")).createReadStream(filePath));
+    reply.header("Content-Length", size);
+    return reply.send(createReadStream(filePath));
   });
 }

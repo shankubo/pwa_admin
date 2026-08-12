@@ -43,6 +43,12 @@ const STATUS_FILTERS: { key: "all" | BackupRunStatus; label: string }[] = [
   { key: "running", label: "En cours" },
 ];
 
+function historyCardClass(status: BackupRunStatus): string | undefined {
+  if (status === "success") return "border-primary/40 bg-primary/5";
+  if (status === "failed") return "border-destructive/50 bg-destructive/5";
+  return undefined; // pending/running — no verdict yet
+}
+
 async function triggerDownload(runId: string) {
   const { token } = await apiJson<{ token: string }>(`/backups/history/${runId}/download-token`, {
     method: "POST",
@@ -328,7 +334,7 @@ export function Backups() {
           {filteredHistory.map((h) => {
             const driveStatus = driveStatusByRunId.get(h.runId);
             return (
-              <Card key={h.runId}>
+              <Card key={h.runId} className={historyCardClass(h.status)}>
                 <div className="flex items-center justify-between text-sm">
                   <div className="min-w-0">
                     <p className="truncate font-medium">

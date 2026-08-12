@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { createWriteStream } from "node:fs";
+import { createWriteStream, createReadStream } from "node:fs";
 import { mkdir, stat, unlink } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
 import { join, basename } from "node:path";
@@ -228,10 +228,10 @@ export default async function backupRoutes(app: FastifyInstance) {
 
     const entry = BackupHistoryModel.findByRunId(runId);
     if (!entry?.file_path) return reply.code(404).send({ error: "not_found" });
+    const { size } = await stat(entry.file_path);
     reply.header("Content-Disposition", `attachment; filename="${basename(entry.file_path)}"`);
-    return reply.sendFile
-      ? reply.sendFile(entry.file_path)
-      : reply.send((await import("node:fs")).createReadStream(entry.file_path));
+    reply.header("Content-Length", size);
+    return reply.send(createReadStream(entry.file_path));
   });
 
   app.delete(
@@ -477,6 +477,59 @@ export default async function backupRoutes(app: FastifyInstance) {
       });
 
       reply.send({ runId });
+    }
+  );
+
+  // Copies an already-completed LOCAL backup's file onto the configured USB
+  // drive after the fact — e.g. an admin who backed up locally only, and
+  // later decides they also want a USB copy of that exact run, from the
+  // Restore screen. Reuses the same UsbBackupService.copyBackupFile the
+  // original backup-creation code paths use, then patches only usb_path on
+  // the existing row (never re-touches status/file_path — see
+  // BackupHistoryModel.setUsbPath's doc comment).
+  app.post(
+    "/backups/history/:runId/copy-to-usb",
+    { preHandler: [(app as any).requireAuth, withAudit("backup.history.copy_to_usb", (r) => (r.params as any).runId)] },
+    async (req, reply) => {
+      const { runId } = req.params as { runId: string };
+      const entry = BackupHistoryModel.findByRunId(runId);
+      if (!entry?.file_path) return reply.code(404).send({ error: "not_found" });
+      if (entry.usb_path) return reply.send({ usbPath: entry.usb_path, alreadyPresent: true });
+      try {
+        const category = entry.source_type === "volume" ? "volumes" : entry.source_type === "db" ? "db" : "paths";
+        const sourceRef =
+          entry.source_type === "image" ? `image-${entry.source_ref}` : entry.source_ref;
+        const { usbPath } = await UsbBackupService.copyBackupFile(entry.file_path, category, sourceRef);
+        BackupHistoryModel.setUsbPath(runId, usbPath);
+        reply.send({ usbPath, alreadyPresent: false });
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      }
+    }
+  );
+
+  // Same idea as copy-to-usb but for Google Drive — uploads an existing
+  // local run's file, keyed by its already-known sourceType/sourceRef, then
+  // patches drive_file_id on the existing row.
+  app.post(
+    "/backups/history/:runId/copy-to-gdrive",
+    { preHandler: [(app as any).requireAuth, withAudit("backup.history.copy_to_gdrive", (r) => (r.params as any).runId)] },
+    async (req, reply) => {
+      const { runId } = req.params as { runId: string };
+      const entry = BackupHistoryModel.findByRunId(runId);
+      if (!entry?.file_path) return reply.code(404).send({ error: "not_found" });
+      if (entry.drive_file_id) return reply.send({ driveFileId: entry.drive_file_id, alreadyPresent: true });
+      if (!GDriveAuthService.isAuthorized()) return reply.code(400).send({ error: "gdrive_not_connected" });
+      try {
+        const category = entry.source_type === "volume" ? "volumes" : entry.source_type === "db" ? "db" : "paths";
+        const sourceRef =
+          entry.source_type === "image" ? `image-${entry.source_ref}` : entry.source_ref;
+        const { fileId } = await GDriveService.uploadBackupFile(entry.file_path, category, sourceRef);
+        BackupHistoryModel.setDriveFileId(runId, fileId);
+        reply.send({ driveFileId: fileId, alreadyPresent: false });
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      }
     }
   );
 

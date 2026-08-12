@@ -27,6 +27,15 @@ const STATUS_LABELS: Record<Pm2Status, string> = {
   "one-launch-status": "unique",
 };
 
+const CARD_STYLES: Record<Pm2Status, string> = {
+  online: "border-primary/40 bg-primary/5",
+  stopped: "border-muted-foreground/30 bg-muted/30",
+  stopping: "border-warning/50 bg-warning/5",
+  launching: "border-warning/50 bg-warning/5",
+  errored: "border-destructive/50 bg-destructive/5",
+  "one-launch-status": "border-muted-foreground/30 bg-muted/30",
+};
+
 function formatUptime(ms: number | null): string {
   if (ms == null) return "—";
   const totalSeconds = Math.floor(ms / 1000);
@@ -97,7 +106,7 @@ export function Pm2() {
 
       <div className="flex flex-col gap-3">
         {processes?.map((p) => (
-          <Card key={p.pmId}>
+          <Card key={p.pmId} className={CARD_STYLES[p.status]}>
             <div className="flex items-start justify-between gap-2">
               <div
                 className="min-w-0 cursor-pointer"

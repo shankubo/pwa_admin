@@ -35,7 +35,14 @@ import {
   Wand2,
   X,
   Plus,
+  Upload,
 } from "lucide-react";
+
+function vhostCardClass(v: NginxVhostSummary): string {
+  if (!v.enabled) return "border-muted-foreground/30 bg-muted/30";
+  if (v.maintenanceMode) return "border-warning/50 bg-warning/5";
+  return "border-primary/40 bg-primary/5";
+}
 
 export function Nginx() {
   const [status, setStatus] = useState<NginxStatus | null>(null);
@@ -156,7 +163,7 @@ export function Nginx() {
           {!vhosts && <Card className="text-sm text-muted-foreground">Chargement…</Card>}
           {vhosts?.length === 0 && <Card className="text-sm text-muted-foreground">Aucun vhost.</Card>}
           {vhosts?.map((v) => (
-            <Card key={v.name}>
+            <Card key={v.name} className={vhostCardClass(v)}>
               <div
                 className="flex cursor-pointer items-start justify-between gap-2"
                 onClick={() => setExpanded(expanded === v.name ? null : v.name)}
@@ -191,6 +198,11 @@ export function Nginx() {
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
+                  {v.enabled && v.maintenanceMode && (
+                    <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
+                      maintenance
+                    </span>
+                  )}
                   <span
                     className={
                       "rounded-full px-2 py-0.5 text-xs font-medium " +
@@ -657,6 +669,163 @@ function HeaderCheckbox({
   );
 }
 
+/**
+ * Cert import UI for the guided editor's SSL section — only shown in "edit"
+ * mode (a real vhostName is required to key the managed-certs folder; a
+ * brand-new vhost doesn't have one yet). Two independent paths: paste raw
+ * PEM text, or upload cert/key files — both land on the same backend
+ * endpoint family and, on success, overwrite certPath/certKeyPath in the
+ * form model so the admin doesn't have to copy the resulting paths by hand.
+ */
+function CertImportPanel({
+  vhostName,
+  onImported,
+}: {
+  vhostName: string;
+  onImported: (result: { certPath: string; keyPath: string }) => void;
+}) {
+  const [mode, setMode] = useState<"closed" | "paste" | "upload">("closed");
+  const [certPem, setCertPem] = useState("");
+  const [keyPem, setKeyPem] = useState("");
+  const [certFile, setCertFile] = useState<File | null>(null);
+  const [keyFile, setKeyFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  async function submitPaste() {
+    setBusy(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      const result = await apiJson<{ certPath: string; keyPath: string }>("/nginx/cert-paths/import-text", {
+        method: "POST",
+        body: JSON.stringify({ vhostName, certPem, keyPem }),
+      });
+      onImported(result);
+      setSuccess(true);
+      setCertPem("");
+      setKeyPem("");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitUpload() {
+    if (!certFile || !keyFile) return;
+    setBusy(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      const form = new FormData();
+      form.append("vhostName", vhostName);
+      form.append("cert", certFile);
+      form.append("key", keyFile);
+      const res = await apiFetch("/nginx/cert-paths/import-file", { method: "POST", body: form });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "import_failed" }));
+        throw new Error(body.error ?? "import_failed");
+      }
+      const result = await res.json();
+      onImported(result);
+      setSuccess(true);
+      setCertFile(null);
+      setKeyFile(null);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (mode === "closed") {
+    return (
+      <div className="mt-2 flex gap-2">
+        <Button size="sm" variant="outline" onClick={() => setMode("paste")}>
+          Coller un certificat
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => setMode("upload")}>
+          <Upload className="h-3.5 w-3.5" /> Importer des fichiers
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 rounded-md border border-border p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-xs font-medium">{mode === "paste" ? "Coller le certificat et la clé" : "Importer les fichiers"}</p>
+        <button type="button" onClick={() => setMode("closed")} className="text-muted-foreground hover:text-foreground">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {mode === "paste" && (
+        <div className="flex flex-col gap-2">
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">Certificat (PEM, ex: fullchain.pem)</label>
+            <textarea
+              value={certPem}
+              onChange={(e) => setCertPem(e.target.value)}
+              rows={4}
+              placeholder="-----BEGIN CERTIFICATE-----"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">Clé privée (PEM, ex: privkey.pem)</label>
+            <textarea
+              value={keyPem}
+              onChange={(e) => setKeyPem(e.target.value)}
+              rows={4}
+              placeholder="-----BEGIN PRIVATE KEY-----"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <Button size="sm" disabled={busy || !certPem.trim() || !keyPem.trim()} onClick={submitPaste}>
+            {busy ? "Enregistrement…" : "Enregistrer"}
+          </Button>
+        </div>
+      )}
+
+      {mode === "upload" && (
+        <div className="flex flex-col gap-2">
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">Fichier certificat (.pem/.crt)</label>
+            <input
+              type="file"
+              accept=".pem,.crt,.cer"
+              onChange={(e) => setCertFile(e.target.files?.[0] ?? null)}
+              className="w-full text-xs"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted-foreground">Fichier clé privée (.pem/.key)</label>
+            <input
+              type="file"
+              accept=".pem,.key"
+              onChange={(e) => setKeyFile(e.target.files?.[0] ?? null)}
+              className="w-full text-xs"
+            />
+          </div>
+          <Button size="sm" disabled={busy || !certFile || !keyFile} onClick={submitUpload}>
+            {busy ? "Import en cours…" : "Importer"}
+          </Button>
+        </div>
+      )}
+
+      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+      {success && (
+        <p className="mt-2 flex items-center gap-1 text-xs text-primary">
+          <CheckCircle2 className="h-3.5 w-3.5" /> Certificat enregistré et chemins renseignés ci-dessus.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
   const [open, setOpen] = useState(false);
   const [model, setModel] = useState<NginxGuidedFormModel>(DEFAULT_GUIDED_MODEL);
@@ -698,6 +867,11 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
     } catch {
       setCertCheck("missing");
     }
+  }
+
+  function applyImportedCertPaths(result: { certPath: string; keyPath: string }) {
+    setCertCheck("idle");
+    setModel((m) => ({ ...m, certPath: result.certPath, certKeyPath: result.keyPath }));
   }
 
   async function submit() {
@@ -837,6 +1011,9 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                       className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
+                  {props.mode === "edit" && (
+                    <CertImportPanel vhostName={props.vhostName} onImported={applyImportedCertPaths} />
+                  )}
                 </div>
               )}
             </div>

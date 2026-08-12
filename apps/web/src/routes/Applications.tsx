@@ -220,9 +220,19 @@ export function Applications() {
   const [showNewApp, setShowNewApp] = useState(!!prefillContainer);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [lastRunStatusById, setLastRunStatusById] = useState<Record<number, AppBackupRun["status"] | undefined>>({});
 
   async function loadApps() {
-    setApps(await apiJson<Application[]>("/applications"));
+    const data = await apiJson<Application[]>("/applications");
+    setApps(data);
+    const entries = await Promise.all(
+      data.map((app) =>
+        apiJson<AppBackupRun[]>(`/applications/${app.id}/runs`)
+          .then((runs) => [app.id, runs[0]?.status] as const)
+          .catch(() => [app.id, undefined] as const)
+      )
+    );
+    setLastRunStatusById(Object.fromEntries(entries));
   }
 
   useEffect(() => {
@@ -285,6 +295,7 @@ export function Applications() {
             <AppCard
               key={app.id}
               app={app}
+              lastRunStatus={lastRunStatusById[app.id]}
               expanded={expandedId === app.id}
               onToggleExpand={() => setExpandedId((prev) => (prev === app.id ? null : app.id))}
               onBackup={(kind) => runBackup(app.id, kind)}
@@ -297,21 +308,29 @@ export function Applications() {
   );
 }
 
+function appCardClass(status: AppBackupRun["status"] | undefined): string | undefined {
+  if (status === "success") return "border-primary/40 bg-primary/5";
+  if (status === "failed") return "border-destructive/50 bg-destructive/5";
+  return undefined; // pending/running/no runs yet — no verdict to color by
+}
+
 function AppCard({
   app,
+  lastRunStatus,
   expanded,
   onToggleExpand,
   onBackup,
   onDelete,
 }: {
   app: Application;
+  lastRunStatus: AppBackupRun["status"] | undefined;
   expanded: boolean;
   onToggleExpand: () => void;
   onBackup: (kind: AppBackupRunKind) => void;
   onDelete: () => void;
 }) {
   return (
-    <Card>
+    <Card className={appCardClass(lastRunStatus)}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 cursor-pointer" onClick={onToggleExpand}>
           <p className="flex items-center gap-1 truncate font-medium">

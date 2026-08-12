@@ -48,6 +48,11 @@ const envSchema = z.object({
   NGINX_CONFIG_BACKUP_DIR: z.string().default("./data/nginx-config-history"),
   NGINX_MAINTENANCE_ROOT: z.string().default("/var/www/server-admin-maintenance"),
   CERTBOT_LIVE_DIR: z.string().default("/etc/letsencrypt/live"),
+  // Certs imported (upload or paste) through the guided editor land here —
+  // owned by the service user like the rest of data/, so writing a new cert
+  // never needs a new sudo rule (unlike the read-only /etc/letsencrypt and
+  // /etc/ssl paths checkCertPathExists probes for admin-placed certs).
+  NGINX_MANAGED_CERTS_DIR: z.string().default("./data/nginx-certs"),
 
   OS_MODULE_ENABLED: z.coerce.boolean().default(true),
   APT_ALLOW_INSTALL_REMOVE: z.coerce.boolean().default(false),
@@ -93,6 +98,7 @@ export const env = {
   APP_DIR: REPO_ROOT,
   SQLITE_PATH: resolveFromRoot(parsed.data.SQLITE_PATH),
   NGINX_CONFIG_BACKUP_DIR: resolveFromRoot(parsed.data.NGINX_CONFIG_BACKUP_DIR),
+  NGINX_MANAGED_CERTS_DIR: resolveFromRoot(parsed.data.NGINX_MANAGED_CERTS_DIR),
   APT_JOB_LOG_DIR: resolveFromRoot(parsed.data.APT_JOB_LOG_DIR),
   BACKUP_LOCAL_ROOT: resolveFromRoot(parsed.data.BACKUP_LOCAL_ROOT),
   GDRIVE_OAUTH_TOKEN_PATH: resolveFromRoot(parsed.data.GDRIVE_OAUTH_TOKEN_PATH),
