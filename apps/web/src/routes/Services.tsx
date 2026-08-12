@@ -4,9 +4,9 @@ import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { Network, Container, Hexagon, CheckCircle2, XCircle, RefreshCw, Loader2 } from "lucide-react";
+import { Network, Container, Hexagon, Server, CheckCircle2, XCircle, RefreshCw, Loader2 } from "lucide-react";
 
-const ICONS = { tailscale: Network, docker: Container, pm2: Hexagon } as const;
+const ICONS = { tailscale: Network, docker: Container, pm2: Hexagon, webserver: Server } as const;
 
 export function Services() {
   const [overview, setOverview] = useState<ServicesOverview | null>(null);

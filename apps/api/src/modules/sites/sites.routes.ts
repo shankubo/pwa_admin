@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { SitesService } from "./sites.service.js";
 import { SiteDuplicateService } from "./siteDuplicate.service.js";
-import { NginxService } from "../nginx/nginx.service.js";
+import { webServer } from "../webserver/webserver.registry.js";
 import { withAudit } from "../../middleware/auditLog.js";
 
 export default async function sitesRoutes(app: FastifyInstance) {
@@ -21,7 +21,7 @@ export default async function sitesRoutes(app: FastifyInstance) {
     { preHandler: [(app as any).requireAuth, withAudit("sites.enable", (r) => (r.params as any).name)] },
     async (req, reply) => {
       const { name } = req.params as { name: string };
-      await NginxService.enableVhost(name);
+      await webServer().enableVhost(name);
       reply.send({ ok: true });
     }
   );
@@ -31,7 +31,7 @@ export default async function sitesRoutes(app: FastifyInstance) {
     { preHandler: [(app as any).requireAuth, withAudit("sites.disable", (r) => (r.params as any).name)] },
     async (req, reply) => {
       const { name } = req.params as { name: string };
-      await NginxService.disableVhost(name);
+      await webServer().disableVhost(name);
       reply.send({ ok: true });
     }
   );
@@ -42,7 +42,7 @@ export default async function sitesRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { name } = req.params as { name: string };
       try {
-        await NginxService.enableMaintenance(name);
+        await webServer().enableMaintenance(name);
         reply.send({ ok: true });
       } catch (err) {
         reply.code(400).send({ error: (err as Error).message });
@@ -56,7 +56,7 @@ export default async function sitesRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { name } = req.params as { name: string };
       try {
-        await NginxService.disableMaintenance(name);
+        await webServer().disableMaintenance(name);
         reply.send({ ok: true });
       } catch (err) {
         reply.code(400).send({ error: (err as Error).message });
@@ -67,7 +67,7 @@ export default async function sitesRoutes(app: FastifyInstance) {
   app.get("/sites/:name/logs", auth, async (req, reply) => {
     const { name } = req.params as { name: string };
     const { type, tail } = req.query as { type?: "access" | "error"; tail?: string };
-    const logs = await NginxService.getVhostLogs(name, type ?? "error", tail ? Number(tail) : 200);
+    const logs = await webServer().getVhostLogs(name, type ?? "error", tail ? Number(tail) : 200);
     reply.type("text/plain").send(logs);
   });
 
@@ -122,7 +122,7 @@ export default async function sitesRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { name } = req.params as { name: string };
       try {
-        await NginxService.switchToDuplicate(name);
+        await webServer().switchToDuplicate(name);
         reply.send({ ok: true });
       } catch (err) {
         reply.code(400).send({ error: (err as Error).message });
@@ -136,7 +136,7 @@ export default async function sitesRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { name } = req.params as { name: string };
       try {
-        await NginxService.switchToPrimary(name);
+        await webServer().switchToPrimary(name);
         reply.send({ ok: true });
       } catch (err) {
         reply.code(400).send({ error: (err as Error).message });

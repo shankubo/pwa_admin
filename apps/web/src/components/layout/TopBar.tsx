@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import { navItems } from "./navItems";
 import { ServerSwitcher } from "./ServerSwitcher";
 import { useHostname } from "@/lib/useHostname";
+import { useWebServerEngine } from "@/lib/useWebServerEngine";
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -14,7 +15,12 @@ export function TopBar({ onMenuClick, alertCount = 0 }: TopBarProps) {
   const location = useLocation();
   const current = navItems.find((i) => (i.to === "/" ? location.pathname === "/" : location.pathname.startsWith(i.to)));
   const hostname = useHostname();
-  const pageLabel = current?.label ?? "Server Admin";
+  const webServerEngine = useWebServerEngine();
+  // The nav menu's own "Nginx" label stays static (see useWebServerEngine's
+  // doc comment) — only the page title, which is actually visible while the
+  // admin is looking at this exact screen, reflects the real detected engine.
+  const pageLabel =
+    current?.to === "/nginx" && webServerEngine === "apache" ? "Apache" : current?.label ?? "Server Admin";
 
   useEffect(() => {
     document.title = hostname ? `${pageLabel} — ${hostname}` : pageLabel;

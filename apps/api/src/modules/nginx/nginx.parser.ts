@@ -35,6 +35,7 @@ export function parseVhostSummary(
   if (rootMatch) root = rootMatch[1].trim();
 
   return {
+    engine: "nginx",
     name,
     enabled,
     serverNames: [...serverNames],

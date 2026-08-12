@@ -1,4 +1,4 @@
-export type ServiceName = "tailscale" | "docker" | "pm2";
+export type ServiceName = "tailscale" | "docker" | "pm2" | "webserver";
 
 export interface ServiceStatusEntry {
   name: ServiceName;

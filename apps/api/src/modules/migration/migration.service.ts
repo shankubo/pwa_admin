@@ -8,11 +8,12 @@ import si from "systeminformation";
 import { docker } from "../../services/docker.client.js";
 import { runCommand, isValidLinuxUsername } from "../../utils/exec.js";
 import { UsbBackupService } from "../../services/usbBackup.client.js";
+import { GDriveService } from "../../services/gdrive.client.js";
 import { registerChannel } from "../../services/wsHub.js";
 import { OsService } from "../os/os.service.js";
 import { BackupService } from "../backup/backup.service.js";
 import { DbBackupService } from "../dbbackup/dbbackup.service.js";
-import { NginxService } from "../nginx/nginx.service.js";
+import { webServer } from "../webserver/webserver.registry.js";
 import { HardwareService } from "../hardware/hardware.service.js";
 import { ApplicationService } from "../application/application.service.js";
 import { ApplicationModel, AppBackupRunModel, type ApplicationRow } from "../../db/models/application.js";
@@ -250,8 +251,9 @@ async function capturePwaAdminConfig(manifestId: string, usbRoot: string): Promi
 }
 
 async function captureNginxConfig(manifestId: string, usbRoot: string): Promise<MigrationManifestItem> {
-  return captureItem(manifestId, "nginx-config", "Configuration Nginx (vhosts)", async () => {
-    const run = await NginxService.backupConfig(["local"]);
+  const label = webServer().engine === "apache" ? "Configuration Apache (vhosts)" : "Configuration Nginx (vhosts)";
+  return captureItem(manifestId, "nginx-config", label, async () => {
+    const run = await webServer().backupConfig(["local"]);
     if (run.status === "failed") throw new Error(run.error ?? "nginx_config_backup_failed");
     // backupConfig doesn't return the archive path — it's deterministic from
     // the runId it generates (`nginx-cfg-<ts>`), same layout it writes to.
@@ -267,10 +269,10 @@ async function captureNginxConfig(manifestId: string, usbRoot: string): Promise<
 /** One "tls-cert" item per vhost that actually has a resolvable certificate —
  * a vhost with no TLS (plain HTTP redirect-only, or terminated upstream of
  * this box) yields no item rather than a failed one, since there's nothing
- * to capture. See NginxService.resolveCertPaths for the certbot-vs-manual
+ * to capture. See WebServerService.resolveCertPaths for the certbot-vs-manual
  * path resolution this relies on. */
 async function captureTlsCert(manifestId: string, usbRoot: string, vhostName: string): Promise<MigrationManifestItem | null> {
-  const resolved = await NginxService.resolveCertPaths(vhostName);
+  const resolved = await webServer().resolveCertPaths(vhostName);
   if (!resolved) return null;
   return captureItem(manifestId, "tls-cert", `Certificat TLS (${resolved.domain})`, async () => {
     // Sudo tar always writes to this service's own fixed staging dir first
@@ -603,6 +605,22 @@ export const MigrationService = {
     if (!match) throw new Error("file_not_in_manifest");
     return match.path;
   },
+
+  /**
+   * Uploads one manifest file (already on USB) to Google Drive on demand —
+   * the "Voir les fichiers" export panel's Drive counterpart to its existing
+   * download button, for an admin who wants an off-USB copy of a specific
+   * migration archive without uploading the whole snapshot. No local
+   * tracking of "already uploaded" (unlike backup_history's driveFileId) —
+   * migration files aren't rows in a table, they're derived fresh from
+   * manifest.json every call, so this simply re-uploads each time it's
+   * invoked rather than persisting state that has nowhere to live.
+   */
+  async uploadManifestFileToDrive(manifestId: string, fileId: string): Promise<{ driveFileId: string }> {
+    const path = await this.resolveManifestFileId(manifestId, fileId);
+    const { fileId: driveFileId } = await GDriveService.uploadBackupFile(path, "apps", `migration-${manifestId}`);
+    return { driveFileId };
+  },
 };
 
 function flattenManifestFiles(manifest: MigrationManifest): (MigrationManifestFileEntry & { path: string })[] {
@@ -730,7 +748,7 @@ async function captureServerItems(
 
   items.push(await captureNginxConfig(manifestId, usbRoot));
 
-  const vhosts = await NginxService.listVhosts();
+  const vhosts = await webServer().listVhosts();
   for (const vhost of vhosts) {
     const certItem = await captureTlsCert(manifestId, usbRoot, vhost.name);
     if (certItem) items.push(certItem);
@@ -812,7 +830,7 @@ async function captureApplication(manifestId: string, usbRoot: string, app: Appl
 async function captureSiteItems(manifestId: string, usbRoot: string, vhostName: string): Promise<MigrationManifestItem[]> {
   const items: MigrationManifestItem[] = [];
 
-  const vhost = await NginxService.getVhostDetail(vhostName);
+  const vhost = await webServer().getVhostDetail(vhostName);
   const linkedContainer = await findLinkedContainer(vhost.proxyPassTarget);
 
   if (linkedContainer) {
@@ -1232,7 +1250,7 @@ async function runRestoreFromManifest(
         await mkdir(destDir, { recursive: true });
         const localPath = join(destDir, `migration-restore-${Date.now()}.tar.gz`);
         await copyFile(item.archiveRelPath!, localPath);
-        await NginxService.restoreCertArchive(localPath);
+        await webServer().restoreCertArchive(localPath);
       });
       if (!ran) throw new RestoreSkipped();
     });
@@ -1264,7 +1282,7 @@ async function runRestoreFromManifest(
         await mkdir(destDir, { recursive: true });
         const localPath = join(destDir, `migration-restore-${Date.now()}.tar.gz`);
         await copyFile(item.archiveRelPath!, localPath);
-        await NginxService.restoreConfig(localPath);
+        await webServer().restoreConfig(localPath);
       });
       if (!ran) throw new RestoreSkipped();
     });

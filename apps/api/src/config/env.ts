@@ -39,7 +39,6 @@ const envSchema = z.object({
   // install.sh, and must not silently fall back to this default.
   SERVICE_USER: z.string().default("shan"),
 
-  PROXY_TYPE: z.enum(["nginx", "traefik"]).default("nginx"),
   NGINX_SITES_AVAILABLE: z.string().default("/etc/nginx/sites-available"),
   NGINX_SITES_ENABLED: z.string().default("/etc/nginx/sites-enabled"),
   NGINX_CONF_D: z.string().default("/etc/nginx/conf.d"),
@@ -53,6 +52,20 @@ const envSchema = z.object({
   // never needs a new sudo rule (unlike the read-only /etc/letsencrypt and
   // /etc/ssl paths checkCertPathExists probes for admin-placed certs).
   NGINX_MANAGED_CERTS_DIR: z.string().default("./data/nginx-certs"),
+
+  // Apache (httpd) support — v1 targets Debian/Ubuntu's `apache2` package
+  // conventions only (see the Apache-parity implementation plan for why
+  // RHEL/httpd's differing layout is out of scope). Mirrors the NGINX_* set
+  // above field-for-field so ApacheService's own logic stays a direct
+  // parallel of NginxService's.
+  APACHE_SITES_AVAILABLE: z.string().default("/etc/apache2/sites-available"),
+  APACHE_SITES_ENABLED: z.string().default("/etc/apache2/sites-enabled"),
+  APACHE_LOG_DIR: z.string().default("/var/log/apache2"),
+  APACHE_BINARY_PATH: z.string().default("/usr/sbin/apache2"),
+  APACHE_CTL_PATH: z.string().default("/usr/sbin/apache2ctl"),
+  APACHE_CONFIG_BACKUP_DIR: z.string().default("./data/apache-config-history"),
+  APACHE_MAINTENANCE_ROOT: z.string().default("/var/www/server-admin-maintenance"),
+  APACHE_MANAGED_CERTS_DIR: z.string().default("./data/apache-certs"),
 
   OS_MODULE_ENABLED: z.coerce.boolean().default(true),
   APT_ALLOW_INSTALL_REMOVE: z.coerce.boolean().default(false),
@@ -99,6 +112,8 @@ export const env = {
   SQLITE_PATH: resolveFromRoot(parsed.data.SQLITE_PATH),
   NGINX_CONFIG_BACKUP_DIR: resolveFromRoot(parsed.data.NGINX_CONFIG_BACKUP_DIR),
   NGINX_MANAGED_CERTS_DIR: resolveFromRoot(parsed.data.NGINX_MANAGED_CERTS_DIR),
+  APACHE_CONFIG_BACKUP_DIR: resolveFromRoot(parsed.data.APACHE_CONFIG_BACKUP_DIR),
+  APACHE_MANAGED_CERTS_DIR: resolveFromRoot(parsed.data.APACHE_MANAGED_CERTS_DIR),
   APT_JOB_LOG_DIR: resolveFromRoot(parsed.data.APT_JOB_LOG_DIR),
   BACKUP_LOCAL_ROOT: resolveFromRoot(parsed.data.BACKUP_LOCAL_ROOT),
   GDRIVE_OAUTH_TOKEN_PATH: resolveFromRoot(parsed.data.GDRIVE_OAUTH_TOKEN_PATH),

@@ -2,6 +2,7 @@ import { runCommand } from "../../utils/exec.js";
 import { docker } from "../../services/docker.client.js";
 import { SecurityService } from "../security/security.service.js";
 import { Pm2Service } from "../pm2/pm2.service.js";
+import { webServer } from "../webserver/webserver.registry.js";
 import type { ServiceStatusEntry, ServicesOverview, ServiceUpdateResult } from "@pwa-admin/shared";
 
 async function getVersion(bin: string, args: string[]): Promise<string | null> {
@@ -95,8 +96,37 @@ export const ServicesService = {
     }
   },
 
+  /**
+   * Reads whichever engine webserver.registry.ts already resolved at boot —
+   * never re-probes, since detection is boot-only (see detect.ts's own doc
+   * comment). "installed" reflects whether an engine was detected at all
+   * (engine !== "none"), a state that's only genuinely reachable since the
+   * Apache-parity refactor (previously Nginx was assumed always-present).
+   */
+  async getWebServerStatus(): Promise<ServiceStatusEntry> {
+    const ws = webServer();
+    if (ws.engine === "none") {
+      return { name: "webserver", label: "Serveur Web", installed: false, running: false, version: null, updateAvailable: null, detail: null };
+    }
+    const status = await ws.getStatus();
+    return {
+      name: "webserver",
+      label: ws.engine === "apache" ? "Apache" : "Nginx",
+      installed: true,
+      running: status.active,
+      version: status.version,
+      updateAvailable: null,
+      detail: { engine: ws.engine },
+    };
+  },
+
   async getOverview(): Promise<ServicesOverview> {
-    const services = await Promise.all([this.getTailscaleStatus(), this.getDockerStatus(), this.getPm2Status()]);
+    const services = await Promise.all([
+      this.getTailscaleStatus(),
+      this.getDockerStatus(),
+      this.getPm2Status(),
+      this.getWebServerStatus(),
+    ]);
     return { services, checkedAt: new Date().toISOString() };
   },
 

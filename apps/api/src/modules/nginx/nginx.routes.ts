@@ -3,8 +3,7 @@ import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { pipeline } from "node:stream/promises";
 import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
-import { NginxService } from "./nginx.service.js";
-import { parseGuidedFields, applyGuidedFields, buildInitialVhostConfig } from "./nginx.guidedEditor.js";
+import { webServer } from "../webserver/webserver.registry.js";
 import { withAudit } from "../../middleware/auditLog.js";
 import { env } from "../../config/env.js";
 import type { NginxGuidedFormModel } from "@pwa-admin/shared";
@@ -13,17 +12,17 @@ export default async function nginxRoutes(app: FastifyInstance) {
   const auth = { preHandler: (app as any).requireAuth };
 
   app.get("/nginx/status", auth, async (_req, reply) => {
-    reply.send(await NginxService.getStatus());
+    reply.send(await webServer().getStatus());
   });
 
   app.get("/nginx/vhosts", auth, async (_req, reply) => {
-    reply.send(await NginxService.listVhosts());
+    reply.send(await webServer().listVhosts());
   });
 
   app.get("/nginx/vhosts/:name", auth, async (req, reply) => {
     const { name } = req.params as { name: string };
     try {
-      reply.send(await NginxService.getVhostDetail(name));
+      reply.send(await webServer().getVhostDetail(name));
     } catch (err) {
       reply.code(400).send({ error: (err as Error).message });
     }
@@ -35,7 +34,7 @@ export default async function nginxRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { name } = req.params as { name: string };
       try {
-        await NginxService.enableVhost(name);
+        await webServer().enableVhost(name);
         reply.send({ ok: true });
       } catch (err) {
         reply.code(400).send({ error: (err as Error).message });
@@ -49,7 +48,7 @@ export default async function nginxRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { name } = req.params as { name: string };
       try {
-        await NginxService.disableVhost(name);
+        await webServer().disableVhost(name);
         reply.send({ ok: true });
       } catch (err) {
         reply.code(400).send({ error: (err as Error).message });
@@ -73,7 +72,7 @@ export default async function nginxRoutes(app: FastifyInstance) {
       const { name } = req.params as { name: string };
       const { content } = req.body as { content: string };
       try {
-        await NginxService.writeVhostConfig(name, content);
+        await webServer().writeVhostConfig(name, content);
         reply.send({ ok: true });
       } catch (err) {
         reply.code(400).send({ error: (err as Error).message });
@@ -94,7 +93,7 @@ export default async function nginxRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const { content } = req.body as { content: string };
-      reply.send(parseGuidedFields(content));
+      reply.send(webServer().parseGuidedFields(content));
     }
   );
 
@@ -113,7 +112,7 @@ export default async function nginxRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { content, model } = req.body as { content: string; model: NginxGuidedFormModel };
       try {
-        reply.send({ content: applyGuidedFields(content, model) });
+        reply.send({ content: await webServer().applyGuidedFields(content, model) });
       } catch (err) {
         reply.code(400).send({ error: (err as Error).message });
       }
@@ -142,20 +141,24 @@ export default async function nginxRoutes(app: FastifyInstance) {
         serverName: string;
         listenPort: number;
       };
-      reply.send({ content: buildInitialVhostConfig({ ...model, serverName, listenPort }) });
+      try {
+        reply.send({ content: await webServer().buildInitialVhostConfig({ ...model, serverName, listenPort }) });
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      }
     }
   );
 
   app.get("/nginx/cert-paths/check", auth, async (req, reply) => {
     const { path } = req.query as { path?: string };
     if (!path) return reply.code(400).send({ error: "path_required" });
-    reply.send({ exists: await NginxService.checkCertPathExists(path) });
+    reply.send({ exists: await webServer().checkCertPathExists(path) });
   });
 
   // Paste-PEM-text variant: writes both blocks to a tmp staging file each
   // (same "write plain content, validate, then place" idiom as the upload
-  // route below) so NginxService.saveManagedCert's openssl validation runs
-  // against real files, then moves them into NGINX_MANAGED_CERTS_DIR.
+  // route below) so saveManagedCert's openssl validation runs against real
+  // files, then moves them into NGINX_MANAGED_CERTS_DIR/APACHE_MANAGED_CERTS_DIR.
   app.post(
     "/nginx/cert-paths/import-text",
     {
@@ -174,14 +177,15 @@ export default async function nginxRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const { vhostName, certPem, keyPem } = req.body as { vhostName: string; certPem: string; keyPem: string };
-      const tmpDir = join(env.NGINX_MANAGED_CERTS_DIR, "_tmp-paste");
+      const managedCertsDir = webServer().engine === "apache" ? env.APACHE_MANAGED_CERTS_DIR : env.NGINX_MANAGED_CERTS_DIR;
+      const tmpDir = join(managedCertsDir, "_tmp-paste");
       await mkdir(tmpDir, { recursive: true });
       const certTmp = join(tmpDir, `${Date.now()}-cert.pem`);
       const keyTmp = join(tmpDir, `${Date.now()}-key.pem`);
       try {
         await writeFile(certTmp, certPem);
         await writeFile(keyTmp, keyPem);
-        const result = await NginxService.saveManagedCert(vhostName, certTmp, keyTmp);
+        const result = await webServer().saveManagedCert(vhostName, certTmp, keyTmp);
         reply.send(result);
       } catch (err) {
         reply.code(400).send({ error: (err as Error).message });
@@ -198,7 +202,8 @@ export default async function nginxRoutes(app: FastifyInstance) {
     "/nginx/cert-paths/import-file",
     { preHandler: [(app as any).requireAuth, withAudit("nginx.cert.import_file")] },
     async (req, reply) => {
-      const tmpDir = join(env.NGINX_MANAGED_CERTS_DIR, "_tmp-upload");
+      const managedCertsDir = webServer().engine === "apache" ? env.APACHE_MANAGED_CERTS_DIR : env.NGINX_MANAGED_CERTS_DIR;
+      const tmpDir = join(managedCertsDir, "_tmp-upload");
       await mkdir(tmpDir, { recursive: true });
       let vhostName: string | undefined;
       let certTmp: string | undefined;
@@ -223,7 +228,7 @@ export default async function nginxRoutes(app: FastifyInstance) {
         if (!vhostName || !certTmp || !keyTmp) {
           return reply.code(400).send({ error: "vhostName_cert_and_key_required" });
         }
-        const result = await NginxService.saveManagedCert(vhostName, certTmp, keyTmp);
+        const result = await webServer().saveManagedCert(vhostName, certTmp, keyTmp);
         reply.send(result);
       } catch (err) {
         reply.code(400).send({ error: (err as Error).message });
@@ -249,7 +254,7 @@ export default async function nginxRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { name, content } = req.body as { name: string; content: string };
       try {
-        await NginxService.createVhost(name, content);
+        await webServer().createVhost(name, content);
         reply.send({ ok: true });
       } catch (err) {
         const message = (err as Error).message;
@@ -260,7 +265,7 @@ export default async function nginxRoutes(app: FastifyInstance) {
 
   app.get("/nginx/vhosts/:name/history", auth, async (req, reply) => {
     const { name } = req.params as { name: string };
-    reply.send(await NginxService.listVhostHistory(name));
+    reply.send(await webServer().listVhostHistory(name));
   });
 
   app.post(
@@ -274,7 +279,7 @@ export default async function nginxRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const { name, snapshotId } = req.params as { name: string; snapshotId: string };
       try {
-        await NginxService.restoreSnapshot(name, Number(snapshotId));
+        await webServer().restoreSnapshot(name, Number(snapshotId));
         reply.send({ ok: true });
       } catch (err) {
         reply.code(400).send({ error: (err as Error).message });
@@ -286,9 +291,9 @@ export default async function nginxRoutes(app: FastifyInstance) {
     "/nginx/reload",
     { preHandler: [(app as any).requireAuth, withAudit("nginx.reload")] },
     async (_req, reply) => {
-      const test = await NginxService.testConfig();
+      const test = await webServer().testConfig();
       if (!test.ok) return reply.code(400).send({ error: "config_invalid", output: test.output });
-      await NginxService.reload();
+      await webServer().reload();
       reply.send({ ok: true });
     }
   );
@@ -306,7 +311,7 @@ export default async function nginxRoutes(app: FastifyInstance) {
       },
     },
     async (_req, reply) => {
-      await NginxService.restart();
+      await webServer().restart();
       reply.send({ ok: true });
     }
   );
@@ -314,19 +319,19 @@ export default async function nginxRoutes(app: FastifyInstance) {
   app.get("/nginx/vhosts/:name/logs", auth, async (req, reply) => {
     const { name } = req.params as { name: string };
     const { type, tail } = req.query as { type?: "access" | "error"; tail?: string };
-    const logs = await NginxService.getVhostLogs(name, type ?? "error", tail ? Number(tail) : 200);
+    const logs = await webServer().getVhostLogs(name, type ?? "error", tail ? Number(tail) : 200);
     reply.type("text/plain").send(logs);
   });
 
   app.get("/nginx/vhosts/:name/cert", auth, async (req, reply) => {
     const { name } = req.params as { name: string };
-    reply.send(await NginxService.getCertStatus(name));
+    reply.send(await webServer().getCertStatus(name));
   });
 
   app.get("/nginx/vhosts/:name/accessibility", auth, async (req, reply) => {
     const { name } = req.params as { name: string };
     try {
-      reply.send(await NginxService.checkAccessibility(name));
+      reply.send(await webServer().checkAccessibility(name));
     } catch (err) {
       reply.code(400).send({ error: (err as Error).message });
     }
@@ -336,7 +341,7 @@ export default async function nginxRoutes(app: FastifyInstance) {
     const { name } = req.params as { name: string };
     const { window, limit } = req.query as { window?: string; limit?: string };
     try {
-      reply.send(await NginxService.getVhostErrors(name, window ? Number(window) : 24, limit ? Number(limit) : 50));
+      reply.send(await webServer().getVhostErrors(name, window ? Number(window) : 24, limit ? Number(limit) : 50));
     } catch (err) {
       reply.code(400).send({ error: (err as Error).message });
     }
@@ -357,7 +362,7 @@ export default async function nginxRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const { targets } = (req.body as { targets?: ("local" | "gdrive")[] }) ?? {};
-      const run = await NginxService.backupConfig(targets && targets.length ? targets : ["local"]);
+      const run = await webServer().backupConfig(targets && targets.length ? targets : ["local"]);
       reply.send(run);
     }
   );

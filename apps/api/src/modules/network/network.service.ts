@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { runCommand, isValidIp } from "../../utils/exec.js";
 import { env } from "../../config/env.js";
 import { docker } from "../../services/docker.client.js";
+import { webServer } from "../webserver/webserver.registry.js";
 import { HardwareService } from "../hardware/hardware.service.js";
 import type { ListeningPort, TopPageEntry, VisitorStats, Fail2banJailStatus, BlockedIpEntry } from "@pwa-admin/shared";
 
@@ -279,14 +280,15 @@ export const NetworkService = {
 
 async function resolveAccessLogPath(siteName: string): Promise<string | null> {
   if (!/^[a-zA-Z0-9._-]+$/.test(siteName)) return null;
+  const logDir = webServer().logDir;
   const candidates = [
-    join(env.NGINX_LOG_DIR, `${siteName}.access.log`),
-    join(env.NGINX_LOG_DIR, `${siteName}_access.log`),
+    join(logDir, `${siteName}.access.log`),
+    join(logDir, `${siteName}_access.log`),
   ];
   for (const candidate of candidates) {
     if (existsSync(candidate)) return candidate;
   }
-  const shared = join(env.NGINX_LOG_DIR, "access.log");
+  const shared = join(logDir, "access.log");
   return existsSync(shared) ? shared : null;
 }
 

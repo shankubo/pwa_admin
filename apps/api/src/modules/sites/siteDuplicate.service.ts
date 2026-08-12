@@ -4,7 +4,7 @@ import { db } from "../../db/index.js";
 import { runCommand } from "../../utils/exec.js";
 import { dirSize } from "../../utils/dirSize.js";
 import { docker } from "../../services/docker.client.js";
-import { NginxService } from "../nginx/nginx.service.js";
+import { webServer } from "../webserver/webserver.registry.js";
 import { DbBackupService } from "../dbbackup/dbbackup.service.js";
 import { DockerService } from "../docker/docker.service.js";
 import type { SiteDuplicateStatus } from "@pwa-admin/shared";
@@ -178,7 +178,7 @@ export const SiteDuplicateService = {
     vhostName: string,
     opts: { dbLocation?: "docker" | "native"; dbRef?: string; dbName?: string }
   ): Promise<SiteDuplicateStatus> {
-    if (NginxService.isSwitchedToDuplicate(vhostName)) {
+    if (webServer().isSwitchedToDuplicate(vhostName)) {
       throw new Error("cannot_refresh_while_failover_active");
     }
 
@@ -195,7 +195,7 @@ export const SiteDuplicateService = {
   },
 
   async deleteDuplicate(vhostName: string): Promise<void> {
-    if (NginxService.isSwitchedToDuplicate(vhostName)) {
+    if (webServer().isSwitchedToDuplicate(vhostName)) {
       throw new Error("cannot_delete_while_failover_active");
     }
 
@@ -223,7 +223,7 @@ async function runCreateDuplicate(
   vhostName: string,
   opts: { dbLocation?: "docker" | "native"; dbRef?: string; dbName?: string }
 ): Promise<void> {
-  const vhost = await NginxService.getVhostDetail(vhostName);
+  const vhost = await webServer().getVhostDetail(vhostName);
 
   let contentPath: string | null = null;
   if (vhost.root) {

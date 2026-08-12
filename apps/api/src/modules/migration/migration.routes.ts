@@ -152,6 +152,29 @@ export default async function migrationRoutes(app: FastifyInstance) {
     }
   );
 
+  // Same "voir les fichiers" export panel — sends one manifest archive to
+  // Google Drive on demand, alongside the existing direct-download button.
+  app.post(
+    "/migration/manifests/:manifestId/files/upload-to-gdrive",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("migration.manifest.file.upload_to_gdrive", (r) => (r.params as any).manifestId)],
+      schema: {
+        body: { type: "object", required: ["fileId"], properties: { fileId: { type: "string" } } },
+      },
+    },
+    async (req, reply) => {
+      const { manifestId } = req.params as { manifestId: string };
+      const { fileId } = req.body as { fileId?: string };
+      if (!fileId) return reply.code(400).send({ error: "fileId_required" });
+      try {
+        const result = await MigrationService.uploadManifestFileToDrive(manifestId, fileId);
+        reply.send(result);
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      }
+    }
+  );
+
   app.get("/migration/manifests/:manifestId/files/download", async (req, reply) => {
     const { manifestId } = req.params as { manifestId: string };
     const { token, fileId: queryFileId } = req.query as { token?: string; fileId?: string };

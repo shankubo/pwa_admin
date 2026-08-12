@@ -54,6 +54,46 @@ __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/openssl x509 -in * -noout -endd
 # app-side already restricts the path to /etc/letsencrypt/ or /etc/ssl/ before this runs.
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/test -f /etc/letsencrypt/*, /usr/bin/test -f /etc/ssl/*
 
+# --- Apache module ---
+# Installed unconditionally, same as every other module's rules in this
+# file (e.g. PostgreSQL/MariaDB rules below exist even on a server running
+# neither) — webserver.registry.ts's runtime detection decides which engine
+# actually gets used, sudoers doesn't need to know in advance. A server
+# running Nginx-only never exercises any of these; they're inert, not a
+# security cost.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/sbin/apache2ctl configtest
+# apache2ctl -M (list loaded modules, used by ensureModuleEnabled's pre-check)
+# deliberately runs WITHOUT sudo — no rule needed here, unlike configtest.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /bin/systemctl reload apache2
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /bin/systemctl restart apache2
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /bin/systemctl is-active apache2
+# a2ensite/a2dissite are Apache's own symlink-management wrapper scripts
+# (functionally the same ln -s/rm the Nginx rules above do by hand) — used
+# directly rather than hand-rolled, since they also validate the required
+# .conf naming convention sites-available files need under Apache (see
+# apache.service.ts's own doc comment).
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/sbin/a2ensite *
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/sbin/a2dissite *
+# Guided editor's module auto-enable (apache.service.ts's ensureModuleEnabled)
+# — scoped to the exact four module names that function ever passes, never
+# a wildcard, matching this file's "exact command" discipline everywhere else.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/sbin/a2enmod ssl, /usr/sbin/a2enmod headers, /usr/sbin/a2enmod deflate, /usr/sbin/a2enmod expires
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/rm -f /etc/apache2/sites-enabled/*
+# sites-available/* removal is scoped to ApacheService.createVhost's own
+# revert-on-failure path only, same rationale as the equivalent Nginx rule above.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/rm -f /etc/apache2/sites-available/*
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/cp __PWA_ADMIN_APP_DIR__/data/apache-config-history/*, /etc/apache2/sites-available/*
+# Full config backup (sites-available + apache2.conf) — same staging-dir
+# scoping as the Nginx equivalent above, also covers ApacheService.restoreConfig's
+# own throwaway pre-restore snapshot.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tar czf __PWA_ADMIN_APP_DIR__/data/backups/apache-config/*.tar.gz -C /etc/apache2 sites-available
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tar czf __PWA_ADMIN_APP_DIR__/data/backups/apache-config/*.tar.gz -C /etc/apache2 sites-available apache2.conf
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/chown __PWA_ADMIN_USER__ __PWA_ADMIN_APP_DIR__/data/backups/apache-config/*.tar.gz
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tar xzf __PWA_ADMIN_APP_DIR__/data/backups/apache-config/*.tar.gz -C /etc/apache2
+# The existing openssl x509 and test -f rules above already cover Apache's
+# cert reads/existence checks too (generic argv shape, path-scoped not
+# nginx-scoped) — no Apache-specific duplicate needed.
+
 # --- OS / apt module ---
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/apt-get update
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/apt-get upgrade -y
@@ -252,4 +292,4 @@ __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/mkdir -p /home/*
 # an allocated pseudo-terminal — fine for interactive SSH use, but the
 # pwa-admin service invokes sudo via execFile with no TTY at all, so every
 # scoped command here needs both `!requiretty` and `!use_pty` to run non-interactively.
-Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/bin/systemctl,/usr/bin/fail2ban-client,/usr/bin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/pg_dump,/usr/bin/pg_restore,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat,/usr/sbin/ufw,/usr/bin/tail,/usr/bin/tailscale,/usr/sbin/useradd,/usr/bin/mkdir,/usr/bin/test,/usr/bin/kill !requiretty,!use_pty
+Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/usr/sbin/apache2ctl,/usr/sbin/a2ensite,/usr/sbin/a2dissite,/usr/sbin/a2enmod,/bin/systemctl,/usr/bin/fail2ban-client,/usr/bin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/pg_dump,/usr/bin/pg_restore,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat,/usr/sbin/ufw,/usr/bin/tail,/usr/bin/tailscale,/usr/sbin/useradd,/usr/bin/mkdir,/usr/bin/test,/usr/bin/kill !requiretty,!use_pty

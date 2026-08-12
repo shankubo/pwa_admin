@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import type {
-  NginxStatus,
-  NginxVhostSummary,
-  NginxVhostDetail,
-  NginxConfigSnapshot,
-  NginxCertStatus,
-  NginxVhostAccessibility,
-  NginxVhostErrorSummary,
-  NginxConfigBackupRun,
-  NginxGuidedFormModel,
+  WebServerStatus,
+  VhostSummary,
+  VhostDetail,
+  ConfigSnapshot,
+  CertStatus,
+  VhostAccessibility,
+  VhostErrorSummary,
+  ConfigBackupRun,
+  GuidedFormModel,
   TopPageEntry,
   VisitorStats,
 } from "@pwa-admin/shared";
@@ -38,15 +38,15 @@ import {
   Upload,
 } from "lucide-react";
 
-function vhostCardClass(v: NginxVhostSummary): string {
+function vhostCardClass(v: VhostSummary): string {
   if (!v.enabled) return "border-muted-foreground/30 bg-muted/30";
   if (v.maintenanceMode) return "border-warning/50 bg-warning/5";
   return "border-primary/40 bg-primary/5";
 }
 
 export function Nginx() {
-  const [status, setStatus] = useState<NginxStatus | null>(null);
-  const [vhosts, setVhosts] = useState<NginxVhostSummary[] | null>(null);
+  const [status, setStatus] = useState<WebServerStatus | null>(null);
+  const [vhosts, setVhosts] = useState<VhostSummary[] | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -54,8 +54,8 @@ export function Nginx() {
   async function load() {
     try {
       const [s, v] = await Promise.all([
-        apiJson<NginxStatus>("/nginx/status"),
-        apiJson<NginxVhostSummary[]>("/nginx/vhosts"),
+        apiJson<WebServerStatus>("/nginx/status"),
+        apiJson<VhostSummary[]>("/nginx/vhosts"),
       ]);
       setStatus(s);
       setVhosts(v);
@@ -273,13 +273,13 @@ function certBadgeClass(daysRemaining: number | null) {
 
 function NginxConfigBackupCard() {
   const [running, setRunning] = useState(false);
-  const [lastRun, setLastRun] = useState<NginxConfigBackupRun | null>(null);
+  const [lastRun, setLastRun] = useState<ConfigBackupRun | null>(null);
   const [useDrive, setUseDrive] = useState(true);
 
   async function runBackup() {
     setRunning(true);
     try {
-      const run = await apiJson<NginxConfigBackupRun>("/nginx/config/backup", {
+      const run = await apiJson<ConfigBackupRun>("/nginx/config/backup", {
         method: "POST",
         body: JSON.stringify({ targets: useDrive ? ["local", "gdrive"] : ["local"] }),
       });
@@ -328,26 +328,26 @@ function NginxConfigBackupCard() {
 }
 
 function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => void }) {
-  const [detail, setDetail] = useState<NginxVhostDetail | null>(null);
-  const [cert, setCert] = useState<NginxCertStatus | null>(null);
-  const [history, setHistory] = useState<NginxConfigSnapshot[] | null>(null);
+  const [detail, setDetail] = useState<VhostDetail | null>(null);
+  const [cert, setCert] = useState<CertStatus | null>(null);
+  const [history, setHistory] = useState<ConfigSnapshot[] | null>(null);
   const [content, setContent] = useState("");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [logType, setLogType] = useState<"access" | "error">("error");
   const [logChunk, setLogChunk] = useState<string | null>(null);
   const [initialLog, setInitialLog] = useState<string>("");
-  const [accessibility, setAccessibility] = useState<NginxVhostAccessibility | null>(null);
+  const [accessibility, setAccessibility] = useState<VhostAccessibility | null>(null);
   const [checkingAccess, setCheckingAccess] = useState(false);
-  const [errorSummary, setErrorSummary] = useState<NginxVhostErrorSummary | null>(null);
+  const [errorSummary, setErrorSummary] = useState<VhostErrorSummary | null>(null);
   const [topPages, setTopPages] = useState<TopPageEntry[] | null>(null);
   const [visitors, setVisitors] = useState<VisitorStats | null>(null);
 
   async function load() {
     const [d, c, h] = await Promise.all([
-      apiJson<NginxVhostDetail>(`/nginx/vhosts/${name}`),
-      apiJson<NginxCertStatus>(`/nginx/vhosts/${name}/cert`),
-      apiJson<NginxConfigSnapshot[]>(`/nginx/vhosts/${name}/history`),
+      apiJson<VhostDetail>(`/nginx/vhosts/${name}`),
+      apiJson<CertStatus>(`/nginx/vhosts/${name}/cert`),
+      apiJson<ConfigSnapshot[]>(`/nginx/vhosts/${name}/history`),
     ]);
     setDetail(d);
     setContent(d.rawConfig);
@@ -358,7 +358,7 @@ function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => 
   async function checkAccess() {
     setCheckingAccess(true);
     try {
-      setAccessibility(await apiJson<NginxVhostAccessibility>(`/nginx/vhosts/${name}/accessibility`));
+      setAccessibility(await apiJson<VhostAccessibility>(`/nginx/vhosts/${name}/accessibility`));
     } catch (err) {
       setAccessibility({
         checkedUrl: null,
@@ -376,7 +376,7 @@ function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => 
   useEffect(() => {
     load().catch(() => {});
     checkAccess().catch(() => {});
-    apiJson<NginxVhostErrorSummary>(`/nginx/vhosts/${name}/errors?window=24&limit=20`)
+    apiJson<VhostErrorSummary>(`/nginx/vhosts/${name}/errors?window=24&limit=20`)
       .then(setErrorSummary)
       .catch(() => setErrorSummary(null));
     apiJson<TopPageEntry[]>(`/analytics/sites/${name}/top-pages?window=7`)
@@ -600,7 +600,7 @@ function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => 
   );
 }
 
-const DEFAULT_GUIDED_MODEL: NginxGuidedFormModel = {
+const DEFAULT_GUIDED_MODEL: GuidedFormModel = {
   sslEnabled: false,
   certPath: null,
   certKeyPath: null,
@@ -828,10 +828,15 @@ function CertImportPanel({
 
 function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
   const [open, setOpen] = useState(false);
-  const [model, setModel] = useState<NginxGuidedFormModel>(DEFAULT_GUIDED_MODEL);
+  const [model, setModel] = useState<GuidedFormModel>(DEFAULT_GUIDED_MODEL);
   const [serverName, setServerName] = useState("");
   const [listenPort, setListenPort] = useState(80);
   const [newVhostName, setNewVhostName] = useState("");
+  // Cert import (create mode) is keyed by the "Nom du fichier" field at
+  // import time — if the admin edits that field afterward, the already-
+  // filled certPath/certKeyPath silently point at the WRONG managed-cert
+  // folder (data/nginx-certs/<old-name>/) unless flagged.
+  const [certImportedForName, setCertImportedForName] = useState<string | null>(null);
   const [certCheck, setCertCheck] = useState<"idle" | "checking" | "found" | "missing">("idle");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -841,7 +846,7 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
     setError(null);
     setCertCheck("idle");
     if (props.mode === "edit") {
-      apiJson<NginxGuidedFormModel>(`/nginx/vhosts/${props.vhostName}/guided/parse`, {
+      apiJson<GuidedFormModel>(`/nginx/vhosts/${props.vhostName}/guided/parse`, {
         method: "POST",
         body: JSON.stringify({ content: props.content }),
       })
@@ -852,6 +857,7 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
       setServerName("");
       setListenPort(80);
       setNewVhostName("");
+      setCertImportedForName(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -872,6 +878,7 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
   function applyImportedCertPaths(result: { certPath: string; keyPath: string }) {
     setCertCheck("idle");
     setModel((m) => ({ ...m, certPath: result.certPath, certKeyPath: result.keyPath }));
+    if (props.mode === "create") setCertImportedForName(newVhostName.trim());
   }
 
   async function submit() {
@@ -1011,8 +1018,22 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                       className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
-                  {props.mode === "edit" && (
+                  {props.mode === "edit" ? (
                     <CertImportPanel vhostName={props.vhostName} onImported={applyImportedCertPaths} />
+                  ) : newVhostName.trim() ? (
+                    <>
+                      {certImportedForName && certImportedForName !== newVhostName.trim() && (
+                        <p className="mt-2 flex items-center gap-1 text-xs text-warning">
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                          Le certificat importé était lié au nom « {certImportedForName} » — réimportez-le pour « {newVhostName.trim()} » avant d'enregistrer.
+                        </p>
+                      )}
+                      <CertImportPanel vhostName={newVhostName.trim()} onImported={applyImportedCertPaths} />
+                    </>
+                  ) : (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Renseignez le nom du fichier ci-dessus pour pouvoir importer un certificat.
+                    </p>
                   )}
                 </div>
               )}

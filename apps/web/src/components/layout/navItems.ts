@@ -36,7 +36,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, group: "top" },
   { to: "/docker", label: "Docker", icon: Container, group: "management", requiresService: "docker" },
-  { to: "/nginx", label: "Nginx", icon: Server, group: "management" },
+  { to: "/nginx", label: "Nginx", icon: Server, group: "management", requiresService: "webserver" },
   { to: "/sites", label: "Sites", icon: Globe, group: "management" },
   { to: "/os", label: "OS / Paquets", icon: Package, group: "management" },
   { to: "/pm2", label: "Node.js (PM2)", icon: Hexagon, group: "management", requiresService: "pm2" },

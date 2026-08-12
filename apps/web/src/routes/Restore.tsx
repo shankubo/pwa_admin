@@ -281,7 +281,7 @@ export function Restore() {
       )}
 
       {step === 3 && selected && selected.kind === "migration" && (
-        <StepMigrationConfirm manifest={selected.manifest} onReset={reset} />
+        <StepMigrationConfirm manifest={selected.manifest} gdriveAuthorized={gdriveAuthorized} onReset={reset} />
       )}
 
       {step === 3 && selected && selected.kind !== "migration" && (
@@ -1189,12 +1189,24 @@ async function downloadManifestFile(manifestId: string, fileId: string) {
   window.location.href = `/api/migration/manifests/${manifestId}/files/download?token=${encodeURIComponent(token)}`;
 }
 
+async function uploadManifestFileToDrive(manifestId: string, fileId: string): Promise<void> {
+  await apiJson(`/migration/manifests/${manifestId}/files/upload-to-gdrive`, {
+    method: "POST",
+    body: JSON.stringify({ fileId }),
+  });
+}
+
 /** Read-only export view for a migration manifest — lets the admin see and
  * download the exact archives an automated restore would use, for a manual
- * SSH-based install instead. Never mutates anything. */
-function MigrationFileListPanel({ manifestId }: { manifestId: string }) {
+ * SSH-based install instead. Never mutates anything except the optional
+ * Drive upload, which only ever ADDS a copy elsewhere, never touches the
+ * USB archive or the restore flow itself. */
+function MigrationFileListPanel({ manifestId, gdriveAuthorized }: { manifestId: string; gdriveAuthorized: boolean }) {
   const [list, setList] = useState<MigrationManifestFileList | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [uploadedIds, setUploadedIds] = useState<Set<string>>(new Set());
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
     setList(null);
@@ -1203,6 +1215,19 @@ function MigrationFileListPanel({ manifestId }: { manifestId: string }) {
       .then(setList)
       .catch((err) => setError((err as Error).message));
   }, [manifestId]);
+
+  async function uploadToDrive(fileId: string) {
+    setUploadingId(fileId);
+    setUploadError(null);
+    try {
+      await uploadManifestFileToDrive(manifestId, fileId);
+      setUploadedIds((prev) => new Set(prev).add(fileId));
+    } catch (err) {
+      setUploadError((err as Error).message);
+    } finally {
+      setUploadingId(null);
+    }
+  }
 
   return (
     <div className="mt-2 rounded-md border border-border p-3">
@@ -1220,6 +1245,7 @@ function MigrationFileListPanel({ manifestId }: { manifestId: string }) {
             disque monté) :
           </p>
           <p className="break-all rounded-md bg-muted p-2 font-mono text-[11px]">{list.usbRoot}</p>
+          {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
           {list.files.length === 0 && <p className="text-xs text-muted-foreground">Aucun fichier disponible.</p>}
           {list.files.length > 0 && (
             <div className="flex flex-col gap-1">
@@ -1234,6 +1260,25 @@ function MigrationFileListPanel({ manifestId }: { manifestId: string }) {
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     {f.sizeBytes != null && <span className="text-muted-foreground">{formatBytes(f.sizeBytes)}</span>}
+                    {uploadedIds.has(f.fileId) ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-1 text-primary">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Envoyé
+                      </span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!gdriveAuthorized || uploadingId === f.fileId}
+                        title={gdriveAuthorized ? "Envoyer vers Google Drive" : "Google Drive non connecté (voir Settings)"}
+                        onClick={() => uploadToDrive(f.fileId)}
+                      >
+                        {uploadingId === f.fileId ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Cloud className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    )}
                     <Button size="sm" variant="outline" onClick={() => downloadManifestFile(manifestId, f.fileId)}>
                       <Download className="h-3.5 w-3.5" />
                     </Button>
@@ -1248,7 +1293,15 @@ function MigrationFileListPanel({ manifestId }: { manifestId: string }) {
   );
 }
 
-function StepMigrationConfirm({ manifest, onReset }: { manifest: MigrationManifest; onReset: () => void }) {
+function StepMigrationConfirm({
+  manifest,
+  gdriveAuthorized,
+  onReset,
+}: {
+  manifest: MigrationManifest;
+  gdriveAuthorized: boolean;
+  onReset: () => void;
+}) {
   const [includeOsPackages, setIncludeOsPackages] = useState(false);
   const [restoreId, setRestoreId] = useState<string | null>(null);
   const [run, setRun] = useState<MigrationRestoreRun | null>(null);
@@ -1422,7 +1475,7 @@ function StepMigrationConfirm({ manifest, onReset }: { manifest: MigrationManife
       <Button size="sm" variant="outline" className="mt-2" onClick={() => setShowFiles((v) => !v)}>
         <FileText className="h-3.5 w-3.5" /> {showFiles ? "Masquer les fichiers" : "Voir les fichiers"}
       </Button>
-      {showFiles && <MigrationFileListPanel manifestId={manifest.manifestId} />}
+      {showFiles && <MigrationFileListPanel manifestId={manifest.manifestId} gdriveAuthorized={gdriveAuthorized} />}
 
       {planError && <p className="mt-2 text-xs text-destructive">{planError}</p>}
 

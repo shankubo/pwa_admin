@@ -4,6 +4,7 @@ export * from "./types/ws-protocol.js";
 export * from "./types/docker.js";
 export * from "./types/backup.js";
 export * from "./types/nginx.js";
+export * from "./types/webserver.js";
 export * from "./types/network.js";
 export * from "./types/os.js";
 export * from "./types/pm2.js";

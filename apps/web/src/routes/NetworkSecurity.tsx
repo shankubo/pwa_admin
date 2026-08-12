@@ -4,7 +4,7 @@ import type {
   TopPageEntry,
   VisitorStats,
   BlockedIpEntry,
-  NginxVhostSummary,
+  VhostSummary,
   HardwareOverview,
 } from "@pwa-admin/shared";
 import { apiJson } from "@/lib/api";
@@ -237,14 +237,14 @@ function OpenPortsSection() {
 }
 
 function AnalyticsSection() {
-  const [sites, setSites] = useState<NginxVhostSummary[] | null>(null);
+  const [sites, setSites] = useState<VhostSummary[] | null>(null);
   const [selected, setSelected] = useState<string>("");
   const [windowDays, setWindowDays] = useState(7);
   const [topPages, setTopPages] = useState<TopPageEntry[] | null>(null);
   const [visitors, setVisitors] = useState<VisitorStats | null>(null);
 
   useEffect(() => {
-    apiJson<NginxVhostSummary[]>("/nginx/vhosts")
+    apiJson<VhostSummary[]>("/nginx/vhosts")
       .then((v) => {
         setSites(v);
         if (v.length > 0) setSelected(v[0].name);

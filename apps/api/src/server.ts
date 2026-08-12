@@ -39,6 +39,7 @@ import migrationRoutes from "./modules/migration/migration.routes.js";
 import usbExplorerRoutes from "./modules/usbExplorer/usbExplorer.routes.js";
 import { registerExternalModules } from "./modules/_external/index.js";
 import { SchedulerService } from "./services/scheduler.js";
+import { resolveWebServerService } from "./modules/webserver/webserver.registry.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -74,6 +75,13 @@ await app.register(rateLimitPlugin);
 await app.register(fastifyMultipart, {
   limits: { fileSize: 5 * 1024 * 1024 * 1024 }, // 5 GB — Docker image archives can be large
 });
+
+// Resolved once, at boot, before any route registration — see
+// webserver.registry.ts's own doc comment for why this is boot-only (no
+// hot re-detection) and why it's a plain module-level singleton rather than
+// a DI-passed reference.
+const webServerEngine = await resolveWebServerService();
+app.log.info(`Detected web server engine: ${webServerEngine.engine}`);
 
 await app.register(async (api) => {
   await api.register(authRoutes);

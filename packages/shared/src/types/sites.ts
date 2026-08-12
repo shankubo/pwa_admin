@@ -1,4 +1,4 @@
-import type { NginxVhostSummary, NginxVhostDetail, NginxCertStatus } from "./nginx.js";
+import type { VhostSummary, VhostDetail, CertStatus } from "./webserver.js";
 
 export interface LinkedContainer {
   id: string;
@@ -31,7 +31,7 @@ export interface SiteDuplicateStatus {
   createdAt: string;
 }
 
-export interface SiteSummary extends NginxVhostSummary {
+export interface SiteSummary extends VhostSummary {
   linkedContainer: LinkedContainer | null;
   /** Whether a duplicate exists for this vhost — drives the failover button's
    * visibility in the Sites list without a per-row status fetch. */
@@ -41,8 +41,8 @@ export interface SiteSummary extends NginxVhostSummary {
 }
 
 export interface SiteDetail {
-  vhost: NginxVhostDetail;
-  cert: NginxCertStatus;
+  vhost: VhostDetail;
+  cert: CertStatus;
   linkedContainer: LinkedContainer | null;
   duplicate: SiteDuplicateStatus | null;
   failoverActive: boolean;

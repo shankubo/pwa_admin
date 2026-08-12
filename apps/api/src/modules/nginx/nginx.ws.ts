@@ -1,9 +1,12 @@
 import { watch, existsSync, statSync, openSync, readSync, closeSync } from "node:fs";
 import { join } from "node:path";
 import { registerChannel } from "../../services/wsHub.js";
-import { env } from "../../config/env.js";
-import { resolveVhostLogPath } from "./nginx.service.js";
+import { webServer } from "../webserver/webserver.registry.js";
 
+// Channel name kept as "nginx.logs" (WsChannel union member unchanged) even
+// though it may tail an Apache log under the hood — renaming the public WS
+// surface for zero functional benefit isn't worth the frontend/type churn,
+// same reasoning as keeping the /nginx/* HTTP route prefix.
 registerChannel("nginx.logs", (params, push) => {
   const name = params.name as string;
   const type = (params.type as string) === "access" ? "access" : "error";
@@ -33,12 +36,14 @@ registerChannel("nginx.logs", (params, push) => {
     });
   }
 
-  resolveVhostLogPath(name, type).then((resolved) => {
-    if (stopped) return;
-    const path = resolved ?? join(env.NGINX_LOG_DIR, `${type}.log`);
-    if (!existsSync(path)) return;
-    startWatching(path);
-  });
+  webServer()
+    .resolveVhostLogPath(name, type)
+    .then((resolved) => {
+      if (stopped) return;
+      const path = resolved ?? join(webServer().logDir, `${type}.log`);
+      if (!existsSync(path)) return;
+      startWatching(path);
+    });
 
   return () => {
     stopped = true;

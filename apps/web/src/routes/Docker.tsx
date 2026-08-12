@@ -8,7 +8,7 @@ import type {
   NetworkSummary,
   BackupHistoryEntry,
   SiteSummary,
-  NginxVhostAccessibility,
+  VhostAccessibility,
 } from "@pwa-admin/shared";
 import { apiJson, apiFetch } from "@/lib/api";
 import { useWsChannel } from "@/lib/ws";
@@ -88,7 +88,7 @@ function stateBadgeClass(state: string) {
 function siteLinkedCardClass(
   state: string,
   site: SiteSummary | undefined,
-  accessibility: NginxVhostAccessibility | null | undefined
+  accessibility: VhostAccessibility | null | undefined
 ): string | undefined {
   const s = state.toLowerCase();
   if (s !== "running") return "border-destructive/50 bg-destructive/5";
@@ -107,7 +107,7 @@ function ContainersTab() {
   const [error, setError] = useState<string | null>(null);
   const [sitesByContainer, setSitesByContainer] = useState<Record<string, SiteSummary>>({});
   const [accessibilityByContainer, setAccessibilityByContainer] = useState<
-    Record<string, NginxVhostAccessibility | null>
+    Record<string, VhostAccessibility | null>
   >({});
 
   async function load() {
@@ -137,7 +137,7 @@ function ContainersTab() {
     const toCheck = Object.values(byContainer).filter((s) => s.enabled && !s.maintenanceMode);
     const results = await Promise.all(
       toCheck.map((s) =>
-        apiJson<NginxVhostAccessibility>(`/nginx/vhosts/${encodeURIComponent(s.name)}/accessibility`).catch(
+        apiJson<VhostAccessibility>(`/nginx/vhosts/${encodeURIComponent(s.name)}/accessibility`).catch(
           () => null
         )
       )
