@@ -33,6 +33,8 @@ import {
   XCircle,
   Loader2,
   Shuffle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 type SelectedItem =
@@ -267,6 +269,7 @@ export function Restore() {
       {step === 2 && source === "migration" && (
         <StepMigration
           manifests={migrationManifests ?? []}
+          currentHostname={usbStatus?.hostname ?? null}
           onSelect={(manifest) => {
             setSelected({ kind: "migration", manifest });
             setStep(3);
@@ -940,13 +943,50 @@ function StepConfirm({
   );
 }
 
+/** Sanitized the same way MigrationService's USB folder scan derives a
+ * hostname slug from BACKUP/<slug>/ (see sanitizeSegment on the API side) —
+ * manifest.hostname itself is the raw os.hostname() at capture time, so this
+ * must match it the same way before comparing against currentHostname (the
+ * already-sanitized slug from GET /backups/usb/status). */
+function hostnameSlug(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
 function StepMigration({
   manifests,
+  currentHostname,
   onSelect,
 }: {
   manifests: MigrationManifest[];
+  currentHostname: string | null;
   onSelect: (manifest: MigrationManifest) => void;
 }) {
+  const [expandedHosts, setExpandedHosts] = useState<Set<string>>(new Set());
+
+  const groups = useMemo(() => {
+    const byHost = new Map<string, MigrationManifest[]>();
+    for (const m of manifests) {
+      const slug = hostnameSlug(m.hostname);
+      if (!byHost.has(slug)) byHost.set(slug, []);
+      byHost.get(slug)!.push(m);
+    }
+    const ownHost = currentHostname && byHost.has(currentHostname) ? currentHostname : null;
+    const ownManifests = ownHost ? byHost.get(ownHost)! : [];
+    const otherGroups = [...byHost.entries()]
+      .filter(([slug]) => slug !== ownHost)
+      .sort((a, b) => a[0].localeCompare(b[0]));
+    return { ownHost, ownManifests, otherGroups };
+  }, [manifests, currentHostname]);
+
+  function toggleHost(slug: string) {
+    setExpandedHosts((prev) => {
+      const next = new Set(prev);
+      if (next.has(slug)) next.delete(slug);
+      else next.add(slug);
+      return next;
+    });
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-muted-foreground">
@@ -955,27 +995,60 @@ function StepMigration({
       {manifests.length === 0 && (
         <p className="text-sm text-muted-foreground">Aucun instantané de migration trouvé.</p>
       )}
-      {manifests.map((m) => {
-        const successCount = m.items.filter((i) => i.status === "success").length;
+
+      {groups.ownManifests.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {groups.ownManifests.map((m) => (
+            <ManifestTile key={m.manifestId} manifest={m} onSelect={onSelect} />
+          ))}
+        </div>
+      )}
+
+      {manifests.length > 0 && groups.ownManifests.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          Aucun instantané pour ce serveur ({currentHostname ?? "hôte inconnu"}) — voir les autres machines ci-dessous.
+        </p>
+      )}
+
+      {groups.otherGroups.map(([slug, hostManifests]) => {
+        const expanded = expandedHosts.has(slug);
         return (
-          <button
-            key={m.manifestId}
-            type="button"
-            onClick={() => onSelect(m)}
-            className="rounded-md border border-border p-3 text-left text-sm hover:bg-muted"
-          >
-            <p className="flex items-center gap-2 font-medium">
-              <Shuffle className="h-4 w-4 text-primary" />
-              {m.scope.type === "site" ? `Site : ${m.scope.siteName}` : `Serveur complet (${m.hostname})`}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {new Date(m.createdAt).toLocaleString()} · {successCount}/{m.items.length} éléments capturés ·{" "}
-              {m.osDistro} {m.osRelease}
-            </p>
-          </button>
+          <div key={slug} className="flex flex-col gap-2">
+            <Button size="sm" variant="outline" className="self-start" onClick={() => toggleHost(slug)}>
+              {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              Autres — {slug} ({hostManifests.length})
+            </Button>
+            {expanded && (
+              <div className="ml-2 flex flex-col gap-2 border-l border-border pl-3">
+                {hostManifests.map((m) => (
+                  <ManifestTile key={m.manifestId} manifest={m} onSelect={onSelect} />
+                ))}
+              </div>
+            )}
+          </div>
         );
       })}
     </div>
+  );
+}
+
+function ManifestTile({ manifest: m, onSelect }: { manifest: MigrationManifest; onSelect: (manifest: MigrationManifest) => void }) {
+  const successCount = m.items.filter((i) => i.status === "success").length;
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(m)}
+      className="rounded-md border border-border p-3 text-left text-sm hover:bg-muted"
+    >
+      <p className="flex items-center gap-2 font-medium">
+        <Shuffle className="h-4 w-4 text-primary" />
+        {m.scope.type === "site" ? `Site : ${m.scope.siteName}` : `Serveur complet (${m.hostname})`}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        {new Date(m.createdAt).toLocaleString()} · {successCount}/{m.items.length} éléments capturés ·{" "}
+        {m.osDistro} {m.osRelease}
+      </p>
+    </button>
   );
 }
 
