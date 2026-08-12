@@ -12,6 +12,7 @@ import { NetworkSecurity } from "@/routes/NetworkSecurity";
 import { Security } from "@/routes/Security";
 import { Backups } from "@/routes/Backups";
 import { Restore } from "@/routes/Restore";
+import { UsbExplorer } from "@/routes/UsbExplorer";
 import { Applications } from "@/routes/Applications";
 import { System } from "@/routes/System";
 import { Services } from "@/routes/Services";
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="/applications" element={<Applications />} />
           <Route path="/backups" element={<Backups />} />
           <Route path="/restore" element={<Restore />} />
+          <Route path="/usb-explorer" element={<UsbExplorer />} />
           <Route path="/system" element={<System />} />
           <Route path="/services" element={<Services />} />
           <Route path="/help" element={<Help />} />

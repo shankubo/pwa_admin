@@ -84,3 +84,12 @@ const DEBIAN_PACKAGE_VERSION_RE = /^[a-zA-Z0-9][a-zA-Z0-9.+~:-]*$/;
 export function isValidPackageVersion(value: string): boolean {
   return DEBIAN_PACKAGE_VERSION_RE.test(value) && value.length <= 255;
 }
+
+// useradd(8) / Debian policy naming rule — a migration manifest's Application
+// paths (read from a USB drive) can imply a /home/<user> owner that must be
+// validated the same way before ever reaching a sudo useradd argv.
+const LINUX_USERNAME_RE = /^[a-z_][a-z0-9_-]{0,31}$/;
+
+export function isValidLinuxUsername(value: string): boolean {
+  return LINUX_USERNAME_RE.test(value);
+}

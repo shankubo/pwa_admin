@@ -160,6 +160,50 @@ export const HardwareService = {
     await runCommand("sudo", ["nmcli", "device", "disconnect", deviceName], { timeoutMs: 10000 });
   },
 
+  /** Lists every saved NetworkManager connection profile of type wifi (not
+   * just the one currently active) — this is what a migration snapshot needs
+   * to reconnect to the SAME networks on a new machine, not just today's
+   * active SSID. */
+  async listSavedWifiConnections(): Promise<string[]> {
+    const { stdout } = await runCommand(
+      "nmcli",
+      ["-t", "-f", "NAME,TYPE", "connection", "show"],
+      { timeoutMs: 5000 }
+    ).catch(() => ({ stdout: "" }));
+    return stdout
+      .split("\n")
+      .filter((l) => l.split(":")[1] === "802-11-wireless")
+      .map((l) => l.split(":")[0])
+      .filter(Boolean);
+  },
+
+  /** Tars the whole system-connections directory (root-only .nmconnection
+   * files, PSK included in plaintext per NetworkManager's own storage format)
+   * to destPath — sudo required, same root-only-file rationale as sshd_config
+   * above. Captures every saved profile in one archive rather than one file
+   * per SSID, since nmcli doesn't expose a stable file-per-connection-name
+   * mapping without also shelling out per connection. */
+  async backupWifiConnections(destPath: string): Promise<void> {
+    await runCommand(
+      "sudo",
+      ["tar", "czf", destPath, "-C", "/etc/NetworkManager", "system-connections"],
+      { timeoutMs: 15000 }
+    );
+  },
+
+  /** Restore-side counterpart to backupWifiConnections — extracts the saved
+   * profiles back into place and asks NetworkManager to reload them from
+   * disk, same mechanism `nmcli connection reload` uses after any manual
+   * edit under system-connections/. */
+  async restoreWifiConnections(archivePath: string): Promise<void> {
+    await runCommand(
+      "sudo",
+      ["tar", "xzf", archivePath, "-C", "/etc/NetworkManager"],
+      { timeoutMs: 15000 }
+    );
+    await runCommand("sudo", ["nmcli", "connection", "reload"], { timeoutMs: 10000 }).catch(() => {});
+  },
+
   async getSshStatus(): Promise<SshStatus> {
     let active = false;
     let enabled = false;

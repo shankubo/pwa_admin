@@ -184,9 +184,47 @@ __PWA_ADMIN_USER__ ALL=(postgres) NOPASSWD: /usr/bin/psql -c *
 # Every other artifact a migration snapshot captures (Docker images/volumes,
 # databases, nginx config, Applications) reuses the sudo rules already
 # defined in their own modules' sections above.
+#
+# TLS certificate capture/restore (NginxService.resolveCertPaths/
+# restoreCertArchive, called from MigrationService's captureTlsCert/tls-cert
+# restore step) — /etc/letsencrypt/{live,archive} and manually declared
+# ssl_certificate/ssl_certificate_key paths (e.g. /etc/ssl/private) are
+# root-only, same rationale as the existing openssl x509 rule above. Sudo tar
+# always writes/reads a fixed local staging dir first — same "never point a
+# sudo rule at an arbitrary/USB-mounted path" pattern as the nginx-config
+# rules above — the USB copy itself is a plain unprivileged file copy.
+# sudoers `*` spans the whole rest of the argv string, so a single trailing
+# `*` covers the variable number of trailing paths captureTlsCert passes (1
+# certbot live+archive pair, or 1-2 manual cert/key paths).
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tar czf __PWA_ADMIN_APP_DIR__/data/backups/tls-certs/*.tar.gz -C / *
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/chown __PWA_ADMIN_USER__ __PWA_ADMIN_APP_DIR__/data/backups/tls-certs/*.tar.gz
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tar xzf __PWA_ADMIN_APP_DIR__/data/backups/tls-certs/*.tar.gz -C /
+#
+# Wi-Fi connection profile capture/restore (HardwareService.backupWifiConnections/
+# restoreWifiConnections) — /etc/NetworkManager/system-connections/*.nmconnection
+# files are root-only 0600 (they store the PSK in plaintext, per
+# NetworkManager's own storage format), same root-only-file rationale as the
+# existing nmcli/sshd_config rules above. Same fixed-staging-dir pattern as
+# the TLS cert rules directly above.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tar czf __PWA_ADMIN_APP_DIR__/data/backups/wifi-config/*.tar.gz -C /etc/NetworkManager system-connections
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/chown __PWA_ADMIN_USER__ __PWA_ADMIN_APP_DIR__/data/backups/wifi-config/*.tar.gz
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tar xzf __PWA_ADMIN_APP_DIR__/data/backups/wifi-config/*.tar.gz -C /etc/NetworkManager
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/nmcli connection reload
+#
+# Missing-owner recreation for Application bind-mount restore
+# (ensureHomeOwnerExists) — on a truly blank server, the /home/<user> owner
+# an Application path was captured under may not exist yet; recreated as a
+# locked-password system account (same useradd shape install.sh already uses
+# for the pwa-admin service account itself) so ownership AND that admin's own
+# login both come back identical, rather than restoring files under a UID
+# with no matching account. Scoped to /home/* exactly like the rsync restore
+# rule above — never an arbitrary --home-dir. mkdir -p pre-creates the
+# extraction target itself, since `tar -C <dir>` requires it to already exist.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/sbin/useradd --system --create-home --home-dir /home/* --shell /usr/sbin/nologin *
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/mkdir -p /home/*
 
 # The system-wide sudoers `Defaults` sets `use_pty`, which makes sudo require
 # an allocated pseudo-terminal — fine for interactive SSH use, but the
 # pwa-admin service invokes sudo via execFile with no TTY at all, so every
 # scoped command here needs both `!requiretty` and `!use_pty` to run non-interactively.
-Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/bin/systemctl,/usr/bin/fail2ban-client,/usr/bin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/pg_dump,/usr/bin/pg_restore,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat,/usr/sbin/ufw,/usr/bin/tail,/usr/bin/tailscale !requiretty,!use_pty
+Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/bin/systemctl,/usr/bin/fail2ban-client,/usr/bin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/pg_dump,/usr/bin/pg_restore,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat,/usr/sbin/ufw,/usr/bin/tail,/usr/bin/tailscale,/usr/sbin/useradd,/usr/bin/mkdir !requiretty,!use_pty

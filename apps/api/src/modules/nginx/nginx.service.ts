@@ -720,4 +720,67 @@ export const NginxService = {
     await rm(revertArchive, { force: true }).catch(() => {});
     await this.reload();
   },
+
+  /**
+   * Resolves the on-disk paths a vhost's TLS certificate actually needs for a
+   * migration snapshot to restore it "as-is" — same declared-vs-certbot logic
+   * as getCertStatus, but returning paths to archive rather than parsed cert
+   * metadata. For a certbot-issued cert, `live/<domain>` is a symlink farm
+   * into `archive/<domain>` — both directories must travel together or the
+   * restored symlinks dangle. For a manually declared cert, only the exact
+   * files ssl_certificate/ssl_certificate_key point to are captured.
+   *
+   * Returns null for a vhost with no TLS at all (plain HTTP, or TLS
+   * terminated upstream of this box) — unlike getCertStatus, which always
+   * returns SOME result (an "empty"/found:false shape) since a status
+   * display needs a row either way, this is used purely to decide whether
+   * there's anything to capture, so "nothing to capture" must be
+   * distinguishable from "capture the certbot convention path" without the
+   * caller re-deriving that itself. Existence is confirmed the same way
+   * getCertStatus does — a probing `openssl x509` read, since /etc/letsencrypt
+   * is root-only and a plain existsSync() from this process would always
+   * report false regardless of whether the cert is really there.
+   */
+  async resolveCertPaths(name: string): Promise<{ domain: string; source: "certbot" | "manual"; paths: string[] } | null> {
+    const detail = await this.getVhostDetail(name);
+    const primaryDomain = detail.serverNames[0];
+    if (!primaryDomain) return null;
+
+    const certMatch = /^\s*ssl_certificate\s+([^;]+);/m.exec(detail.rawConfig);
+    const keyMatch = /^\s*ssl_certificate_key\s+([^;]+);/m.exec(detail.rawConfig);
+    const declaredCert = certMatch ? certMatch[1].trim() : null;
+    const declaredKey = keyMatch ? keyMatch[1].trim() : null;
+
+    const certbotLiveDir = join(env.CERTBOT_LIVE_DIR, primaryDomain);
+    const certbotArchiveDir = join(resolve(env.CERTBOT_LIVE_DIR, ".."), "archive", primaryDomain);
+    const isCertbotPath = (p: string | null) => p != null && p.startsWith(env.CERTBOT_LIVE_DIR);
+
+    // Same exact argv shape as the existing sudoers rule for this binary
+    // (`openssl x509 -in * -noout -enddate -issuer -subject`) — reused
+    // as a pure existence/readability probe, output discarded.
+    const certFileExists = async (certPath: string) =>
+      runCommand("sudo", ["openssl", "x509", "-in", certPath, "-noout", "-enddate", "-issuer", "-subject"], {
+        timeoutMs: 5000,
+      }).then(
+        () => true,
+        () => false
+      );
+
+    if (!declaredCert || isCertbotPath(declaredCert)) {
+      const certbotCertFile = join(certbotLiveDir, "cert.pem");
+      if (!(await certFileExists(certbotCertFile))) return null;
+      return { domain: primaryDomain, source: "certbot", paths: [certbotLiveDir, certbotArchiveDir] };
+    }
+    if (!(await certFileExists(declaredCert))) return null;
+    const manualPaths = [declaredCert, declaredKey].filter((p): p is string => !!p);
+    return { domain: primaryDomain, source: "manual", paths: manualPaths };
+  },
+
+  /** Extracts a tls-cert migration archive back onto the filesystem at the
+   * exact absolute paths it was captured from (archive is tarred with `-C /`,
+   * see MigrationCertTarget.restorePaths) — run BEFORE nginx-config restore
+   * so the extracted config's ssl_certificate directives resolve immediately. */
+  async restoreCertArchive(archivePath: string): Promise<void> {
+    await runCommand("sudo", ["tar", "xzf", archivePath, "-C", "/"], { timeoutMs: 30_000 });
+  },
 };

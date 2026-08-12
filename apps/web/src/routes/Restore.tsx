@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import type {
   Application,
   AppBackupRun,
@@ -43,6 +44,8 @@ type SelectedItem =
 type Source = "local" | "usb" | "gdrive" | "upload" | "migration";
 
 export function Restore() {
+  const location = useLocation();
+  const preselectedManifestId = (location.state as { manifestId?: string } | null)?.manifestId ?? null;
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [source, setSource] = useState<Source | null>(null);
   const [selected, setSelected] = useState<SelectedItem | null>(null);
@@ -70,6 +73,21 @@ export function Restore() {
   }, []);
 
   const usbConfigured = usbStatus?.drives.some((d) => d.isBackupConfigured) ?? false;
+
+  // Deep-link from "Disque externe USB" — double-clicking a manifest.json
+  // there navigates here with { manifestId } in router state so the admin
+  // lands straight on the confirmation screen instead of re-walking Steps
+  // 1-2, even for a manifest captured under a DIFFERENT hostname than this
+  // server's own (see MigrationService.listManifestsOnUsb's cross-hostname scan).
+  useEffect(() => {
+    if (!preselectedManifestId || !migrationManifests) return;
+    const manifest = migrationManifests.find((m) => m.manifestId === preselectedManifestId);
+    if (manifest) {
+      setSource("migration");
+      setSelected({ kind: "migration", manifest });
+      setStep(3);
+    }
+  }, [preselectedManifestId, migrationManifests]);
 
   useEffect(() => {
     if (source !== "usb" || !usbConfigured || usbArchives) return;

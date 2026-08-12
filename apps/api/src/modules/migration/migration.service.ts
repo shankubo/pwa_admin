@@ -6,13 +6,14 @@ import { hostname } from "node:os";
 import { fileURLToPath } from "node:url";
 import si from "systeminformation";
 import { docker } from "../../services/docker.client.js";
-import { runCommand } from "../../utils/exec.js";
+import { runCommand, isValidLinuxUsername } from "../../utils/exec.js";
 import { UsbBackupService } from "../../services/usbBackup.client.js";
 import { registerChannel } from "../../services/wsHub.js";
 import { OsService } from "../os/os.service.js";
 import { BackupService } from "../backup/backup.service.js";
 import { DbBackupService } from "../dbbackup/dbbackup.service.js";
 import { NginxService } from "../nginx/nginx.service.js";
+import { HardwareService } from "../hardware/hardware.service.js";
 import { ApplicationService } from "../application/application.service.js";
 import { ApplicationModel, AppBackupRunModel, type ApplicationRow } from "../../db/models/application.js";
 import { findLinkedContainer } from "../sites/siteDuplicate.service.js";
@@ -110,6 +111,8 @@ async function captureItem(
     applicationDbArchivePath?: MigrationManifestItem["applicationDbArchivePath"];
     databaseTarget?: MigrationManifestItem["databaseTarget"];
     volumeTarget?: MigrationManifestItem["volumeTarget"];
+    certTarget?: MigrationManifestItem["certTarget"];
+    wifiProfile?: MigrationManifestItem["wifiProfile"];
   }>
 ): Promise<MigrationManifestItem> {
   const defaults = {
@@ -118,6 +121,8 @@ async function captureItem(
     applicationDbArchivePath: null,
     databaseTarget: null,
     volumeTarget: null,
+    certTarget: null,
+    wifiProfile: null,
   } as const;
   try {
     const result = await fn();
@@ -257,6 +262,69 @@ async function captureNginxConfig(manifestId: string, usbRoot: string): Promise<
   });
 }
 
+/** One "tls-cert" item per vhost that actually has a resolvable certificate —
+ * a vhost with no TLS (plain HTTP redirect-only, or terminated upstream of
+ * this box) yields no item rather than a failed one, since there's nothing
+ * to capture. See NginxService.resolveCertPaths for the certbot-vs-manual
+ * path resolution this relies on. */
+async function captureTlsCert(manifestId: string, usbRoot: string, vhostName: string): Promise<MigrationManifestItem | null> {
+  const resolved = await NginxService.resolveCertPaths(vhostName);
+  if (!resolved) return null;
+  return captureItem(manifestId, "tls-cert", `Certificat TLS (${resolved.domain})`, async () => {
+    // Sudo tar always writes to this service's own fixed staging dir first
+    // (same "never point a sudo rule at an arbitrary/USB-mounted
+    // destination" pattern captureNginxConfig/backupConfig already use) —
+    // the USB copy below is a plain unprivileged file copy, both sides
+    // already service-user-owned by that point.
+    const stagingDir = join(env.BACKUP_LOCAL_ROOT, "tls-certs");
+    await mkdir(stagingDir, { recursive: true });
+    const fileName = `${resolved.domain.replace(/[^a-zA-Z0-9._-]/g, "_")}-${Date.now()}.tar.gz`;
+    const localPath = join(stagingDir, fileName);
+    // -C / with each path made relative to / — restore extracts back onto
+    // these exact absolute locations (see restoreCertArchive), which is why
+    // every path here must already be absolute (both certbot and manually
+    // declared ssl_certificate paths always are).
+    const relPaths = resolved.paths.map((p) => p.replace(/^\/+/, ""));
+    await runCommand("sudo", ["tar", "czf", localPath, "-C", "/", ...relPaths], { timeoutMs: 30_000 });
+    await runCommand("sudo", ["chown", env.SERVICE_USER, localPath], { timeoutMs: 5000 }).catch(() => {});
+
+    const destDir = join(usbRoot, "tls-certs");
+    await mkdir(destDir, { recursive: true });
+    const destPath = join(destDir, fileName);
+    await copyFile(localPath, destPath);
+    const stats = await stat(destPath);
+    return {
+      sourceRunId: null,
+      archiveRelPath: destPath,
+      sizeBytes: stats.size,
+      certTarget: { vhostName, domain: resolved.domain, source: resolved.source, restorePaths: resolved.paths },
+    };
+  });
+}
+
+/** Only captured when this machine reports at least one saved Wi-Fi
+ * connection profile — most servers are wired-only, and nmcli returning
+ * nothing isn't a failure worth recording as one. */
+async function captureWifiConfig(manifestId: string, usbRoot: string): Promise<MigrationManifestItem | null> {
+  const names = await HardwareService.listSavedWifiConnections();
+  if (names.length === 0) return null;
+  return captureItem(manifestId, "wifi-config", "Connexions Wi-Fi enregistrées", async () => {
+    const stagingDir = join(env.BACKUP_LOCAL_ROOT, "wifi-config");
+    await mkdir(stagingDir, { recursive: true });
+    const fileName = `wifi-connections-${Date.now()}.tar.gz`;
+    const localPath = join(stagingDir, fileName);
+    await HardwareService.backupWifiConnections(localPath);
+    await runCommand("sudo", ["chown", env.SERVICE_USER, localPath], { timeoutMs: 5000 }).catch(() => {});
+
+    const destDir = join(usbRoot, "wifi-config");
+    await mkdir(destDir, { recursive: true });
+    const destPath = join(destDir, fileName);
+    await copyFile(localPath, destPath);
+    const stats = await stat(destPath);
+    return { sourceRunId: null, archiveRelPath: destPath, sizeBytes: stats.size, wifiProfile: { connectionNames: names } };
+  });
+}
+
 export const MigrationService = {
   /**
    * Kicks off a whole-server snapshot in the background and returns
@@ -305,29 +373,55 @@ export const MigrationService = {
     return MigrationSnapshotModel.list();
   },
 
-  /** Reads every manifest.json already written to the configured USB drive —
-   * ground truth independent of the local migration_snapshots table, same
-   * "browse what's actually there" principle as UsbBackupService.browseArchives. */
+  /**
+   * Reads every manifest.json already written to a USB drive — ground truth
+   * independent of the local migration_snapshots table, same "browse what's
+   * actually there" principle as UsbBackupService.browseArchives.
+   *
+   * Deliberately scans EVERY BACKUP/<hostname>/migration/ folder on the
+   * drive, not just this machine's own hostname slug — a migration snapshot
+   * is captured with the OLD server's hostname (which the new/replacement
+   * server, by definition, doesn't share), so restricting this to
+   * currentHostnameSlug() would make a disaster-recovery restore invisible
+   * on the exact machine it's meant to be restored onto.
+   *
+   * Deliberately does NOT filter on detectDrives()'s isBackupConfigured —
+   * that flag only reflects whether THIS machine's own BACKUP/<thisHost>
+   * folder exists, which is never true yet on a genuinely blank replacement
+   * server (the whole point of this scan). Every USB-mounted drive is
+   * scanned directly for a BACKUP/ tree instead.
+   */
   async listManifestsOnUsb(): Promise<MigrationManifest[]> {
-    const drives = (await UsbBackupService.detectDrives()).filter((d) => d.isBackupConfigured);
+    const drives = await UsbBackupService.detectDrives();
     const manifests: MigrationManifest[] = [];
     for (const drive of drives) {
-      const migrationDir = join(drive.backupRoot, "migration");
-      let manifestIds: string[];
+      const backupRootParent = dirname(drive.backupRoot); // <mountpoint>/BACKUP
+      let hostSlugs: string[];
       try {
-        manifestIds = (await readdir(migrationDir, { withFileTypes: true }))
+        hostSlugs = (await readdir(backupRootParent, { withFileTypes: true }))
           .filter((e) => e.isDirectory())
           .map((e) => e.name);
       } catch {
         continue;
       }
-      for (const id of manifestIds) {
+      for (const hostSlug of hostSlugs) {
+        const migrationDir = join(backupRootParent, hostSlug, "migration");
+        let manifestIds: string[];
         try {
-          const raw = await readFile(join(migrationDir, id, "manifest.json"), "utf8");
-          manifests.push(JSON.parse(raw) as MigrationManifest);
+          manifestIds = (await readdir(migrationDir, { withFileTypes: true }))
+            .filter((e) => e.isDirectory())
+            .map((e) => e.name);
         } catch {
-          // manifest.json missing/corrupt (snapshot interrupted before it was
-          // written) — skip rather than fail the whole listing.
+          continue;
+        }
+        for (const id of manifestIds) {
+          try {
+            const raw = await readFile(join(migrationDir, id, "manifest.json"), "utf8");
+            manifests.push(JSON.parse(raw) as MigrationManifest);
+          } catch {
+            // manifest.json missing/corrupt (snapshot interrupted before it was
+            // written) — skip rather than fail the whole listing.
+          }
         }
       }
     }
@@ -422,6 +516,10 @@ export const MigrationService = {
         items.push(await planReplaceLine(item, "docker-volume", item.volumeTarget.volumeName, item.archiveRelPath));
       } else if (item.category === "nginx-config" && item.archiveRelPath) {
         items.push(await planReplaceLine(item, "nginx-config", "server", item.archiveRelPath));
+      } else if (item.category === "tls-cert" && item.certTarget && item.archiveRelPath) {
+        items.push(await planReplaceLine(item, "tls-cert", item.certTarget.domain, item.archiveRelPath));
+      } else if (item.category === "wifi-config" && item.archiveRelPath) {
+        items.push(await planReplaceLine(item, "wifi-config", "system-connections", item.archiveRelPath));
       } else if (item.category === "database") {
         items.push({ category: item.category, label: item.label, action: "restore", detail: null });
       } else if (item.category === "application") {
@@ -533,6 +631,15 @@ async function captureServerItems(manifestId: string, usbRoot: string): Promise<
   }
 
   items.push(await captureNginxConfig(manifestId, usbRoot));
+
+  const vhosts = await NginxService.listVhosts();
+  for (const vhost of vhosts) {
+    const certItem = await captureTlsCert(manifestId, usbRoot, vhost.name);
+    if (certItem) items.push(certItem);
+  }
+
+  const wifiItem = await captureWifiConfig(manifestId, usbRoot);
+  if (wifiItem) items.push(wifiItem);
 
   for (const app of ApplicationModel.list()) {
     items.push(await captureApplication(manifestId, usbRoot, app));
@@ -659,6 +766,9 @@ async function captureSiteItems(manifestId: string, usbRoot: string, vhostName: 
 
   items.push(await captureNginxConfig(manifestId, usbRoot));
 
+  const certItem = await captureTlsCert(manifestId, usbRoot, vhostName);
+  if (certItem) items.push(certItem);
+
   return items;
 }
 
@@ -685,11 +795,94 @@ async function runCaptureSnapshot(manifestId: string, scope: MigrationManifestSc
   };
 
   await writeFile(join(usbRoot, "manifest.json"), JSON.stringify(manifest, null, 2));
+  await writeFile(join(usbRoot, "migrate.sh"), buildMigrateScript(manifest), { mode: 0o755 });
 
   const anyFailed = items.some((i) => i.status === "failed");
   const finalStatus = anyFailed ? "partial" : "success";
   MigrationSnapshotModel.complete(manifestId, { status: finalStatus, manifest });
   publishProgress(manifestId, { done: true, status: finalStatus });
+}
+
+/**
+ * Generates a standalone script written INTO this exact manifest's own USB
+ * folder (migration/<manifestId>/migrate.sh) — the admin's requested "just
+ * start it over SSH" path, distinct from deploy/bootstrap-fresh-server.sh
+ * (a generic script fetched from git, which still has to interactively find
+ * the USB drive and locate a manifest by hand). This one is pre-bound to a
+ * single manifestId and needs no interaction beyond the USB mountpoint
+ * itself.
+ *
+ * Deliberately requires running from a real file path (USB physically
+ * plugged into the new machine, or the migration folder copied over first) —
+ * NOT piped through `ssh ... 'bash -s' < migrate.sh`. A script read from
+ * stdin has no reliable $0/BASH_SOURCE to locate its own directory (it
+ * resolves to "bash", not a real path), which would silently break the
+ * manifest.json/bootstrap-fresh-server.sh lookups below. The supported "over
+ * SSH" shape is instead: `ssh user@newhost bash /mnt/usb/.../migrate.sh
+ * <APP_DIR> <SERVICE_USER>` — the path is still passed as a real argv, so
+ * $0 resolves correctly even though the shell itself is remote.
+ */
+function buildMigrateScript(manifest: MigrationManifest): string {
+  const scopeLabel =
+    manifest.scope.type === "site" ? `site "${manifest.scope.siteName}"` : "serveur complet";
+  return `#!/usr/bin/env bash
+set -euo pipefail
+
+# Script de migration auto-genere pour l'instantane ${manifest.manifestId}
+# (${scopeLabel}, capture le ${manifest.createdAt} depuis "${manifest.hostname}",
+# ${manifest.osDistro} ${manifest.osRelease}).
+#
+# A executer directement sur la NOUVELLE machine, disque USB contenant ce
+# dossier deja branche — en console locale, ou a distance par SSH SANS pipe
+# stdin (le script doit garder un vrai chemin de fichier pour se localiser) :
+#   ssh <utilisateur>@<nouvelle-machine> bash "/chemin/vers/migrate.sh" <APP_DIR> <SERVICE_USER>
+#
+# Ne fait qu'appeler bootstrap-fresh-server.sh (clone/build pwa-admin, audit +
+# installation des dependances manquantes avec confirmation unique, config
+# Tailscale) puis laisse pwa-admin restaurer LUI-MEME cet instantane precis
+# (Restore > Migration serveur) une fois demarre — jamais de logique de
+# restauration dupliquee ici.
+
+if [ -z "${'$'}{BASH_SOURCE[0]:-}" ] || [ "${'$'}{BASH_SOURCE[0]}" = "bash" ]; then
+  echo "Ce script doit etre execute depuis un vrai chemin de fichier (pas via un pipe stdin)." >&2
+  echo "Exemple : ssh <utilisateur>@<nouvelle-machine> bash \\"/chemin/vers/migrate.sh\\" <APP_DIR> <SERVICE_USER>" >&2
+  exit 1
+fi
+
+APP_DIR="${'$'}{1:?Usage: migrate.sh <APP_DIR> <SERVICE_USER> [--authkey KEY]}"
+SERVICE_USER="${'$'}{2:?Usage: migrate.sh <APP_DIR> <SERVICE_USER> [--authkey KEY]}"
+shift 2 || true
+
+SCRIPT_DIR="$(cd "$(dirname "${'$'}{BASH_SOURCE[0]}")" && pwd)"
+MANIFEST_ID="${manifest.manifestId}"
+
+echo "== Migration ${manifest.manifestId} (${scopeLabel}) vers ${'$'}{APP_DIR} =="
+echo "Ce script va installer/mettre a jour pwa-admin sur cette machine, puis"
+echo "vous devrez terminer la restauration depuis l'interface (Restore >"
+echo "Migration serveur > cet instantane) une fois pwa-admin demarre."
+echo ""
+
+if [ ! -f "${'$'}{SCRIPT_DIR}/manifest.json" ]; then
+  echo "manifest.json introuvable a cote de ce script (${'$'}{SCRIPT_DIR}) — le dossier de migration a-t-il ete deplace/copie en partie ?" >&2
+  exit 1
+fi
+
+BOOTSTRAP="${'$'}{SCRIPT_DIR}/bootstrap-fresh-server.sh"
+if [ ! -f "$BOOTSTRAP" ]; then
+  # Le dossier de migration ne contient que manifest.json + les archives —
+  # bootstrap-fresh-server.sh vit dans le depot git, telecharge ici au besoin
+  # pour que ce script reste utilisable seul, sans avoir clone le repo au prealable.
+  echo "Telechargement de bootstrap-fresh-server.sh depuis le depot pwa_admin..."
+  curl -fsSL "https://raw.githubusercontent.com/shankubo/pwa_admin/master/deploy/bootstrap-fresh-server.sh" -o "$BOOTSTRAP"
+  chmod +x "$BOOTSTRAP"
+fi
+
+echo "Point de montage USB attendu par bootstrap-fresh-server.sh : $(cd "${'$'}{SCRIPT_DIR}/../../.." && pwd)"
+echo "(dossier contenant BACKUP/${manifest.hostname}/migration/${manifest.manifestId}/)"
+echo ""
+
+exec "$BOOTSTRAP" "$APP_DIR" "$SERVICE_USER" "$@"
+`;
 }
 
 /** Registers a fresh backup_history row pointing directly at a manifest
@@ -713,6 +906,50 @@ function registerUsbArchiveAsRun(
  * to do" (see restoreIfChanged) — distinct from a real failure so the item
  * is recorded as "skipped", not "failed". */
 class RestoreSkipped extends Error {}
+
+const homeOwnersEnsured = new Set<string>();
+
+/**
+ * An Application's bind-mount path (e.g. /home/shan/myapp/data) implies an OS
+ * user ("shan") that owned it on the OLD server. On a truly blank new server
+ * that account doesn't exist yet — `tar -C <path>` fails outright if the
+ * directory's never been created, and even if it were pre-created, files
+ * would restore under a UID with no matching name, breaking that admin's own
+ * login on the new box. This creates the missing account (system user, home
+ * dir matching the path's /home/<user> segment, locked password — the admin
+ * sets one manually afterward same as any fresh account) BEFORE the archive
+ * is extracted, so ownership and the login itself both come back identical.
+ * Only acts on /home/<user>/... paths — anything else (e.g. /var/www/...) is
+ * already owned by root or a service account created earlier in this same
+ * restore (nginx/docker/etc), not an individual admin login.
+ */
+async function ensureHomeOwnerExists(targetPath: string): Promise<void> {
+  const match = /^\/home\/([^/]+)/.exec(targetPath);
+  if (!match) return;
+  const username = match[1];
+  if (!isValidLinuxUsername(username) || homeOwnersEnsured.has(username)) return;
+
+  const exists = await runCommand("id", [username], { timeoutMs: 5000 }).then(
+    () => true,
+    () => false
+  );
+  if (exists) {
+    homeOwnersEnsured.add(username);
+    return;
+  }
+
+  // Only marked "ensured" once useradd is confirmed to have actually
+  // succeeded — a failed attempt must stay retryable on a later
+  // ensureHomeOwnerExists call (same restore retry, or a different manifest
+  // referencing the same username) rather than permanently poisoning this
+  // module-level cache for the rest of the process lifetime.
+  await runCommand(
+    "sudo",
+    ["useradd", "--system", "--create-home", "--home-dir", `/home/${username}`, "--shell", "/usr/sbin/nologin", username],
+    { timeoutMs: 10_000 }
+  );
+  homeOwnersEnsured.add(username);
+}
 
 async function restoreItem(
   restoreId: string,
@@ -878,6 +1115,41 @@ async function runRestoreFromManifest(
     });
   }
 
+  // Certs are restored BEFORE nginx-config so the config's own ssl_certificate
+  // paths already resolve to real files by the time restoreConfig's own
+  // `nginx -t` runs — restoring in the opposite order would make every
+  // TLS vhost fail that test and trigger the config's revert-on-failure path.
+  for (const item of byCategory("tls-cert")) {
+    await restoreItem(restoreId, results, item.category, item.label, async () => {
+      if (!item.archiveRelPath || !item.certTarget) throw new Error("no_archive_or_target");
+      const { ran } = await restoreIfChanged("tls-cert", item.certTarget.domain, item.archiveRelPath, async () => {
+        // Same staging rationale as the nginx-config/application-path
+        // restores below — the sudo tar rule is scoped to this fixed local
+        // dir, never an arbitrary USB path.
+        const destDir = join(env.BACKUP_LOCAL_ROOT, "tls-certs");
+        await mkdir(destDir, { recursive: true });
+        const localPath = join(destDir, `migration-restore-${Date.now()}.tar.gz`);
+        await copyFile(item.archiveRelPath!, localPath);
+        await NginxService.restoreCertArchive(localPath);
+      });
+      if (!ran) throw new RestoreSkipped();
+    });
+  }
+
+  for (const item of byCategory("wifi-config")) {
+    await restoreItem(restoreId, results, item.category, item.label, async () => {
+      if (!item.archiveRelPath) throw new Error("no_archive_path");
+      const { ran } = await restoreIfChanged("wifi-config", "system-connections", item.archiveRelPath, async () => {
+        const destDir = join(env.BACKUP_LOCAL_ROOT, "wifi-config");
+        await mkdir(destDir, { recursive: true });
+        const localPath = join(destDir, `migration-restore-${Date.now()}.tar.gz`);
+        await copyFile(item.archiveRelPath!, localPath);
+        await HardwareService.restoreWifiConnections(localPath);
+      });
+      if (!ran) throw new RestoreSkipped();
+    });
+  }
+
   for (const item of byCategory("nginx-config")) {
     await restoreItem(restoreId, results, item.category, item.label, async () => {
       if (!item.archiveRelPath) throw new Error("no_archive_path");
@@ -933,10 +1205,22 @@ async function runRestoreFromManifest(
             // bind-mount restore sudo rule is scoped to
             // BACKUP_LOCAL_ROOT/paths/*/*.tar.gz, never an arbitrary USB
             // path, so stage a local copy first.
+            await ensureHomeOwnerExists(path);
             const destDir = join(env.BACKUP_LOCAL_ROOT, "paths", basename(path));
             await mkdir(destDir, { recursive: true });
             const localPath = join(destDir, basename(usbArchivePath));
             await copyFile(usbArchivePath, localPath);
+            // sudo mkdir is only needed (and only sudoers-scoped) for paths
+            // under /home/<user> that ensureHomeOwnerExists may have just
+            // created the owner for — everything else (e.g. /var/www/...) is
+            // an existing, already-managed path by the time an Application
+            // restore reaches it, same assumption the pre-existing rsync
+            // restore rule above makes.
+            if (/^\/home\//.test(path)) {
+              await runCommand("sudo", ["mkdir", "-p", path], { timeoutMs: 10_000 });
+            } else {
+              await mkdir(path, { recursive: true }).catch(() => {});
+            }
             await runCommand("sudo", ["tar", "xzf", localPath, "-C", path], { timeoutMs: 600_000 });
           });
           if (ran) anyChanged = true;

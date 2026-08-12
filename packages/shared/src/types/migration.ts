@@ -6,6 +6,8 @@ export type MigrationManifestItemCategory =
   | "docker-volume"
   | "database"
   | "nginx-config"
+  | "tls-cert"
+  | "wifi-config"
   | "application"
   | "pwa-admin-config";
 
@@ -58,6 +60,32 @@ export interface MigrationVolumeTarget {
   volumeName: string;
 }
 
+/**
+ * Only set on "tls-cert" items — one vhost's certificate material. Both
+ * `certbot` (whole `/etc/letsencrypt/live/<domain>` + `archive/<domain>`,
+ * since `live` is a symlink farm pointing into `archive`) and `manual`
+ * (whatever exact files the vhost's own `ssl_certificate`/`ssl_certificate_key`
+ * directives point to) are captured as a single tar so restore can extract it
+ * back verbatim — re-issuing a Let's Encrypt cert automatically isn't
+ * attempted, since that requires the new server's DNS/port 80 to already be
+ * reachable from the outside, which a Tailscale-only box never is.
+ */
+export interface MigrationCertTarget {
+  vhostName: string;
+  domain: string;
+  source: "certbot" | "manual";
+  /** Absolute paths this archive restores files back to, relative to `/` — used to extract with `-C /`. */
+  restorePaths: string[];
+}
+
+/** Only set on "wifi-config" items — this machine's saved NetworkManager
+ * Wi-Fi connection profiles (`/etc/NetworkManager/system-connections/*.nmconnection`),
+ * PSK included. Captured only when nmcli reports at least one Wi-Fi device
+ * (most servers are wired-only) — see WifiStatus.available. */
+export interface MigrationWifiProfile {
+  connectionNames: string[];
+}
+
 /** One host directory path from an Application's `paths[]`, paired with the
  * per-path tar.gz archive AppBackupRunModel.copySnapshotToUsb produced for
  * it on the USB drive — restore extracts each archive directly back onto
@@ -93,6 +121,10 @@ export interface MigrationManifestItem {
   databaseTarget: MigrationDatabaseTarget | null;
   /** Only set on "docker-volume" items — see MigrationVolumeTarget. */
   volumeTarget: MigrationVolumeTarget | null;
+  /** Only set on "tls-cert" items — see MigrationCertTarget. */
+  certTarget: MigrationCertTarget | null;
+  /** Only set on "wifi-config" items — see MigrationWifiProfile. */
+  wifiProfile: MigrationWifiProfile | null;
 }
 
 /** Distinguishes a whole-server snapshot from a single-site snapshot (captured

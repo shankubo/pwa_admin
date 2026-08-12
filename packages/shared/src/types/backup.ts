@@ -112,6 +112,34 @@ export interface UsbBackupArchive {
   modifiedAt: string;
 }
 
+/** One entry (file or folder) inside the "Disque externe USB" file explorer —
+ * walks the raw BACKUP/ tree on a drive across EVERY hostname folder found on
+ * it, not just this machine's own (see UsbExplorerService). `kind` drives the
+ * icon/detail shown client-side; `migrationManifestId`/`hostname` are only
+ * set for a manifest.json file so a double-click can jump straight into the
+ * Restore wizard without re-parsing the file client-side. */
+export type UsbExplorerEntryKind = "folder" | "manifest" | "archive" | "json" | "file";
+
+export interface UsbExplorerEntry {
+  name: string;
+  path: string;
+  kind: UsbExplorerEntryKind;
+  isDirectory: boolean;
+  sizeBytes: number | null;
+  modifiedAt: string;
+  /** Hostname folder this entry lives under (BACKUP/<hostname>/...) — null at the drive/BACKUP root itself. */
+  hostname: string | null;
+  /** Only set when kind === "manifest" — the manifestId to hand straight to the Restore wizard. */
+  migrationManifestId: string | null;
+}
+
+export interface UsbExplorerListing {
+  mountpoint: string;
+  /** Path relative to the drive's BACKUP/ root ("" at the top). */
+  relativePath: string;
+  entries: UsbExplorerEntry[];
+}
+
 /** The category the admin declares when uploading a backup archive from their
  * PC — determines which restore endpoint (generic volume/path vs. db) the
  * resulting backup_history row is restorable through. */

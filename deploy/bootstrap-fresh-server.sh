@@ -12,10 +12,18 @@ set -euo pipefail
 # installed here yet. This script's only job is to get a plain `git pull` +
 # `npm run build` + `systemctl start pwa-admin` away from a working install —
 # everything else (Docker containers/images, volumes, databases, nginx
-# vhosts, Applications) is restored by pwa-admin ITSELF once it's running,
-# via Restore > Migration serveur, reading the manifest.json this script only
-# locates and validates (never parses/restores individual items — that's
-# deliberately left to the existing, tested restore endpoints in the app).
+# vhosts + their TLS certificates, saved Wi-Fi connections, Applications) is
+# restored by pwa-admin ITSELF once it's running, via Restore > Migration
+# serveur, reading the manifest.json this script only locates and validates
+# (never parses/restores individual items — that's deliberately left to the
+# existing, tested restore endpoints in the app).
+#
+# A manifest-scoped, ready-to-run counterpart also lives next to
+# manifest.json itself (migration/<manifestId>/migrate.sh, written by
+# MigrationService at capture time) — same flow, but pre-bound to one exact
+# snapshot so it can be started directly over SSH with no interactive USB/
+# manifest lookup. This script remains the generic, git-fetched entry point
+# migrate.sh itself falls back to for the actual bootstrap work.
 #
 # Two things this script can NEVER automate away, by design — both are called
 # out below when reached, not silently skipped:
@@ -233,10 +241,14 @@ if [ -n "$TS_DOMAIN" ]; then
 fi
 echo ""
 echo "Prochaines etapes MANUELLES (non automatisables depuis ce script) :"
-echo "  1. Emettre un nouveau certificat TLS Tailscale (l'ancien n'est pas portable):"
+echo "  1. Emettre un nouveau certificat TLS Tailscale pour pwa-admin lui-meme (l'ancien"
+echo "     n'est jamais restaure - il est lie a l'identite Tailscale de l'ancienne machine):"
 echo "     sudo tailscale cert <nom-de-cette-machine>.<tailnet>.ts.net"
 echo "     puis renseigner TLS_CERT_PATH/TLS_KEY_PATH dans ${APP_DIR}/.env et redemarrer pwa-admin."
 echo "  2. Connectez-vous a pwa-admin, allez dans Restore > Migration serveur, choisissez"
 echo "     l'instantane sur ${USB_MOUNT}, et lancez la restauration (conteneurs/images Docker,"
-echo "     volumes, bases de donnees, config Nginx, Applications)."
+echo "     volumes, bases de donnees, certificats TLS des sites hebergés, connexions Wi-Fi"
+echo "     enregistrees, config Nginx, Applications) — contrairement au certificat Tailscale"
+echo "     ci-dessus, les certificats des sites (Let's Encrypt/manuels) SONT restaures a"
+echo "     l'identique par cette etape, sans action manuelle."
 echo "  3. Gardez le disque USB branche jusqu'a la fin de cette restauration."

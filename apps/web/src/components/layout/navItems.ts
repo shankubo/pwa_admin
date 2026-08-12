@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   RotateCcw,
   Wrench,
+  Usb,
 } from "lucide-react";
 import { externalNavItems } from "./externalNavItems";
 
@@ -38,6 +39,7 @@ export const navItems: NavItem[] = [
   { to: "/applications", label: "Applications", icon: Boxes, group: "ops" },
   { to: "/backups", label: "Backups", icon: DatabaseBackup, group: "ops" },
   { to: "/restore", label: "Restore", icon: RotateCcw, group: "ops" },
+  { to: "/usb-explorer", label: "Disque externe USB", icon: Usb, group: "ops" },
   { to: "/system", label: "System", icon: Activity, group: "ops" },
   { to: "/services", label: "Services", icon: Wrench, group: "ops" },
   { to: "/help", label: "Aide", icon: HelpCircle, group: "bottom" },
