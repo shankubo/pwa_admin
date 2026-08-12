@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LiveLogPanel } from "@/components/LiveLogPanel";
 import { formatBytes } from "./Docker";
-import { ChevronDown, ChevronUp, Globe, ExternalLink, Copy, Loader2, Server } from "lucide-react";
+import { ChevronDown, ChevronUp, Globe, ExternalLink, Copy, Loader2, HardDriveUpload } from "lucide-react";
 
 function siteUrl(s: SiteSummary): string | null {
   const host = s.serverNames.find((n) => n !== "_");
@@ -235,7 +235,7 @@ export function Sites() {
               {migratingFor === s.name ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Server className="h-3.5 w-3.5" />
+                <HardDriveUpload className="h-3.5 w-3.5" />
               )}{" "}
               Migration
             </Button>

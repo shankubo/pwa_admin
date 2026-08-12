@@ -33,7 +33,7 @@ import {
   Usb,
   Download,
   ArrowRight,
-  Server,
+  HardDriveUpload,
 } from "lucide-react";
 
 const STATUS_FILTERS: { key: "all" | BackupRunStatus; label: string }[] = [
@@ -1051,7 +1051,7 @@ function MigrationSnapshotCard() {
   return (
     <Card>
       <CardTitle className="flex items-center gap-1">
-        <Server className="h-4 w-4" /> Migration serveur (disque externe)
+        <HardDriveUpload className="h-4 w-4" /> Migration serveur (disque externe)
       </CardTitle>
       <p className="text-xs text-muted-foreground">
         Capture un instantané complet du serveur (images/volumes Docker, bases de données, config

@@ -344,7 +344,10 @@ export const MigrationService = {
    * normal (same-server) restores — this is an orchestrator, not a new
    * restore engine.
    */
-  async restoreFromManifest(manifestId: string, options: { includeOsPackages: boolean }): Promise<{ restoreId: string }> {
+  async restoreFromManifest(
+    manifestId: string,
+    options: { includeOsPackages: boolean; excludedLabels?: string[]; selectedPackageNames?: string[] }
+  ): Promise<{ restoreId: string }> {
     const manifest = (await this.listManifestsOnUsb()).find((m) => m.manifestId === manifestId);
     if (!manifest) throw new Error("manifest_not_found_on_usb");
 
@@ -767,12 +770,24 @@ async function restoreIfChanged(
 async function runRestoreFromManifest(
   restoreId: string,
   manifest: MigrationManifest,
-  options: { includeOsPackages: boolean }
+  options: { includeOsPackages: boolean; excludedLabels?: string[]; selectedPackageNames?: string[] }
 ): Promise<void> {
   const results: MigrationRestoreResults = [];
+  const excluded = new Set(options.excludedLabels ?? []);
 
+  // Item-level selection: the admin can uncheck any individual item on the
+  // confirmation screen (a specific container image, a specific Application,
+  // etc.) — excluded ones are recorded as "skipped" rather than silently
+  // vanishing from the results list, same as the checksum-based
+  // already-up-to-date skip above.
   const byCategory = (category: MigrationManifestItem["category"]) =>
-    manifest.items.filter((i) => i.category === category && i.status === "success");
+    manifest.items.filter((i) => i.category === category && i.status === "success" && !excluded.has(i.label));
+
+  for (const item of manifest.items) {
+    if (item.status === "success" && excluded.has(item.label)) {
+      results.push({ category: item.category, label: `${item.label} (non sélectionné)`, status: "skipped", error: null });
+    }
+  }
 
   // OS distro/release mismatch is never a hard stop — package NAMES rarely
   // differ between Debian/Ubuntu point releases for the base packages this
@@ -796,6 +811,12 @@ async function runRestoreFromManifest(
   // volumes/DBs can be restored into them, and Applications may depend on
   // any/all of the above.
   if (options.includeOsPackages) {
+    // Package-level selection: when the admin has checked only some
+    // packages on the confirmation screen, selectedPackageNames restricts
+    // installOrUpgradePackages to exactly that subset — undefined means
+    // "everything in the manifest", preserving the previous all-or-nothing
+    // behavior for callers that don't send a selection.
+    const selectedPackages = options.selectedPackageNames ? new Set(options.selectedPackageNames) : null;
     for (const item of byCategory("os-packages")) {
       await restoreItem(restoreId, results, item.category, item.label, async () => {
         if (!item.archiveRelPath) throw new Error("no_archive_path");
@@ -803,8 +824,10 @@ async function runRestoreFromManifest(
           name: string;
           version: string;
         }[];
+        const targets = selectedPackages ? packages.filter((p) => selectedPackages.has(p.name)) : packages;
+        if (targets.length === 0) throw new RestoreSkipped();
         const outcome = await OsService.installOrUpgradePackages(
-          packages.map((p) => ({ name: p.name, version: p.version }))
+          targets.map((p) => ({ name: p.name, version: p.version }))
         );
         if (outcome.failed.length > 0) {
           throw new Error(

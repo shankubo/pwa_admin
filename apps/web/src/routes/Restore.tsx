@@ -31,7 +31,7 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
-  Server,
+  Shuffle,
 } from "lucide-react";
 
 type SelectedItem =
@@ -297,6 +297,7 @@ function StepSource({
         <SourceTile
           icon={HardDrive}
           label="Local"
+          description="Restaurer à partir d'une sauvegarde déjà présente sur ce serveur."
           enabled={localAvailable}
           disabledReason="Aucune sauvegarde locale"
           onClick={() => onSelect("local")}
@@ -304,6 +305,7 @@ function StepSource({
         <SourceTile
           icon={Usb}
           label="USB"
+          description="Restaurer depuis un disque externe branché (la sauvegarde doit se trouver dans BACKUP/<nom du serveur>/... sur ce disque)."
           enabled={usbAvailable}
           disabledReason="Aucun disque USB connecté"
           onClick={() => onSelect("usb")}
@@ -311,14 +313,22 @@ function StepSource({
         <SourceTile
           icon={Cloud}
           label="Google Drive"
+          description="Si Google Drive est connecté, la sauvegarde est d'abord téléchargée automatiquement sur ce serveur, puis restaurée."
           enabled={gdriveAuthorized}
           disabledReason="Google Drive non connecté"
           onClick={() => onSelect("gdrive")}
         />
-        <SourceTile icon={Upload} label="Téléverser" enabled onClick={() => setShowUpload(true)} />
         <SourceTile
-          icon={Server}
+          icon={Upload}
+          label="Téléverser"
+          description="Envoyer un fichier de sauvegarde depuis votre appareil (PC/téléphone) vers ce serveur, puis le restaurer directement."
+          enabled
+          onClick={() => setShowUpload(true)}
+        />
+        <SourceTile
+          icon={Shuffle}
           label="Migration serveur"
+          description="Restaurer un instantané complet capturé depuis un disque externe (USB) : sites, données et paquets système sont réinstallés à l'identique — pour remplacer ou reconstruire un serveur."
           enabled={migrationAvailable}
           disabledReason="Aucun instantané de migration sur le disque USB"
           onClick={() => onSelect("migration")}
@@ -333,12 +343,14 @@ function StepSource({
 function SourceTile({
   icon: Icon,
   label,
+  description,
   enabled,
   disabledReason,
   onClick,
 }: {
   icon: typeof HardDrive;
   label: string;
+  description: string;
   enabled: boolean;
   disabledReason?: string;
   onClick: () => void;
@@ -356,7 +368,7 @@ function SourceTile({
     >
       <Icon className={`h-8 w-8 ${enabled ? "text-primary" : "text-muted-foreground"}`} />
       <span className="text-sm font-medium">{label}</span>
-      {!enabled && disabledReason && <span className="text-xs text-muted-foreground">{disabledReason}</span>}
+      <span className="text-xs text-muted-foreground">{enabled ? description : disabledReason ?? description}</span>
     </button>
   );
 }
@@ -935,7 +947,7 @@ function StepMigration({
             className="rounded-md border border-border p-3 text-left text-sm hover:bg-muted"
           >
             <p className="flex items-center gap-2 font-medium">
-              <Server className="h-4 w-4 text-primary" />
+              <Shuffle className="h-4 w-4 text-primary" />
               {m.scope.type === "site" ? `Site : ${m.scope.siteName}` : `Serveur complet (${m.hostname})`}
             </p>
             <p className="text-xs text-muted-foreground">
@@ -957,6 +969,11 @@ function StepMigrationConfirm({ manifest, onReset }: { manifest: MigrationManife
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<MigrationRestorePlan | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
+  // Per-item and per-package opt-out — everything is selected by default
+  // (preserves the previous "restore everything" behavior), the admin
+  // unchecks specific lines/packages they don't want touched this run.
+  const [uncheckedLabels, setUncheckedLabels] = useState<Set<string>>(new Set());
+  const [uncheckedPackages, setUncheckedPackages] = useState<Set<string>>(new Set());
 
   // Pre-flight, read-only: shows exactly what the restore is about to do
   // (installer/mettre à jour/ignorer par paquet, remplacer/ignorer par
@@ -965,10 +982,30 @@ function StepMigrationConfirm({ manifest, onReset }: { manifest: MigrationManife
   useEffect(() => {
     setPlan(null);
     setPlanError(null);
+    setUncheckedLabels(new Set());
+    setUncheckedPackages(new Set());
     apiJson<MigrationRestorePlan>(`/migration/restore/plan/${manifest.manifestId}`)
       .then(setPlan)
       .catch((err) => setPlanError((err as Error).message));
   }, [manifest.manifestId]);
+
+  function toggleLabel(label: string) {
+    setUncheckedLabels((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  }
+
+  function togglePackage(name: string) {
+    setUncheckedPackages((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
 
   useWsChannel(
     "migration.restore",
@@ -1012,9 +1049,19 @@ function StepMigrationConfirm({ manifest, onReset }: { manifest: MigrationManife
     setStarting(true);
     setError(null);
     try {
+      const excludedLabels = [...uncheckedLabels];
+      const selectedPackageNames = includeOsPackages
+        ? (plan?.packages ?? []).filter((p) => !uncheckedPackages.has(p.name)).map((p) => p.name)
+        : undefined;
       const result = await apiJson<{ restoreId: string }>("/migration/restore", {
         method: "POST",
-        body: JSON.stringify({ manifestId: manifest.manifestId, includeOsPackages, confirm: true }),
+        body: JSON.stringify({
+          manifestId: manifest.manifestId,
+          includeOsPackages,
+          excludedLabels,
+          selectedPackageNames,
+          confirm: true,
+        }),
       });
       setRestoreId(result.restoreId);
       setRun({
@@ -1112,16 +1159,21 @@ function StepMigrationConfirm({ manifest, onReset }: { manifest: MigrationManife
                 Paquets système ({plan.packages.length})
               </label>
               {includeOsPackages && (
-                <div className="ml-6 flex flex-col gap-0.5">
+                <div className="ml-6 flex max-h-64 flex-col gap-0.5 overflow-y-auto rounded-md border border-border p-2">
                   {plan.packages
                     .filter((p) => p.action !== "up-to-date")
                     .map((p) => (
-                      <p key={p.name} className="text-xs text-muted-foreground">
+                      <label key={p.name} className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={!uncheckedPackages.has(p.name)}
+                          onChange={() => togglePackage(p.name)}
+                        />
                         <span className="font-mono">{p.name}</span> :{" "}
                         {p.action === "install"
                           ? `installer (${p.manifestVersion})`
                           : `mettre à jour ${p.currentVersion} → ${p.manifestVersion}`}
-                      </p>
+                      </label>
                     ))}
                   {plan.packages.every((p) => p.action === "up-to-date") && (
                     <p className="text-xs text-muted-foreground">Tous les paquets sont déjà à jour.</p>
@@ -1133,10 +1185,21 @@ function StepMigrationConfirm({ manifest, onReset }: { manifest: MigrationManife
 
           <div className="flex flex-col gap-1">
             {plan.items.map((line, i) => (
-              <div key={`${line.category}-${i}`} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{line.label}</p>
-                  {line.detail && <p className="truncate text-xs text-muted-foreground">{line.detail}</p>}
+              <label
+                key={`${line.category}-${i}`}
+                className="flex items-center justify-between gap-2 rounded-md border border-border p-2 text-sm"
+              >
+                <div className="flex min-w-0 items-start gap-2">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={!uncheckedLabels.has(line.label)}
+                    onChange={() => toggleLabel(line.label)}
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{line.label}</p>
+                    {line.detail && <p className="truncate text-xs text-muted-foreground">{line.detail}</p>}
+                  </div>
                 </div>
                 <span
                   className={
@@ -1152,7 +1215,7 @@ function StepMigrationConfirm({ manifest, onReset }: { manifest: MigrationManife
                       ? "déjà à jour"
                       : "restaurer"}
                 </span>
-              </div>
+              </label>
             ))}
           </div>
         </div>
@@ -1167,7 +1230,7 @@ function StepMigrationConfirm({ manifest, onReset }: { manifest: MigrationManife
           </Button>
         }
         title="Restaurer cet instantané de migration ?"
-        description="Cette opération va appliquer le plan ci-dessus : les éléments marqués « remplacer »/« restaurer » seront écrasés, les éléments « déjà à jour » seront ignorés. Action irréversible."
+        description="Cette opération va appliquer uniquement les éléments cochés ci-dessus (les éléments décochés seront ignorés). Les éléments marqués « remplacer »/« restaurer » seront écrasés. Action irréversible."
         requireTypedConfirmation="RESTORE"
         confirmLabel="Restaurer"
         onConfirm={start}

@@ -69,16 +69,25 @@ export default async function migrationRoutes(app: FastifyInstance) {
           properties: {
             manifestId: { type: "string" },
             includeOsPackages: { type: "boolean" },
+            excludedLabels: { type: "array", items: { type: "string" } },
+            selectedPackageNames: { type: "array", items: { type: "string" } },
             confirm: { type: "boolean", const: true },
           },
         },
       },
     },
     async (req, reply) => {
-      const { manifestId, includeOsPackages } = req.body as { manifestId: string; includeOsPackages?: boolean };
+      const { manifestId, includeOsPackages, excludedLabels, selectedPackageNames } = req.body as {
+        manifestId: string;
+        includeOsPackages?: boolean;
+        excludedLabels?: string[];
+        selectedPackageNames?: string[];
+      };
       try {
         const result = await MigrationService.restoreFromManifest(manifestId, {
           includeOsPackages: includeOsPackages ?? false,
+          excludedLabels,
+          selectedPackageNames,
         });
         reply.send(result);
       } catch (err) {
