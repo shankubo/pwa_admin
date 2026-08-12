@@ -11,7 +11,20 @@ import { useAuthStore } from "@/stores/auth.store";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { ShieldCheck, ShieldOff, LogOut, KeyRound, Trash2, RefreshCw, DownloadCloud } from "lucide-react";
+import {
+  ShieldCheck,
+  ShieldOff,
+  LogOut,
+  KeyRound,
+  Trash2,
+  RefreshCw,
+  DownloadCloud,
+  ChevronDown,
+  ChevronUp,
+  Cloud,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 import { APP_VERSION } from "@/lib/appVersion";
 
 // No shared type exists for audit log rows — these are raw sqlite columns (snake_case).
@@ -70,6 +83,8 @@ export function Settings() {
       )}
 
       <AccessTokensCard />
+
+      <GDriveConnectionCard />
 
       <AuditLogCard />
 
@@ -436,11 +451,175 @@ function AccessTokensCard() {
   );
 }
 
+interface GDriveStatus {
+  enabled: boolean;
+  configured: boolean;
+  authorized: boolean;
+  rootFolderId: string | null;
+}
+
+/**
+ * Connexion/déconnexion du compte Google Drive — déplacé depuis Backups.tsx
+ * (qui garde uniquement la vérification/comparaison des sauvegardes déjà
+ * envoyées, propre au contexte backup) vers Settings, aux côtés des autres
+ * réglages de compte/intégrations. Mêmes endpoints qu'avant
+ * (GET/POST /backups/gdrive/*) — seul l'emplacement de l'UI change.
+ */
+function GDriveConnectionCard() {
+  const [status, setStatus] = useState<GDriveStatus | null>(null);
+  const [authUrl, setAuthUrl] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+
+  function loadStatus() {
+    apiJson<GDriveStatus>("/backups/gdrive/status")
+      .then(setStatus)
+      .catch(() => setStatus(null));
+  }
+
+  useEffect(loadStatus, []);
+
+  async function startAuth() {
+    setMessage(null);
+    try {
+      const { url } = await apiJson<{ url: string }>("/backups/gdrive/auth-url");
+      setAuthUrl(url);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setMessage({ type: "error", text: (err as Error).message });
+    }
+  }
+
+  async function submitCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (!code.trim()) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await apiJson("/backups/gdrive/authorize", {
+        method: "POST",
+        body: JSON.stringify({ code: code.trim() }),
+      });
+      setCode("");
+      setAuthUrl(null);
+      setMessage({ type: "ok", text: "Connecté à Google Drive avec succès." });
+      loadStatus();
+    } catch (err) {
+      setMessage({ type: "error", text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function testUpload() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await apiJson("/backups/gdrive/test-upload", { method: "POST" });
+      setMessage({ type: "ok", text: "Fichier de test envoyé avec succès sur Google Drive." });
+    } catch (err) {
+      setMessage({ type: "error", text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function disconnect() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await apiJson("/backups/gdrive/revoke", { method: "POST" });
+      setMessage({ type: "ok", text: "Déconnecté de Google Drive." });
+      loadStatus();
+    } catch (err) {
+      setMessage({ type: "error", text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardTitle className="flex items-center gap-1">
+        <Cloud className="h-4 w-4" /> Google Drive
+      </CardTitle>
+
+      {!status ? (
+        <p className="text-sm text-muted-foreground">Chargement…</p>
+      ) : !status.enabled ? (
+        <p className="text-sm text-muted-foreground">Désactivé (GDRIVE_ENABLED=false côté serveur).</p>
+      ) : !status.configured ? (
+        <p className="text-sm text-muted-foreground">
+          Identifiants OAuth manquants (GDRIVE_OAUTH_CLIENT_ID / GDRIVE_OAUTH_CLIENT_SECRET).
+        </p>
+      ) : status.authorized ? (
+        <div className="flex flex-col gap-2">
+          <p className="flex items-center gap-1 text-sm text-primary">
+            <CheckCircle2 className="h-4 w-4" /> Connecté
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={testUpload} disabled={busy}>
+              Tester la connexion
+            </Button>
+            <ConfirmDialog
+              trigger={
+                <Button size="sm" variant="destructive" disabled={busy}>
+                  Déconnecter
+                </Button>
+              }
+              title="Déconnecter Google Drive ?"
+              description="Les jobs ciblant « gdrive » échoueront jusqu'à une nouvelle autorisation."
+              confirmLabel="Déconnecter"
+              onConfirm={disconnect}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <p className="flex items-center gap-1 text-sm text-warning">
+            <XCircle className="h-4 w-4" /> Non connecté
+          </p>
+          <Button size="sm" variant="outline" onClick={startAuth}>
+            Autoriser l'accès à Google Drive
+          </Button>
+          {authUrl && (
+            <form onSubmit={submitCode} className="flex flex-col gap-2">
+              <p className="text-xs text-muted-foreground">
+                Une fenêtre Google s'est ouverte. Connectez-vous, autorisez l'accès, puis collez le code affiché
+                ci-dessous.
+              </p>
+              <input
+                type="text"
+                placeholder="Code d'autorisation"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+              />
+              <Button type="submit" size="sm" disabled={busy || !code.trim()}>
+                {busy ? "Validation…" : "Valider le code"}
+              </Button>
+            </form>
+          )}
+        </div>
+      )}
+
+      {message && (
+        <p className={`mt-2 text-xs ${message.type === "ok" ? "text-primary" : "text-destructive"}`}>
+          {message.text}
+        </p>
+      )}
+    </Card>
+  );
+}
+
 function AuditLogCard() {
+  const [expanded, setExpanded] = useState(false);
   const [rows, setRows] = useState<AuditLogRow[]>([]);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [loadedOnce, setLoadedOnce] = useState(false);
 
   async function loadMore() {
     setLoading(true);
@@ -451,35 +630,48 @@ function AuditLogCard() {
       setHasMore(page.length === PAGE_SIZE);
     } finally {
       setLoading(false);
+      setLoadedOnce(true);
     }
   }
 
-  useEffect(() => {
-    loadMore();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Repliée par défaut — le journal complet n'est chargé qu'à la demande
+  // (premier dépliage), pas au chargement de la page Settings.
+  function toggle() {
+    setExpanded((v) => {
+      const next = !v;
+      if (next && !loadedOnce) loadMore();
+      return next;
+    });
+  }
 
   return (
     <Card>
-      <CardTitle>Journal d'audit</CardTitle>
-      <div className="flex flex-col gap-1">
-        {rows.map((r) => (
-          <div key={r.id} className="border-b border-border/50 py-1.5 text-xs last:border-0">
-            <div className="flex items-center justify-between">
-              <span className="font-mono">{r.action}</span>
-              <span className={r.result === "success" ? "text-primary" : "text-destructive"}>{r.result}</span>
-            </div>
-            <p className="text-muted-foreground">
-              {r.target ?? "—"} · {new Date(r.created_at).toLocaleString()}
-            </p>
+      <button type="button" onClick={toggle} className="flex w-full items-center justify-between">
+        <CardTitle className="mb-0">Journal d'audit</CardTitle>
+        {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+      </button>
+      {expanded && (
+        <>
+          <div className="mt-2 flex flex-col gap-1">
+            {rows.map((r) => (
+              <div key={r.id} className="border-b border-border/50 py-1.5 text-xs last:border-0">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono">{r.action}</span>
+                  <span className={r.result === "success" ? "text-primary" : "text-destructive"}>{r.result}</span>
+                </div>
+                <p className="text-muted-foreground">
+                  {r.target ?? "—"} · {new Date(r.created_at).toLocaleString()}
+                </p>
+              </div>
+            ))}
+            {rows.length === 0 && !loading && <p className="text-sm text-muted-foreground">Aucune entrée.</p>}
           </div>
-        ))}
-        {rows.length === 0 && !loading && <p className="text-sm text-muted-foreground">Aucune entrée.</p>}
-      </div>
-      {hasMore && (
-        <Button size="sm" variant="outline" className="mt-2 w-full" disabled={loading} onClick={loadMore}>
-          {loading ? "Chargement…" : "Charger plus"}
-        </Button>
+          {hasMore && (
+            <Button size="sm" variant="outline" className="mt-2 w-full" disabled={loading} onClick={loadMore}>
+              {loading ? "Chargement…" : "Charger plus"}
+            </Button>
+          )}
+        </>
       )}
     </Card>
   );

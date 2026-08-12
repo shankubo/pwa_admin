@@ -4,14 +4,30 @@ import { X } from "lucide-react";
 import { navItems } from "./navItems";
 import { cn } from "@/lib/utils";
 import { useHostname } from "@/lib/useHostname";
+import { useInstalledServices } from "@/lib/useInstalledServices";
 
 interface AppDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-function NavGroup({ group, onNavigate }: { group: "top" | "management" | "ops" | "bottom"; onNavigate: () => void }) {
-  const items = navItems.filter((i) => i.group === group);
+function NavGroup({
+  group,
+  installedServices,
+  onNavigate,
+}: {
+  group: "top" | "management" | "ops" | "bottom";
+  installedServices: ReturnType<typeof useInstalledServices>;
+  onNavigate: () => void;
+}) {
+  const items = navItems.filter(
+    (i) =>
+      i.group === group &&
+      // Until the first /services/overview answer arrives, installedServices
+      // is null — show every item rather than hiding docker/pm2 during that
+      // brief window (see useInstalledServices's own doc comment).
+      (!i.requiresService || !installedServices || installedServices.has(i.requiresService))
+  );
   return (
     <div className="flex flex-col gap-1">
       {items.map((item) => (
@@ -39,6 +55,7 @@ function NavGroup({ group, onNavigate }: { group: "top" | "management" | "ops" |
 
 export function AppDrawer({ open, onOpenChange }: AppDrawerProps) {
   const hostname = useHostname();
+  const installedServices = useInstalledServices();
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -59,13 +76,13 @@ export function AppDrawer({ open, onOpenChange }: AppDrawerProps) {
             </Dialog.Close>
           </div>
 
-          <NavGroup group="top" onNavigate={() => onOpenChange(false)} />
+          <NavGroup group="top" installedServices={installedServices} onNavigate={() => onOpenChange(false)} />
           <div className="h-px bg-border" />
-          <NavGroup group="management" onNavigate={() => onOpenChange(false)} />
+          <NavGroup group="management" installedServices={installedServices} onNavigate={() => onOpenChange(false)} />
           <div className="h-px bg-border" />
-          <NavGroup group="ops" onNavigate={() => onOpenChange(false)} />
+          <NavGroup group="ops" installedServices={installedServices} onNavigate={() => onOpenChange(false)} />
           <div className="mt-auto h-px bg-border" />
-          <NavGroup group="bottom" onNavigate={() => onOpenChange(false)} />
+          <NavGroup group="bottom" installedServices={installedServices} onNavigate={() => onOpenChange(false)} />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

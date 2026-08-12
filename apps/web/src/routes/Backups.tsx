@@ -180,7 +180,7 @@ export function Backups() {
         <p className="text-lg font-medium">{storage ? formatBytes(storage.localUsedBytes) : "…"}</p>
       </Card>
 
-      <GDriveConnection
+      <GDriveCompareCard
         comparison={comparison}
         comparing={comparing}
         onCompare={runComparison}
@@ -722,6 +722,49 @@ function DriveStatusBadge({ status }: { status: "verified" | "missing" | "size-m
   );
 }
 
+/**
+ * Backup-context slice of what used to be GDriveConnection — connexion/
+ * déconnexion du compte a déménagé vers Settings (réglages de compte), ce
+ * qui reste ici est propre au contexte "sauvegardes" : comparer ce qui est
+ * en local à ce qui est réellement sur Drive. Vérifie elle-même le statut
+ * de connexion pour rester utilisable indépendamment de Settings — un
+ * admin non connecté à Drive voit juste un message plutôt qu'un bouton
+ * qui échouerait.
+ */
+function GDriveCompareCard({
+  comparison,
+  comparing,
+  onCompare,
+  onDeletedFile,
+}: {
+  comparison: GDriveComparisonResult | null;
+  comparing: boolean;
+  onCompare: () => void;
+  onDeletedFile: () => void;
+}) {
+  const [authorized, setAuthorized] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    apiJson<{ authorized: boolean }>("/backups/gdrive/status")
+      .then((s) => setAuthorized(s.authorized))
+      .catch(() => setAuthorized(false));
+  }, []);
+
+  return (
+    <Card>
+      <CardTitle className="flex items-center gap-1">
+        <Cloud className="h-4 w-4" /> Google Drive
+      </CardTitle>
+      {authorized === false && (
+        <p className="text-sm text-muted-foreground">
+          Non connecté — configurez la connexion dans <Link to="/settings" className="text-primary underline-offset-2 hover:underline">Settings</Link>.
+        </p>
+      )}
+      {authorized && <GDriveCompareSummary comparison={comparison} comparing={comparing} onCompare={onCompare} onDeletedFile={onDeletedFile} />}
+    </Card>
+  );
+}
+
 function GDriveCompareSummary({
   comparison,
   comparing,
@@ -734,7 +777,7 @@ function GDriveCompareSummary({
   onDeletedFile: () => void;
 }) {
   return (
-    <div className="mt-2 border-t border-border pt-3">
+    <div className="border-t border-border pt-3 first:border-t-0 first:pt-0">
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium text-muted-foreground">Comparaison local ↔ Google Drive</p>
         <Button size="sm" variant="outline" onClick={onCompare} disabled={comparing}>
@@ -1109,174 +1152,3 @@ function MigrationSnapshotCard() {
   );
 }
 
-interface GDriveStatus {
-  enabled: boolean;
-  configured: boolean;
-  authorized: boolean;
-  rootFolderId: string | null;
-}
-
-function GDriveConnection({
-  comparison,
-  comparing,
-  onCompare,
-  onDeletedFile,
-}: {
-  comparison: GDriveComparisonResult | null;
-  comparing: boolean;
-  onCompare: () => void;
-  onDeletedFile: () => void;
-}) {
-  const [status, setStatus] = useState<GDriveStatus | null>(null);
-  const [authUrl, setAuthUrl] = useState<string | null>(null);
-  const [code, setCode] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
-
-  function loadStatus() {
-    apiJson<GDriveStatus>("/backups/gdrive/status")
-      .then(setStatus)
-      .catch(() => setStatus(null));
-  }
-
-  useEffect(loadStatus, []);
-
-  async function startAuth() {
-    setMessage(null);
-    try {
-      const { url } = await apiJson<{ url: string }>("/backups/gdrive/auth-url");
-      setAuthUrl(url);
-      window.open(url, "_blank", "noopener,noreferrer");
-    } catch (err) {
-      setMessage({ type: "error", text: (err as Error).message });
-    }
-  }
-
-  async function submitCode(e: React.FormEvent) {
-    e.preventDefault();
-    if (!code.trim()) return;
-    setBusy(true);
-    setMessage(null);
-    try {
-      await apiJson("/backups/gdrive/authorize", {
-        method: "POST",
-        body: JSON.stringify({ code: code.trim() }),
-      });
-      setCode("");
-      setAuthUrl(null);
-      setMessage({ type: "ok", text: "Connecté à Google Drive avec succès." });
-      loadStatus();
-    } catch (err) {
-      setMessage({ type: "error", text: (err as Error).message });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function testUpload() {
-    setBusy(true);
-    setMessage(null);
-    try {
-      await apiJson("/backups/gdrive/test-upload", { method: "POST" });
-      setMessage({ type: "ok", text: "Fichier de test envoyé avec succès sur Google Drive." });
-    } catch (err) {
-      setMessage({ type: "error", text: (err as Error).message });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function disconnect() {
-    setBusy(true);
-    setMessage(null);
-    try {
-      await apiJson("/backups/gdrive/revoke", { method: "POST" });
-      setMessage({ type: "ok", text: "Déconnecté de Google Drive." });
-      loadStatus();
-    } catch (err) {
-      setMessage({ type: "error", text: (err as Error).message });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Card>
-      <CardTitle className="flex items-center gap-1">
-        <Cloud className="h-4 w-4" /> Google Drive
-      </CardTitle>
-
-      {!status ? (
-        <p className="text-sm text-muted-foreground">Chargement…</p>
-      ) : !status.enabled ? (
-        <p className="text-sm text-muted-foreground">
-          Désactivé (GDRIVE_ENABLED=false côté serveur).
-        </p>
-      ) : !status.configured ? (
-        <p className="text-sm text-muted-foreground">
-          Identifiants OAuth manquants (GDRIVE_OAUTH_CLIENT_ID / GDRIVE_OAUTH_CLIENT_SECRET).
-        </p>
-      ) : status.authorized ? (
-        <div className="flex flex-col gap-2">
-          <p className="flex items-center gap-1 text-sm text-primary">
-            <CheckCircle2 className="h-4 w-4" /> Connecté
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={testUpload} disabled={busy}>
-              Tester la connexion
-            </Button>
-            <ConfirmDialog
-              trigger={
-                <Button size="sm" variant="destructive" disabled={busy}>
-                  Déconnecter
-                </Button>
-              }
-              title="Déconnecter Google Drive ?"
-              description="Les jobs ciblant « gdrive » échoueront jusqu'à une nouvelle autorisation."
-              confirmLabel="Déconnecter"
-              onConfirm={disconnect}
-            />
-          </div>
-          <GDriveCompareSummary
-            comparison={comparison}
-            comparing={comparing}
-            onCompare={onCompare}
-            onDeletedFile={onDeletedFile}
-          />
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <p className="flex items-center gap-1 text-sm text-warning">
-            <XCircle className="h-4 w-4" /> Non connecté
-          </p>
-          <Button size="sm" variant="outline" onClick={startAuth}>
-            Autoriser l'accès à Google Drive
-          </Button>
-          {authUrl && (
-            <form onSubmit={submitCode} className="flex flex-col gap-2">
-              <p className="text-xs text-muted-foreground">
-                Une fenêtre Google s'est ouverte. Connectez-vous, autorisez l'accès, puis collez le code affiché ci-dessous.
-              </p>
-              <input
-                type="text"
-                placeholder="Code d'autorisation"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-              />
-              <Button type="submit" size="sm" disabled={busy || !code.trim()}>
-                {busy ? "Validation…" : "Valider le code"}
-              </Button>
-            </form>
-          )}
-        </div>
-      )}
-
-      {message && (
-        <p className={`mt-2 text-xs ${message.type === "ok" ? "text-primary" : "text-destructive"}`}>
-          {message.text}
-        </p>
-      )}
-    </Card>
-  );
-}

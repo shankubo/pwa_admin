@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import type { ServiceName } from "@pwa-admin/shared";
 import {
   LayoutDashboard,
   Container,
@@ -25,15 +26,20 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   group: "top" | "management" | "ops" | "bottom";
+  /** Hidden from the nav until /services/overview confirms this service is
+   * installed on the current deployment — no point sending the admin to a
+   * page that just says "not installed" (see useInstalledServices). Omitted
+   * for every item that's always relevant regardless of what's installed. */
+  requiresService?: ServiceName;
 }
 
 export const navItems: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, group: "top" },
-  { to: "/docker", label: "Docker", icon: Container, group: "management" },
+  { to: "/docker", label: "Docker", icon: Container, group: "management", requiresService: "docker" },
   { to: "/nginx", label: "Nginx", icon: Server, group: "management" },
   { to: "/sites", label: "Sites", icon: Globe, group: "management" },
   { to: "/os", label: "OS / Paquets", icon: Package, group: "management" },
-  { to: "/pm2", label: "Node.js (PM2)", icon: Hexagon, group: "management" },
+  { to: "/pm2", label: "Node.js (PM2)", icon: Hexagon, group: "management", requiresService: "pm2" },
   { to: "/network", label: "Réseau & Sécurité", icon: Network, group: "management" },
   { to: "/security", label: "Sécurité serveur", icon: ShieldCheck, group: "management" },
   { to: "/applications", label: "Applications", icon: Boxes, group: "ops" },
