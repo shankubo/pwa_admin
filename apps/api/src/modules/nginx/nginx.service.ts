@@ -680,4 +680,44 @@ export const NginxService = {
       };
     }
   },
+
+  /**
+   * Restore-side counterpart to backupConfig — extracts a whole-config
+   * tarball (sites-available + nginx.conf) back over /etc/nginx. Unlike the
+   * single-vhost restore functions above, there's no single nginx_config_history
+   * snapshot to revert to on failure (this replaces the whole tree at once),
+   * so it takes its own throwaway tar of the current sites-available dir
+   * first and restores that specific tar if `nginx -t` fails afterward —
+   * same test-then-revert-on-failure principle as
+   * enableMaintenance/switchToDuplicate, just scoped to the whole tree
+   * instead of one vhost's file.
+   */
+  async restoreConfig(archivePath: string): Promise<void> {
+    const sitesAvailableDir = resolve(env.NGINX_SITES_AVAILABLE);
+    const parentDir = resolve(sitesAvailableDir, "..");
+
+    // Staged under BACKUP_LOCAL_ROOT/nginx-config — NOT NGINX_CONFIG_BACKUP_DIR
+    // (a different directory, used by the per-vhost snapshot/revert
+    // functions above) — because that's the exact directory the sudoers
+    // rule for this tar czf/xzf pair is scoped to. Reusing the wrong dir
+    // here means sudo silently rejects every restore.
+    const stagingDir = join(env.BACKUP_LOCAL_ROOT, "nginx-config");
+    await mkdir(stagingDir, { recursive: true });
+    const revertArchive = join(stagingDir, `pre-restore-${Date.now()}.tar.gz`);
+    await runCommand("sudo", ["tar", "czf", revertArchive, "-C", parentDir, basename(sitesAvailableDir)], {
+      timeoutMs: 60_000,
+    });
+
+    await runCommand("sudo", ["tar", "xzf", archivePath, "-C", parentDir], { timeoutMs: 60_000 });
+
+    const test = await this.testConfig();
+    if (!test.ok) {
+      await runCommand("sudo", ["tar", "xzf", revertArchive, "-C", parentDir], { timeoutMs: 60_000 }).catch(() => {});
+      await rm(revertArchive, { force: true }).catch(() => {});
+      throw new Error(`nginx_test_failed: ${test.output}`);
+    }
+
+    await rm(revertArchive, { force: true }).catch(() => {});
+    await this.reload();
+  },
 };

@@ -265,6 +265,58 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    id: 12,
+    name: "migration_snapshots",
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS migration_snapshots (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          manifest_id TEXT NOT NULL UNIQUE,
+          scope TEXT NOT NULL,
+          status TEXT NOT NULL,
+          manifest_json TEXT,
+          error TEXT,
+          started_at TEXT NOT NULL DEFAULT (datetime('now')),
+          finished_at TEXT
+        );
+      `);
+    },
+  },
+  {
+    id: 13,
+    name: "migration_restores",
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS migration_restores (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          restore_id TEXT NOT NULL UNIQUE,
+          manifest_id TEXT NOT NULL,
+          status TEXT NOT NULL,
+          include_os_packages INTEGER NOT NULL DEFAULT 0,
+          items_json TEXT,
+          error TEXT,
+          started_at TEXT NOT NULL DEFAULT (datetime('now')),
+          finished_at TEXT
+        );
+      `);
+    },
+  },
+  {
+    id: 14,
+    name: "migration_restored_archives",
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS migration_restored_archives (
+          target_kind TEXT NOT NULL,
+          target_name TEXT NOT NULL,
+          checksum_sha256 TEXT NOT NULL,
+          restored_at TEXT NOT NULL DEFAULT (datetime('now')),
+          PRIMARY KEY (target_kind, target_name)
+        );
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

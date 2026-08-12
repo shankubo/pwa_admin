@@ -26,10 +26,21 @@ __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /bin/systemctl is-active nginx
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/ln -s /etc/nginx/sites-available/*, /etc/nginx/sites-enabled/*
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/rm -f /etc/nginx/sites-enabled/*
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/cp __PWA_ADMIN_APP_DIR__/data/nginx-config-history/*, /etc/nginx/sites-available/*
-# Full config backup (sites-available + nginx.conf), scoped to its own staging dir.
+# Full config backup (sites-available + nginx.conf), scoped to its own staging
+# dir — also covers NginxService.restoreConfig's own throwaway pre-restore
+# snapshot (same czf shape, same destination dir), so no separate rule is
+# needed for that.
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tar czf __PWA_ADMIN_APP_DIR__/data/backups/nginx-config/*.tar.gz -C /etc/nginx sites-available
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tar czf __PWA_ADMIN_APP_DIR__/data/backups/nginx-config/*.tar.gz -C /etc/nginx sites-available nginx.conf
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/chown __PWA_ADMIN_USER__ __PWA_ADMIN_APP_DIR__/data/backups/nginx-config/*.tar.gz
+# Full config restore (NginxService.restoreConfig, disaster recovery / server
+# migration) — extracts a whole-config tarball back over /etc/nginx.
+# archivePath is ALWAYS a local path under this exact staging dir by the time
+# restoreConfig runs — for a migration restore, MigrationService copies the
+# USB archive here first (a plain, non-privileged file copy: both the USB
+# mount and this staging dir are already service-user-owned) rather than
+# ever passing an arbitrary USB path to a sudo tar rule.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tar xzf __PWA_ADMIN_APP_DIR__/data/backups/nginx-config/*.tar.gz -C /etc/nginx
 # Cert files referenced by ssl_certificate are frequently root-only (e.g. /etc/ssl/private), same rationale as `nginx -t`.
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/openssl x509 -in * -noout -enddate -issuer -subject
 
@@ -39,6 +50,22 @@ __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/apt-get upgrade -y
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/apt-get full-upgrade -y
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/apt-mark hold *
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/apt-mark unhold *
+# Multi-package batch install (OsService.installPackages, POST
+# /os/packages/install-batch) — used by the migration restore flow's
+# "installer les paquets manquants" step. Wildcard on package names is wider
+# than the rest of this file's exact-argv convention, but stays scoped to the
+# install -y subcommand only (never a bare apt-get); each name is validated
+# with isValidPackageName() app-side before this is ever invoked, and the
+# whole route is additionally gated behind APT_ALLOW_INSTALL_REMOVE=true.
+# Same rule also covers `apt-get install -y pkg=version` (version-pinned
+# migration restore) — sudoers matches argv as a single string, and `*`
+# already spans the "=version" suffix.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/apt-get install -y *
+# Upgrade-in-place fallback (OsService.installOrUpgradePackages) for when a
+# migration manifest's exact pinned version isn't available in this
+# machine's repos (different OS/point release) — same isValidPackageName +
+# APT_ALLOW_INSTALL_REMOVE gating as the rule above.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/apt-get install --only-upgrade -y *
 
 # --- Hardware / système module ---
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/nmcli device wifi connect * password *
@@ -148,6 +175,15 @@ __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/mysql *
 # CREATE/DROP DATABASE via psql -c — the existing `psql` rule (no args, used
 # interactively by pg_dumpall's sibling calls) doesn't match this argv shape.
 __PWA_ADMIN_USER__ ALL=(postgres) NOPASSWD: /usr/bin/psql -c *
+
+# --- Migration module ---
+# No sudo rule needed here: MigrationService's own capture step (.env +
+# secrets/ archive) reads files this service user already owns and writes
+# straight to the USB mountpoint (also service-user-owned via
+# backup-usb-mount.sh) — no root-owned source or destination involved.
+# Every other artifact a migration snapshot captures (Docker images/volumes,
+# databases, nginx config, Applications) reuses the sudo rules already
+# defined in their own modules' sections above.
 
 # The system-wide sudoers `Defaults` sets `use_pty`, which makes sudo require
 # an allocated pseudo-terminal — fine for interactive SSH use, but the

@@ -8,8 +8,13 @@ import type {
   BackupUploadResult,
   BackupUploadSourceKind,
   GDriveComparisonResult,
+  MigrationManifest,
+  MigrationRestoreRun,
+  MigrationRestorePlan,
+  WsServerFrame,
 } from "@pwa-admin/shared";
 import { apiJson, apiFetch } from "@/lib/api";
+import { useWsChannel } from "@/lib/ws";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -24,15 +29,18 @@ import {
   Boxes,
   Container,
   CheckCircle2,
+  XCircle,
   Loader2,
+  Server,
 } from "lucide-react";
 
 type SelectedItem =
   | { kind: "generic"; run: BackupHistoryEntry }
   | { kind: "app"; appId: number; appName: string; run: AppBackupRun }
-  | { kind: "app-image"; appId: number; containerName: string; run: BackupHistoryEntry };
+  | { kind: "app-image"; appId: number; containerName: string; run: BackupHistoryEntry }
+  | { kind: "migration"; manifest: MigrationManifest };
 
-type Source = "local" | "usb" | "gdrive" | "upload";
+type Source = "local" | "usb" | "gdrive" | "upload" | "migration";
 
 export function Restore() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -48,6 +56,7 @@ export function Restore() {
   const [gdriveAuthorized, setGdriveAuthorized] = useState(false);
   const [apps, setApps] = useState<Application[] | null>(null);
   const [appRuns, setAppRuns] = useState<AppBackupRun[] | null>(null);
+  const [migrationManifests, setMigrationManifests] = useState<MigrationManifest[] | null>(null);
 
   useEffect(() => {
     apiJson<BackupHistoryEntry[]>("/backups/history?limit=100&offset=0").then(setHistory).catch(() => setHistory([]));
@@ -57,6 +66,7 @@ export function Restore() {
       .catch(() => setGdriveAuthorized(false));
     apiJson<Application[]>("/applications").then(setApps).catch(() => setApps([]));
     apiJson<AppBackupRun[]>("/applications/runs/all").then(setAppRuns).catch(() => setAppRuns([]));
+    apiJson<MigrationManifest[]>("/migration/manifests").then(setMigrationManifests).catch(() => setMigrationManifests([]));
   }, []);
 
   const usbConfigured = usbStatus?.drives.some((d) => d.isBackupConfigured) ?? false;
@@ -80,7 +90,7 @@ export function Restore() {
   }
 
   async function doRestore() {
-    if (!selected) return;
+    if (!selected || selected.kind === "migration") return;
     setRestoring(true);
     setError(null);
     try {
@@ -143,6 +153,7 @@ export function Restore() {
           localAvailable={localAvailable}
           usbAvailable={usbConfigured}
           gdriveAuthorized={gdriveAuthorized}
+          migrationAvailable={usbConfigured && (migrationManifests?.length ?? 0) > 0}
           onSelect={(s) => {
             setSource(s);
             if (s !== "upload") setStep(2);
@@ -235,7 +246,21 @@ export function Restore() {
         />
       )}
 
-      {step === 3 && selected && (
+      {step === 2 && source === "migration" && (
+        <StepMigration
+          manifests={migrationManifests ?? []}
+          onSelect={(manifest) => {
+            setSelected({ kind: "migration", manifest });
+            setStep(3);
+          }}
+        />
+      )}
+
+      {step === 3 && selected && selected.kind === "migration" && (
+        <StepMigrationConfirm manifest={selected.manifest} onReset={reset} />
+      )}
+
+      {step === 3 && selected && selected.kind !== "migration" && (
         <StepConfirm
           selected={selected}
           restoring={restoring}
@@ -252,12 +277,14 @@ function StepSource({
   localAvailable,
   usbAvailable,
   gdriveAuthorized,
+  migrationAvailable,
   onSelect,
   onUploaded,
 }: {
   localAvailable: boolean;
   usbAvailable: boolean;
   gdriveAuthorized: boolean;
+  migrationAvailable: boolean;
   onSelect: (source: Source) => void;
   onUploaded: (result: BackupUploadResult, sourceType: BackupUploadSourceKind, sourceRef: string) => void;
 }) {
@@ -289,6 +316,13 @@ function StepSource({
           onClick={() => onSelect("gdrive")}
         />
         <SourceTile icon={Upload} label="Téléverser" enabled onClick={() => setShowUpload(true)} />
+        <SourceTile
+          icon={Server}
+          label="Migration serveur"
+          enabled={migrationAvailable}
+          disabledReason="Aucun instantané de migration sur le disque USB"
+          onClick={() => onSelect("migration")}
+        />
       </div>
 
       {showUpload && <UploadForm onCancel={() => setShowUpload(false)} onUploaded={onUploaded} />}
@@ -822,7 +856,7 @@ function StepConfirm({
   onRestore,
   onReset,
 }: {
-  selected: SelectedItem;
+  selected: Exclude<SelectedItem, { kind: "migration" }>;
   restoring: boolean;
   restored: boolean;
   onRestore: () => void;
@@ -873,5 +907,291 @@ function StepConfirm({
         onConfirm={onRestore}
       />
     </Card>
+  );
+}
+
+function StepMigration({
+  manifests,
+  onSelect,
+}: {
+  manifests: MigrationManifest[];
+  onSelect: (manifest: MigrationManifest) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-muted-foreground">
+        Étape 2 — Instantanés de migration disponibles sur le disque USB.
+      </p>
+      {manifests.length === 0 && (
+        <p className="text-sm text-muted-foreground">Aucun instantané de migration trouvé.</p>
+      )}
+      {manifests.map((m) => {
+        const successCount = m.items.filter((i) => i.status === "success").length;
+        return (
+          <button
+            key={m.manifestId}
+            type="button"
+            onClick={() => onSelect(m)}
+            className="rounded-md border border-border p-3 text-left text-sm hover:bg-muted"
+          >
+            <p className="flex items-center gap-2 font-medium">
+              <Server className="h-4 w-4 text-primary" />
+              {m.scope.type === "site" ? `Site : ${m.scope.siteName}` : `Serveur complet (${m.hostname})`}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {new Date(m.createdAt).toLocaleString()} · {successCount}/{m.items.length} éléments capturés ·{" "}
+              {m.osDistro} {m.osRelease}
+            </p>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function StepMigrationConfirm({ manifest, onReset }: { manifest: MigrationManifest; onReset: () => void }) {
+  const [includeOsPackages, setIncludeOsPackages] = useState(false);
+  const [restoreId, setRestoreId] = useState<string | null>(null);
+  const [run, setRun] = useState<MigrationRestoreRun | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [plan, setPlan] = useState<MigrationRestorePlan | null>(null);
+  const [planError, setPlanError] = useState<string | null>(null);
+
+  // Pre-flight, read-only: shows exactly what the restore is about to do
+  // (installer/mettre à jour/ignorer par paquet, remplacer/ignorer par
+  // élément) BEFORE anything is touched — refetched whenever the manifest
+  // changes, never triggered by the restore itself.
+  useEffect(() => {
+    setPlan(null);
+    setPlanError(null);
+    apiJson<MigrationRestorePlan>(`/migration/restore/plan/${manifest.manifestId}`)
+      .then(setPlan)
+      .catch((err) => setPlanError((err as Error).message));
+  }, [manifest.manifestId]);
+
+  useWsChannel(
+    "migration.restore",
+    (frame: WsServerFrame) => {
+      const data = frame.data as { items?: MigrationRestoreRun["items"]; done?: boolean; status?: string };
+      if (data.items) {
+        setRun((prev) => (prev ? { ...prev, items: data.items! } : prev));
+      }
+      if (data.done) {
+        setRun((prev) =>
+          prev ? { ...prev, status: (data.status as MigrationRestoreRun["status"]) ?? prev.status } : prev
+        );
+      }
+    },
+    restoreId ? { restoreId } : undefined
+  );
+
+  // Polling fallback alongside the WS subscription above (same pattern as
+  // MigrationSnapshotCard in Backups.tsx) — the server can start publishing
+  // progress before the browser's WebSocket has finished (re)connecting and
+  // subscribing, and wsHub has no frame replay for late subscribers, so a
+  // restore that finishes in that gap would otherwise leave this screen
+  // stuck on "en cours" forever with no way to recover.
+  const runStatus = run?.status;
+  useEffect(() => {
+    if (!restoreId || (runStatus && runStatus !== "running" && runStatus !== "pending")) return;
+    const interval = setInterval(async () => {
+      try {
+        const latest = await apiJson<MigrationRestoreRun>(`/migration/restore/${restoreId}`);
+        setRun(latest);
+      } catch {
+        // transient fetch failure — next tick retries, WS may also still deliver
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [restoreId, runStatus]);
+
+  const hasOsPackagesItem = manifest.items.some((i) => i.category === "os-packages" && i.status === "success");
+
+  async function start() {
+    setStarting(true);
+    setError(null);
+    try {
+      const result = await apiJson<{ restoreId: string }>("/migration/restore", {
+        method: "POST",
+        body: JSON.stringify({ manifestId: manifest.manifestId, includeOsPackages, confirm: true }),
+      });
+      setRestoreId(result.restoreId);
+      setRun({
+        restoreId: result.restoreId,
+        manifestId: manifest.manifestId,
+        status: "running",
+        includeOsPackages,
+        items: [],
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        error: null,
+      });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  if (run && (run.status === "success" || run.status === "partial" || run.status === "failed")) {
+    return (
+      <Card>
+        <p
+          className={`flex items-center gap-1 text-sm ${
+            run.status === "success" ? "text-primary" : run.status === "partial" ? "text-warning" : "text-destructive"
+          }`}
+        >
+          {run.status === "success" ? (
+            <CheckCircle2 className="h-4 w-4" />
+          ) : run.status === "partial" ? (
+            <CheckCircle2 className="h-4 w-4" />
+          ) : (
+            <XCircle className="h-4 w-4" />
+          )}
+          {run.status === "success"
+            ? "Restauration terminée avec succès."
+            : run.status === "partial"
+              ? "Restauration terminée avec des erreurs partielles."
+              : "Échec de la restauration."}
+        </p>
+        <RestoreItemsList items={run.items} />
+        <Button size="sm" variant="outline" className="mt-3" onClick={onReset}>
+          Nouvelle restauration
+        </Button>
+      </Card>
+    );
+  }
+
+  if (run) {
+    return (
+      <Card>
+        <p className="flex items-center gap-1 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Restauration en cours…
+        </p>
+        <RestoreItemsList items={run.items} />
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardTitle>Étape 3 — Confirmation</CardTitle>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {manifest.scope.type === "site" ? `Site : ${manifest.scope.siteName}` : `Serveur complet (${manifest.hostname})`}{" "}
+        · {new Date(manifest.createdAt).toLocaleString()}
+      </p>
+
+      {planError && <p className="mt-2 text-xs text-destructive">{planError}</p>}
+
+      {!plan && !planError && (
+        <p className="mt-3 flex items-center gap-1 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Analyse de l'état actuel du serveur…
+        </p>
+      )}
+
+      {plan && (
+        <div className="mt-3 flex flex-col gap-3">
+          {!plan.osMatch && (
+            <p className="flex items-start gap-1 rounded-md border border-warning/40 bg-warning/10 p-2 text-xs text-warning">
+              <span>
+                OS différent : instantané pris sur {plan.manifestOsDistro} {plan.manifestOsRelease}, ce serveur est{" "}
+                {plan.currentOsDistro} {plan.currentOsRelease} — les paquets seront installés en best-effort.
+              </span>
+            </p>
+          )}
+
+          {plan.packages.length > 0 && (
+            <div>
+              <label className="mb-1 flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={includeOsPackages}
+                  onChange={(e) => setIncludeOsPackages(e.target.checked)}
+                />
+                Paquets système ({plan.packages.length})
+              </label>
+              {includeOsPackages && (
+                <div className="ml-6 flex flex-col gap-0.5">
+                  {plan.packages
+                    .filter((p) => p.action !== "up-to-date")
+                    .map((p) => (
+                      <p key={p.name} className="text-xs text-muted-foreground">
+                        <span className="font-mono">{p.name}</span> :{" "}
+                        {p.action === "install"
+                          ? `installer (${p.manifestVersion})`
+                          : `mettre à jour ${p.currentVersion} → ${p.manifestVersion}`}
+                      </p>
+                    ))}
+                  {plan.packages.every((p) => p.action === "up-to-date") && (
+                    <p className="text-xs text-muted-foreground">Tous les paquets sont déjà à jour.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1">
+            {plan.items.map((line, i) => (
+              <div key={`${line.category}-${i}`} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{line.label}</p>
+                  {line.detail && <p className="truncate text-xs text-muted-foreground">{line.detail}</p>}
+                </div>
+                <span
+                  className={
+                    "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium " +
+                    (line.action === "skip-unchanged"
+                      ? "bg-muted text-muted-foreground"
+                      : "bg-warning/15 text-warning")
+                  }
+                >
+                  {line.action === "replace"
+                    ? "remplacer"
+                    : line.action === "skip-unchanged"
+                      ? "déjà à jour"
+                      : "restaurer"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+
+      <ConfirmDialog
+        trigger={
+          <Button size="sm" variant="destructive" className="mt-3" disabled={starting || !plan}>
+            {starting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Restaurer"}
+          </Button>
+        }
+        title="Restaurer cet instantané de migration ?"
+        description="Cette opération va appliquer le plan ci-dessus : les éléments marqués « remplacer »/« restaurer » seront écrasés, les éléments « déjà à jour » seront ignorés. Action irréversible."
+        requireTypedConfirmation="RESTORE"
+        confirmLabel="Restaurer"
+        onConfirm={start}
+      />
+    </Card>
+  );
+}
+
+function RestoreItemsList({ items }: { items: MigrationRestoreRun["items"] }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-3 flex flex-col gap-1">
+      {items.map((item, i) => (
+        <div key={`${item.category}-${i}`} className="flex items-center justify-between text-xs">
+          <span className="truncate">{item.label}</span>
+          {item.status === "success" ? (
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-primary" />
+          ) : item.status === "failed" ? (
+            <XCircle className="h-3.5 w-3.5 shrink-0 text-destructive" />
+          ) : (
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />
+          )}
+        </div>
+      ))}
+    </div>
   );
 }

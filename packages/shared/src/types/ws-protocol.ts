@@ -5,7 +5,9 @@ export type WsChannel =
   | "docker.stats"
   | "nginx.logs"
   | "os.upgrade"
-  | "pm2.logs";
+  | "pm2.logs"
+  | "migration.snapshot"
+  | "migration.restore";
 
 export interface WsSubscribeMessage<TParams = Record<string, unknown>> {
   channel: WsChannel;

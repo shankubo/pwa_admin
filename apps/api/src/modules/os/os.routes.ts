@@ -97,6 +97,32 @@ export default async function osRoutes(app: FastifyInstance) {
   );
 
   app.post(
+    "/os/packages/install-batch",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("os.package.install-batch")],
+      schema: {
+        body: {
+          type: "object",
+          required: ["names"],
+          properties: {
+            names: { type: "array", items: { type: "string" }, minItems: 1 },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      if (!env.APT_ALLOW_INSTALL_REMOVE) return reply.code(403).send({ error: "install_remove_disabled" });
+      const { names } = req.body as { names: string[] };
+      try {
+        const jobId = await OsService.installPackages(names);
+        reply.send({ jobId });
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      }
+    }
+  );
+
+  app.post(
     "/os/packages/:name/remove",
     {
       preHandler: [(app as any).requireAuth, withAudit("os.package.remove", (r) => (r.params as any).name)],

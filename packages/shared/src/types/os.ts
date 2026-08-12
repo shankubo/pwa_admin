@@ -22,7 +22,7 @@ export interface UpgradablePackage {
   availableVersion: string;
 }
 
-export type OsJobKind = "update-check" | "upgrade" | "install" | "remove" | "hold" | "unhold";
+export type OsJobKind = "update-check" | "upgrade" | "install" | "install-batch" | "remove" | "hold" | "unhold";
 export type OsJobStatus = "pending" | "running" | "succeeded" | "failed";
 
 export interface OsJob {

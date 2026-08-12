@@ -70,3 +70,17 @@ const DEBIAN_PACKAGE_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9+.-]*$/;
 export function isValidPackageName(value: string): boolean {
   return DEBIAN_PACKAGE_NAME_RE.test(value) && value.length <= 255;
 }
+
+// Debian version grammar: optional "epoch:", upstream version, optional
+// "-debian-revision" — see deb-version(7). Permissive but excludes shell
+// metacharacters, since this only ever needs to reject injection attempts,
+// not validate every legal version string byte-for-byte.
+const DEBIAN_PACKAGE_VERSION_RE = /^[a-zA-Z0-9][a-zA-Z0-9.+~:-]*$/;
+
+/** Guards `apt-get install pkg=<version>` argv construction — a migration
+ * manifest's os-packages.json is read from a USB drive, so its "version"
+ * field must be validated the same way a package name is before ever
+ * reaching a sudo apt-get argv. */
+export function isValidPackageVersion(value: string): boolean {
+  return DEBIAN_PACKAGE_VERSION_RE.test(value) && value.length <= 255;
+}

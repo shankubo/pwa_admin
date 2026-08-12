@@ -13,4 +13,5 @@ export * from "./types/services.js";
 export * from "./types/serverConnection.js";
 export * from "./types/sites.js";
 export * from "./types/appUpdate.js";
+export * from "./types/migration.js";
 export * from "./types/_external.js";

@@ -1,8 +1,9 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import si from "systeminformation";
-import { runCommand, isValidPackageName } from "../../utils/exec.js";
+import { runCommand, isValidPackageName, isValidPackageVersion } from "../../utils/exec.js";
 import { AptJobRunner } from "./aptJobRunner.js";
+import { env } from "../../config/env.js";
 import type { OsInfo, InstalledPackage, UpgradablePackage } from "@pwa-admin/shared";
 
 export const OsService = {
@@ -67,6 +68,93 @@ export const OsService = {
   async startUpgrade(mode: "upgrade" | "full-upgrade"): Promise<string> {
     const subcommand = mode === "full-upgrade" ? "full-upgrade" : "upgrade";
     return AptJobRunner.start("upgrade", "sudo", ["apt-get", subcommand, "-y"]);
+  },
+
+  /** Installs several packages in one apt-get invocation — used by the
+   * migration restore flow's "installer les paquets manquants" step, where
+   * re-running the single-package install route once per package would mean
+   * re-running `apt-get update` implicitly N times over. Every name is
+   * validated the same way the single-package route already does. Enforces
+   * APT_ALLOW_INSTALL_REMOVE itself (not just at the route layer) so every
+   * caller — including MigrationService's restore orchestrator — is bound
+   * by the same admin-configured policy. */
+  async installPackages(names: string[]): Promise<string> {
+    if (!env.APT_ALLOW_INSTALL_REMOVE) throw new Error("install_remove_disabled");
+    if (names.length === 0) throw new Error("no_packages_given");
+    for (const name of names) {
+      if (!isValidPackageName(name)) throw new Error(`invalid_package_name: ${name}`);
+    }
+    return AptJobRunner.start("install-batch", "sudo", ["apt-get", "install", "-y", ...names]);
+  },
+
+  /**
+   * Migration restore's package step: installs whatever from `targets` isn't
+   * currently installed, and upgrades whatever IS installed but at an older
+   * version than the manifest recorded — a plain install/AptJobRunner batch
+   * only covers the first half. Runs synchronously (not through AptJobRunner,
+   * which only tracks one fire-and-forget job at a time) because each
+   * package needs its own version-pin-then-fallback attempt, not a single
+   * shared apt-get invocation.
+   *
+   * For each outdated package, tries `apt-get install <pkg>=<version>` first
+   * (exact version from the old server) — if that exact version isn't in
+   * this machine's repos (common after an OS upgrade, or a different
+   * Debian/Ubuntu point release), falls back to `apt-get install
+   * --only-upgrade <pkg>` (whatever's newest available) rather than failing
+   * the whole restore over one unpinned package.
+   */
+  async installOrUpgradePackages(
+    targets: { name: string; version: string }[]
+  ): Promise<{ installed: string[]; upgraded: string[]; upToDate: string[]; failed: { name: string; error: string }[] }> {
+    if (!env.APT_ALLOW_INSTALL_REMOVE) throw new Error("install_remove_disabled");
+
+    await runCommand("sudo", ["apt-get", "update"], { timeoutMs: 60_000 }).catch(() => {});
+
+    const installedByName = new Map((await this.listInstalledPackages()).map((p) => [p.name, p.version]));
+    const installed: string[] = [];
+    const upgraded: string[] = [];
+    const upToDate: string[] = [];
+    const failed: { name: string; error: string }[] = [];
+
+    for (const target of targets) {
+      // target.version comes from a migration manifest's os-packages.json —
+      // a file read off a USB drive, not admin-typed input — so it needs
+      // the same argv-injection guard as the package name before ever
+      // reaching a sudo apt-get invocation.
+      if (!isValidPackageName(target.name) || !isValidPackageVersion(target.version)) {
+        failed.push({ name: target.name, error: "invalid_package_name_or_version" });
+        continue;
+      }
+      const currentVersion = installedByName.get(target.name);
+      if (currentVersion === target.version) {
+        upToDate.push(target.name);
+        continue;
+      }
+
+      try {
+        if (!currentVersion) {
+          await runCommand("sudo", ["apt-get", "install", "-y", `${target.name}=${target.version}`], {
+            timeoutMs: 120_000,
+          }).catch(() =>
+            // Exact version not available on this machine's repos — install
+            // whatever's current rather than failing the whole restore.
+            runCommand("sudo", ["apt-get", "install", "-y", target.name], { timeoutMs: 120_000 })
+          );
+          installed.push(target.name);
+        } else {
+          await runCommand("sudo", ["apt-get", "install", "-y", `${target.name}=${target.version}`], {
+            timeoutMs: 120_000,
+          }).catch(() =>
+            runCommand("sudo", ["apt-get", "install", "--only-upgrade", "-y", target.name], { timeoutMs: 120_000 })
+          );
+          upgraded.push(target.name);
+        }
+      } catch (err) {
+        failed.push({ name: target.name, error: (err as Error).message });
+      }
+    }
+
+    return { installed, upgraded, upToDate, failed };
   },
 
   async holdPackage(name: string): Promise<void> {

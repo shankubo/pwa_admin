@@ -12,6 +12,7 @@ import type {
   GDriveComparisonResult,
   UsbStatus,
   UsbBackupArchive,
+  MigrationSnapshotRun,
 } from "@pwa-admin/shared";
 import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
@@ -32,6 +33,7 @@ import {
   Usb,
   Download,
   ArrowRight,
+  Server,
 } from "lucide-react";
 
 const STATUS_FILTERS: { key: "all" | BackupRunStatus; label: string }[] = [
@@ -186,6 +188,8 @@ export function Backups() {
       />
 
       <UsbConnection />
+
+      <MigrationSnapshotCard />
 
       <div>
         <div className="mb-2 flex items-center justify-between">
@@ -981,6 +985,124 @@ function UsbConnection() {
               ))}
             </div>
           )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** Capture-only card: takes a whole-server "migration" snapshot onto the
+ * configured USB drive (disaster recovery / hardware swap). Restoring FROM a
+ * snapshot is deliberately not here — that's Restore.tsx's job, same
+ * separation as every other backup category in this app. */
+function MigrationSnapshotCard() {
+  const [usbConfigured, setUsbConfigured] = useState(false);
+  const [snapshots, setSnapshots] = useState<MigrationSnapshotRun[] | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [activeManifestId, setActiveManifestId] = useState<string | null>(null);
+
+  function loadSnapshots() {
+    apiJson<MigrationSnapshotRun[]>("/migration/snapshots")
+      .then(setSnapshots)
+      .catch(() => setSnapshots([]));
+  }
+
+  useEffect(() => {
+    apiJson<UsbStatus>("/backups/usb/status")
+      .then((s) => setUsbConfigured(s.drives.some((d) => d.isBackupConfigured)))
+      .catch(() => setUsbConfigured(false));
+    loadSnapshots();
+  }, []);
+
+  useEffect(() => {
+    if (!activeManifestId) return;
+    const interval = setInterval(async () => {
+      try {
+        const run = await apiJson<MigrationSnapshotRun>(`/migration/snapshot/${activeManifestId}`);
+        if (run.status !== "running" && run.status !== "pending") {
+          setActiveManifestId(null);
+          loadSnapshots();
+        }
+      } catch {
+        setActiveManifestId(null);
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [activeManifestId]);
+
+  async function startSnapshot() {
+    setStarting(true);
+    setError(null);
+    try {
+      const { manifestId } = await apiJson<{ manifestId: string }>("/migration/snapshot", {
+        method: "POST",
+        body: JSON.stringify({ confirm: true }),
+      });
+      setActiveManifestId(manifestId);
+      loadSnapshots();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardTitle className="flex items-center gap-1">
+        <Server className="h-4 w-4" /> Migration serveur (disque externe)
+      </CardTitle>
+      <p className="text-xs text-muted-foreground">
+        Capture un instantané complet du serveur (images/volumes Docker, bases de données, config
+        Nginx, applications, paquets système, configuration pwa-admin) sur le disque USB de
+        sauvegarde — à utiliser en cas de changement de matériel. La restauration se fait depuis
+        l'écran Restore, sur le nouveau serveur.
+      </p>
+
+      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+
+      {!usbConfigured ? (
+        <p className="mt-2 flex items-center gap-1 text-sm text-warning">
+          <AlertTriangle className="h-4 w-4" /> Aucun disque USB configuré comme sauvegarde (voir
+          ci-dessus).
+        </p>
+      ) : (
+        <Button size="sm" variant="outline" className="mt-2" onClick={startSnapshot} disabled={starting || !!activeManifestId}>
+          {starting || activeManifestId ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Capture en cours…
+            </>
+          ) : (
+            "Prendre un instantané de migration"
+          )}
+        </Button>
+      )}
+
+      {snapshots && snapshots.length > 0 && (
+        <div className="mt-3 flex flex-col gap-1">
+          {snapshots.map((s) => (
+            <div key={s.manifestId} className="flex items-center justify-between text-xs">
+              <span className="truncate text-muted-foreground">
+                {s.scope.type === "site" ? `Site: ${s.scope.siteName}` : "Serveur complet"} ·{" "}
+                {new Date(s.startedAt).toLocaleString()}
+              </span>
+              <span
+                className={
+                  "shrink-0 rounded-full px-2 py-0.5 font-medium " +
+                  (s.status === "success"
+                    ? "bg-primary/15 text-primary"
+                    : s.status === "failed"
+                      ? "bg-destructive/15 text-destructive"
+                      : s.status === "partial"
+                        ? "bg-warning/15 text-warning"
+                        : "bg-muted text-muted-foreground")
+                }
+              >
+                {s.status}
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </Card>

@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { SiteSummary, SiteDetail, DetectedDatabase } from "@pwa-admin/shared";
+import type { SiteSummary, SiteDetail, DetectedDatabase, UsbStatus } from "@pwa-admin/shared";
 import { apiFetch, apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LiveLogPanel } from "@/components/LiveLogPanel";
 import { formatBytes } from "./Docker";
-import { ChevronDown, ChevronUp, Globe, ExternalLink, Copy, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Globe, ExternalLink, Copy, Loader2, Server } from "lucide-react";
 
 function siteUrl(s: SiteSummary): string | null {
   const host = s.serverNames.find((n) => n !== "_");
@@ -43,6 +43,9 @@ export function Sites() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [cloningFor, setCloningFor] = useState<string | null>(null);
+  const [usbConfigured, setUsbConfigured] = useState(false);
+  const [migratingFor, setMigratingFor] = useState<string | null>(null);
+  const [migrationMessage, setMigrationMessage] = useState<string | null>(null);
   const scrolledToTarget = useRef(false);
 
   async function load() {
@@ -55,7 +58,28 @@ export function Sites() {
 
   useEffect(() => {
     load();
+    apiJson<UsbStatus>("/backups/usb/status")
+      .then((s) => setUsbConfigured(s.drives.some((d) => d.isBackupConfigured)))
+      .catch(() => setUsbConfigured(false));
   }, []);
+
+  async function captureSiteMigration(name: string) {
+    setMigratingFor(name);
+    setMigrationMessage(null);
+    try {
+      await apiJson(`/migration/snapshot/site/${encodeURIComponent(name)}`, {
+        method: "POST",
+        body: JSON.stringify({ confirm: true }),
+      });
+      setMigrationMessage(
+        `Capture de migration démarrée pour ${name} — suivez la progression dans Backups.`
+      );
+    } catch (err) {
+      setMigrationMessage((err as Error).message);
+    } finally {
+      setMigratingFor(null);
+    }
+  }
 
   // Deep-link from Dashboard (?site=<name>): scroll the target card into
   // view once, then drop the query param so it doesn't re-trigger on every
@@ -95,6 +119,7 @@ export function Sites() {
   return (
     <div className="flex flex-col gap-3">
       {actionError && <Card className="text-sm text-destructive">{actionError}</Card>}
+      {migrationMessage && <Card className="text-sm">{migrationMessage}</Card>}
       {sites.map((s) => (
         <Card key={s.name} id={`site-${s.name}`}>
           <div
@@ -196,6 +221,24 @@ export function Sites() {
                 <Copy className="h-3.5 w-3.5" /> Cloner
               </Button>
             )}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!usbConfigured || migratingFor === s.name}
+              onClick={() => captureSiteMigration(s.name)}
+              title={
+                usbConfigured
+                  ? "Capture ce site (conteneur, volumes, base de données, config Nginx) sur le disque USB de sauvegarde, en vue d'une migration vers un nouveau serveur"
+                  : "Connectez et configurez un disque USB de sauvegarde (écran Backups) pour activer la migration"
+              }
+            >
+              {migratingFor === s.name ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Server className="h-3.5 w-3.5" />
+              )}{" "}
+              Migration
+            </Button>
             {s.hasDuplicate && !s.failoverActive && (
               <ConfirmDialog
                 trigger={

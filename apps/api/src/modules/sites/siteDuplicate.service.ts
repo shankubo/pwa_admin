@@ -67,10 +67,10 @@ function getRow(vhostName: string): SiteDuplicateRow | undefined {
 
 /** Finds a matching container the same way sites.service.ts does — a
  * container whose published port appears as a substring of the vhost's
- * proxy_pass target. Not extracted as a shared helper across modules since
- * the heuristic is intentionally simple and each call site's error handling
- * differs. */
-async function findLinkedContainer(proxyPassTarget: string | null) {
+ * proxy_pass target. Exported for reuse by MigrationService's per-site
+ * capture, which needs the same heuristic to scope a snapshot to one site's
+ * linked container. */
+export async function findLinkedContainer(proxyPassTarget: string | null) {
   if (!proxyPassTarget) return null;
   const containers = await DockerService.listContainers();
   return (

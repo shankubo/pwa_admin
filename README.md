@@ -57,6 +57,47 @@ Comme le compte n'a pas de shell interactif, `deploy-to-pi.sh` prend un 3ᵉ arg
 
 `./deploy/install.sh` (sans `--create-user`, avec votre propre nom d'utilisateur en second argument) installe pwa-admin sous un compte admin personnel déjà existant plutôt qu'un compte système dédié — plus simple sur un serveur mono-admin, mais mélange le compte technique de l'app avec votre propre compte. Le compte doit déjà être dans le groupe `docker`. Reste utile pour un déploiement existant qui n'a pas encore migré vers un compte dédié.
 
+## Migration / reprise après sinistre (changement de matériel)
+
+En cas de changement de serveur (Raspberry Pi ou PC de remplacement), pwa-admin peut capturer un
+instantané complet de l'état courant sur un disque USB/SSD externe, puis restaurer cet état sur une
+machine neuve — soit totalement vierge (aucun paquet, Docker, Node.js, nginx ou Tailscale installé),
+soit déjà partiellement préparée.
+
+**Capture** (sur l'ancien serveur, écran Backups) :
+
+- « Instantané de migration » (carte « Migration serveur (disque externe) ») capture tout le serveur :
+  images/volumes Docker, bases de données, config Nginx complète, Applications, liste des paquets OS,
+  et la configuration propre de pwa-admin (`.env` + `secrets/`, jamais les certificats Tailscale — non
+  portables vers une nouvelle identité machine).
+- Bouton « Migration » sur chaque carte de site (écran Sites) capture uniquement ce site : son
+  conteneur lié, ses volumes, sa base de données et la config Nginx correspondante.
+- Chaque instantané est écrit dans son propre dossier autonome
+  `BACKUP/<hostname>/migration/<manifestId>/` sur le disque USB configuré comme sauvegarde (voir
+  écran Backups) — jamais mélangé avec les sauvegardes régulières (volumes/db/paths), qui ont leur
+  propre politique de rétention indépendante.
+
+**Bootstrap sur la machine neuve** (`deploy/bootstrap-fresh-server.sh`, exécuté directement sur le
+nouveau serveur avec un compte sudo) :
+
+```bash
+./deploy/bootstrap-fresh-server.sh /home/pwa-admin-svc pwa-admin-svc
+```
+
+Le script audite d'abord ce qui est déjà présent (Docker/Node/nginx/Tailscale) et n'installe que ce
+qui manque, puis clone/build pwa-admin, exécute `install.sh --create-user`, restaure `.env`/`secrets/`
+depuis le disque USB, et démarre le service. Deux points nécessitent une intervention humaine et ne
+sont **jamais** automatisés :
+
+- l'authentification Tailscale sur la nouvelle machine (URL à approuver depuis un appareil déjà connecté au tailnet) ;
+- l'émission d'un nouveau certificat TLS Tailscale après cette authentification (l'ancien certificat n'est pas portable).
+
+**Restauration finale, pilotée par pwa-admin** : une fois le service démarré, se connecter à pwa-admin
+et aller dans Restore > tuile « Migration serveur », choisir l'instantané sur le disque USB (toujours
+branché), puis confirmer — l'orchestration restaure dans un ordre imposé (paquets OS optionnels →
+images Docker → volumes → bases de données → config Nginx → Applications), chaque étape via les
+mêmes fonctions de restauration déjà utilisées par le reste de l'app.
+
 ## État actuel
 
 Toutes les phases du plan sont implémentées :
