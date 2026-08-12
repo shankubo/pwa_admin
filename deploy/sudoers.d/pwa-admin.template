@@ -25,6 +25,13 @@ __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /bin/systemctl is-active nginx
 # /etc/nginx is root-owned; enable/disable (symlink) and config writes go through these.
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/ln -s /etc/nginx/sites-available/*, /etc/nginx/sites-enabled/*
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/rm -f /etc/nginx/sites-enabled/*
+# sites-available/* removal is scoped to NginxService.createVhost's own
+# revert-on-failure path only (deletes the file that SAME call just wrote,
+# if `nginx -t` then rejects it) — every other nginx code path only ever
+# writes/overwrites sites-available files via the cp rule below, never
+# deletes one, so this narrow addition doesn't open a new way to remove an
+# existing (already-enabled) site's config.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/rm -f /etc/nginx/sites-available/*
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/cp __PWA_ADMIN_APP_DIR__/data/nginx-config-history/*, /etc/nginx/sites-available/*
 # Full config backup (sites-available + nginx.conf), scoped to its own staging
 # dir — also covers NginxService.restoreConfig's own throwaway pre-restore
@@ -43,6 +50,9 @@ __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/chown __PWA_ADMIN_USER__ __PWA_
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tar xzf __PWA_ADMIN_APP_DIR__/data/backups/nginx-config/*.tar.gz -C /etc/nginx
 # Cert files referenced by ssl_certificate are frequently root-only (e.g. /etc/ssl/private), same rationale as `nginx -t`.
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/openssl x509 -in * -noout -enddate -issuer -subject
+# Guided config editor's cert-path existence check (NginxService.checkCertPathExists) —
+# app-side already restricts the path to /etc/letsencrypt/ or /etc/ssl/ before this runs.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/test -f /etc/letsencrypt/*, /usr/bin/test -f /etc/ssl/*
 
 # --- OS / apt module ---
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/apt-get update
@@ -227,4 +237,4 @@ __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/mkdir -p /home/*
 # an allocated pseudo-terminal — fine for interactive SSH use, but the
 # pwa-admin service invokes sudo via execFile with no TTY at all, so every
 # scoped command here needs both `!requiretty` and `!use_pty` to run non-interactively.
-Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/bin/systemctl,/usr/bin/fail2ban-client,/usr/bin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/pg_dump,/usr/bin/pg_restore,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat,/usr/sbin/ufw,/usr/bin/tail,/usr/bin/tailscale,/usr/sbin/useradd,/usr/bin/mkdir !requiretty,!use_pty
+Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/bin/systemctl,/usr/bin/fail2ban-client,/usr/bin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/pg_dump,/usr/bin/pg_restore,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat,/usr/sbin/ufw,/usr/bin/tail,/usr/bin/tailscale,/usr/sbin/useradd,/usr/bin/mkdir,/usr/bin/test !requiretty,!use_pty

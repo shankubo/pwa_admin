@@ -208,3 +208,26 @@ export interface MigrationRestorePlan {
   packages: MigrationPlanPackageLine[];
   items: MigrationPlanItemLine[];
 }
+
+/**
+ * One downloadable artifact inside a migration manifest, for the "voir les
+ * fichiers" export panel on the Restore confirmation screen — a manual-SSH
+ * alternative to the app's own restore flow. `fileId` is an opaque key
+ * (never the raw filesystem path — see MigrationService.listManifestFiles/
+ * resolveManifestFileId) used to request a download without the client ever
+ * round-tripping a real archiveRelPath back to the server.
+ */
+export interface MigrationManifestFileEntry {
+  fileId: string;
+  category: MigrationManifestItemCategory;
+  label: string;
+  /** Where this archive restores TO on the target machine, when known (e.g. an Application bind-mount path) — informational only. */
+  destinationPath: string | null;
+  sizeBytes: number | null;
+}
+
+export interface MigrationManifestFileList {
+  manifestId: string;
+  usbRoot: string;
+  files: MigrationManifestFileEntry[];
+}

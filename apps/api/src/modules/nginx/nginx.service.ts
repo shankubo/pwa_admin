@@ -401,6 +401,40 @@ export const NginxService = {
     await this.reload();
   },
 
+  /**
+   * Creates a brand-new vhost file under sites-available — the "create"
+   * counterpart to writeVhostConfig, used by the guided editor's "Nouveau
+   * site" flow. Kept as a SEPARATE entry point from writeVhostConfig (which
+   * requires the file to already exist) rather than one function silently
+   * doing both, so a typo'd vhost name can never accidentally overwrite an
+   * existing site's config. No new sudoers rule needed: the existing `cp
+   * .../sites-available/*` rule is a plain filename-agnostic glob, already
+   * covers writing a file that doesn't exist yet (verified directly against
+   * the sudoers template — sudoers has no "target must pre-exist" concept).
+   * Deliberately does NOT auto-enable the vhost — enabling stays the
+   * existing, separately confirmed enableVhost action.
+   */
+  async createVhost(name: string, content: string): Promise<void> {
+    const path = resolveVhostPath(env.NGINX_SITES_AVAILABLE, name);
+    if (existsSync(path)) throw new Error("vhost_already_exists");
+
+    await mkdir(env.NGINX_CONFIG_BACKUP_DIR, { recursive: true });
+    const tmpPath = join(env.NGINX_CONFIG_BACKUP_DIR, `${name}.candidate-${Date.now()}`);
+    await writeFile(tmpPath, content, "utf8");
+    await runCommand("sudo", ["cp", tmpPath, path], { timeoutMs: 5000 });
+    await rm(tmpPath, { force: true });
+
+    const test = await this.testConfig();
+    if (!test.ok) {
+      // No prior content to revert to — undo means deleting the file this
+      // call itself just created, not restoring something older.
+      await runCommand("sudo", ["rm", "-f", path], { timeoutMs: 5000 }).catch(() => {});
+      throw new Error(`nginx_test_failed: ${test.output}`);
+    }
+    // Not enabled (no symlink into sites-enabled) — nginx never loads this
+    // file yet, so no reload is needed here; enableVhost triggers one later.
+  },
+
   async snapshotVhost(name: string): Promise<number | null> {
     const path = resolveVhostPath(env.NGINX_SITES_AVAILABLE, name);
     if (!existsSync(path)) return null;
@@ -782,5 +816,24 @@ export const NginxService = {
    * so the extracted config's ssl_certificate directives resolve immediately. */
   async restoreCertArchive(archivePath: string): Promise<void> {
     await runCommand("sudo", ["tar", "xzf", archivePath, "-C", "/"], { timeoutMs: 30_000 });
+  },
+
+  /**
+   * Existence check for the guided config editor's manual cert-path input —
+   * NOT a filesystem browser (deliberately out of v1 scope), just a
+   * "does this exact path exist" probe so the admin gets immediate feedback
+   * before saving. Scoped to the two conventional cert directories, same
+   * allowed-roots pattern as UsbExplorerService's backupRoots() guard.
+   * Plain Node existsSync() would false-negative on root-only cert files
+   * (e.g. /etc/ssl/private/*), hence sudo test -f rather than an fs check.
+   */
+  async checkCertPathExists(path: string): Promise<boolean> {
+    const resolved = resolve(path);
+    const allowedRoots = ["/etc/letsencrypt/", "/etc/ssl/"];
+    if (!allowedRoots.some((root) => resolved.startsWith(root))) return false;
+    return runCommand("sudo", ["test", "-f", resolved], { timeoutMs: 5000 }).then(
+      () => true,
+      () => false
+    );
   },
 };

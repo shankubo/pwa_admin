@@ -31,6 +31,8 @@ import type {
   MigrationRestorePlan,
   MigrationPlanPackageLine,
   MigrationPlanItemLine,
+  MigrationManifestFileEntry,
+  MigrationManifestFileList,
 } from "@pwa-admin/shared";
 
 type MigrationRestoreResults = MigrationRestoreItemResult[];
@@ -556,7 +558,78 @@ export const MigrationService = {
       items,
     };
   },
+
+  /**
+   * Flattens a manifest's items into one row per downloadable archive, for
+   * the Restore confirmation screen's "voir les fichiers" export panel — a
+   * manual-SSH alternative to the app's own restore flow, so the admin can
+   * download the exact same archives the automated restore would use and
+   * apply them by hand. Read-only, no restore side effects.
+   */
+  async listManifestFiles(manifestId: string): Promise<MigrationManifestFileList> {
+    const manifest = (await this.listManifestsOnUsb()).find((m) => m.manifestId === manifestId);
+    if (!manifest) throw new Error("manifest_not_found_on_usb");
+    return { manifestId, usbRoot: manifest.usbRoot, files: flattenManifestFiles(manifest).map(({ path, ...entry }) => entry) };
+  },
+
+  /**
+   * Resolves a client-supplied fileId back to the real (absolute)
+   * filesystem path it refers to, for the download route — the client is
+   * NEVER trusted to round-trip a raw archiveRelPath itself (see
+   * MigrationManifestFileEntry's doc comment). This re-derives the exact
+   * same fileId/path pairs listManifestFiles is built from, from the
+   * manifest's CURRENT items, and matches against those — a pure in-memory
+   * lookup against server-derived data, so there's no separate
+   * path-construction/traversal surface to guard.
+   */
+  async resolveManifestFileId(manifestId: string, fileId: string): Promise<string> {
+    const manifest = (await this.listManifestsOnUsb()).find((m) => m.manifestId === manifestId);
+    if (!manifest) throw new Error("manifest_not_found_on_usb");
+    const match = flattenManifestFiles(manifest).find((f) => f.fileId === fileId);
+    if (!match) throw new Error("file_not_in_manifest");
+    return match.path;
+  },
 };
+
+function flattenManifestFiles(manifest: MigrationManifest): (MigrationManifestFileEntry & { path: string })[] {
+  const files: (MigrationManifestFileEntry & { path: string })[] = [];
+  manifest.items.forEach((item, itemIndex) => {
+    if (item.status !== "success") return;
+
+    if (item.applicationPaths || item.applicationDbArchivePath) {
+      for (const [pathIndex, { path, usbArchivePath }] of (item.applicationPaths ?? []).entries()) {
+        files.push({
+          fileId: `${itemIndex}:path:${pathIndex}`,
+          category: item.category,
+          label: item.label,
+          destinationPath: path,
+          sizeBytes: null,
+          path: usbArchivePath,
+        });
+      }
+      if (item.applicationDbArchivePath) {
+        files.push({
+          fileId: `${itemIndex}:db`,
+          category: item.category,
+          label: `${item.label} (base de données)`,
+          destinationPath: null,
+          sizeBytes: null,
+          path: item.applicationDbArchivePath,
+        });
+      }
+    } else if (item.archiveRelPath) {
+      files.push({
+        fileId: `${itemIndex}`,
+        category: item.category,
+        label: item.label,
+        destinationPath: null,
+        sizeBytes: item.sizeBytes,
+        path: item.archiveRelPath,
+      });
+    }
+  });
+  return files;
+}
 
 async function wouldChange(targetKind: string, targetName: string, archivePath: string): Promise<boolean> {
   const checksum = await sha256OfFile(archivePath);

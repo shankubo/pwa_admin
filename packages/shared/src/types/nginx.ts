@@ -68,3 +68,30 @@ export interface NginxCertStatus {
   daysRemaining: number | null;
   source: "certbot" | "manual" | "none";
 }
+
+/**
+ * Structured form model for the guided config editor's v1 field set —
+ * deliberately NOT a full parse of the server block, only the directives
+ * this editor knows how to read/write (see nginx.guidedEditor.ts's own doc
+ * comment). Anything else in the raw config is left untouched by both
+ * parse and serialize.
+ */
+export interface NginxGuidedHeaders {
+  frameOptions: boolean;
+  contentTypeOptions: boolean;
+  referrerPolicy: boolean;
+  hsts: boolean;
+}
+
+export type NginxGuidedMode = "root" | "proxy_pass" | "mixed" | "unknown";
+
+export interface NginxGuidedFormModel {
+  sslEnabled: boolean;
+  certPath: string | null;
+  certKeyPath: string | null;
+  clientMaxBodySize: string | null;
+  headers: NginxGuidedHeaders;
+  mode: NginxGuidedMode;
+  rootPath: string | null;
+  proxyPassTarget: string | null;
+}

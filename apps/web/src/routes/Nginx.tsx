@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import type {
   NginxStatus,
   NginxVhostSummary,
@@ -8,6 +9,7 @@ import type {
   NginxVhostAccessibility,
   NginxVhostErrorSummary,
   NginxConfigBackupRun,
+  NginxGuidedFormModel,
   TopPageEntry,
   VisitorStats,
 } from "@pwa-admin/shared";
@@ -30,6 +32,9 @@ import {
   Users,
   DatabaseBackup,
   FolderX,
+  Wand2,
+  X,
+  Plus,
 } from "lucide-react";
 
 export function Nginx() {
@@ -135,7 +140,18 @@ export function Nginx() {
       <NginxConfigBackupCard />
 
       <div>
-        <h2 className="mb-2 text-sm font-semibold text-muted-foreground">Vhosts</h2>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-muted-foreground">Vhosts</h2>
+          <GuidedConfigEditorDialog
+            mode="create"
+            trigger={
+              <Button size="sm" variant="outline">
+                <Plus className="h-3.5 w-3.5" /> Nouveau site
+              </Button>
+            }
+            onCreated={load}
+          />
+        </div>
         <div className="flex flex-col gap-3">
           {!vhosts && <Card className="text-sm text-muted-foreground">Chargement…</Card>}
           {vhosts?.length === 0 && <Card className="text-sm text-muted-foreground">Aucun vhost.</Card>}
@@ -507,9 +523,22 @@ function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => 
           className="h-56 w-full resize-y rounded-md border border-border bg-black/90 p-2 font-mono text-xs text-green-400 outline-none focus:ring-2 focus:ring-primary"
         />
         {saveError && <p className="mt-1 text-xs text-destructive">{saveError}</p>}
-        <Button size="sm" className="mt-2" disabled={saving} onClick={save}>
-          {saving ? "Enregistrement…" : "Enregistrer"}
-        </Button>
+        <div className="mt-2 flex gap-2">
+          <Button size="sm" disabled={saving} onClick={save}>
+            {saving ? "Enregistrement…" : "Enregistrer"}
+          </Button>
+          <GuidedConfigEditorDialog
+            mode="edit"
+            vhostName={name}
+            content={content}
+            trigger={
+              <Button size="sm" variant="outline">
+                <Wand2 className="h-3.5 w-3.5" /> Éditeur guidé
+              </Button>
+            }
+            onApply={(newContent) => setContent(newContent)}
+          />
+        </div>
       </div>
 
       {history && history.length > 0 && (
@@ -558,3 +587,372 @@ function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => 
     </div>
   );
 }
+
+const DEFAULT_GUIDED_MODEL: NginxGuidedFormModel = {
+  sslEnabled: false,
+  certPath: null,
+  certKeyPath: null,
+  clientMaxBodySize: null,
+  headers: { frameOptions: false, contentTypeOptions: false, referrerPolicy: false, hsts: false },
+  mode: "root",
+  rootPath: null,
+  proxyPassTarget: null,
+};
+
+type GuidedConfigEditorDialogProps =
+  | {
+      mode: "edit";
+      vhostName: string;
+      content: string;
+      trigger: React.ReactNode;
+      onApply: (newContent: string) => void;
+    }
+  | {
+      mode: "create";
+      trigger: React.ReactNode;
+      onCreated: () => void;
+    };
+
+/**
+ * Guided editor for the v1 field set (SSL toggle + cert paths,
+ * client_max_body_size, common security headers, root/proxy_pass mode) —
+ * checkboxes/inputs instead of hand-writing nginx directives, with a short
+ * explanation under each field. Never writes anything on its own: in "edit"
+ * mode it only produces a new candidate `content` string handed back to the
+ * parent via onApply (the existing "Enregistrer" button does the actual
+ * save through the already-validated PUT .../config path); in "create" mode
+ * it calls POST /nginx/vhosts directly since there's no existing file/save
+ * button to defer to.
+ */
+function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
+  const [open, setOpen] = useState(false);
+  const [model, setModel] = useState<NginxGuidedFormModel>(DEFAULT_GUIDED_MODEL);
+  const [serverName, setServerName] = useState("");
+  const [listenPort, setListenPort] = useState(80);
+  const [newVhostName, setNewVhostName] = useState("");
+  const [certCheck, setCertCheck] = useState<"idle" | "checking" | "found" | "missing">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setCertCheck("idle");
+    if (props.mode === "edit") {
+      apiJson<NginxGuidedFormModel>(`/nginx/vhosts/${props.vhostName}/guided/parse`, {
+        method: "POST",
+        body: JSON.stringify({ content: props.content }),
+      })
+        .then(setModel)
+        .catch((err) => setError((err as Error).message));
+    } else {
+      setModel(DEFAULT_GUIDED_MODEL);
+      setServerName("");
+      setListenPort(80);
+      setNewVhostName("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  async function checkCertPath() {
+    if (!model.certPath) return;
+    setCertCheck("checking");
+    try {
+      const { exists } = await apiJson<{ exists: boolean }>(
+        `/nginx/cert-paths/check?path=${encodeURIComponent(model.certPath)}`
+      );
+      setCertCheck(exists ? "found" : "missing");
+    } catch {
+      setCertCheck("missing");
+    }
+  }
+
+  async function submit() {
+    setSaving(true);
+    setError(null);
+    try {
+      if (props.mode === "edit") {
+        const { content: newContent } = await apiJson<{ content: string }>(
+          `/nginx/vhosts/${props.vhostName}/guided/apply`,
+          { method: "POST", body: JSON.stringify({ content: props.content, model }) }
+        );
+        props.onApply(newContent);
+        setOpen(false);
+      } else {
+        if (!newVhostName.trim() || !serverName.trim()) {
+          setError("Nom de fichier et server_name requis.");
+          return;
+        }
+        const { content } = await apiJson<{ content: string }>("/nginx/vhosts/guided/build", {
+          method: "POST",
+          body: JSON.stringify({ model, serverName: serverName.trim(), listenPort }),
+        });
+        await apiJson("/nginx/vhosts", {
+          method: "POST",
+          body: JSON.stringify({ name: newVhostName.trim(), content }),
+        });
+        props.onCreated();
+        setOpen(false);
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger asChild>{props.trigger}</Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[92vw] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-card p-4 shadow-xl outline-none">
+          <div className="flex items-center justify-between">
+            <Dialog.Title className="text-base font-semibold">
+              {props.mode === "create" ? "Nouveau site — configuration guidée" : "Éditeur guidé"}
+            </Dialog.Title>
+            <Dialog.Close className="rounded-md p-1 hover:bg-muted" aria-label="Fermer">
+              <X className="h-4 w-4" />
+            </Dialog.Close>
+          </div>
+
+          <div className="mt-3 flex flex-col gap-4 text-sm">
+            {props.mode === "create" && (
+              <div className="flex flex-col gap-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium">Nom du fichier (sites-available)</label>
+                  <input
+                    type="text"
+                    value={newVhostName}
+                    onChange={(e) => setNewVhostName(e.target.value)}
+                    placeholder="mon-site"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium">server_name</label>
+                  <input
+                    type="text"
+                    value={serverName}
+                    onChange={(e) => setServerName(e.target.value)}
+                    placeholder="exemple.fr www.exemple.fr"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium">Port d'écoute</label>
+                  <input
+                    type="number"
+                    value={listenPort}
+                    onChange={(e) => setListenPort(Number(e.target.value) || 80)}
+                    className="w-32 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="flex items-center gap-2 font-medium">
+                <input
+                  type="checkbox"
+                  checked={model.sslEnabled}
+                  onChange={(e) => setModel((m) => ({ ...m, sslEnabled: e.target.checked }))}
+                />
+                Activer SSL (HTTPS)
+              </label>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Active HTTPS pour ce site en référençant un certificat et sa clé déjà présents sur le serveur.
+              </p>
+              {model.sslEnabled && (
+                <div className="mt-2 flex flex-col gap-2 pl-6">
+                  <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Chemin du certificat</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={model.certPath ?? ""}
+                        onChange={(e) => {
+                          setCertCheck("idle");
+                          setModel((m) => ({ ...m, certPath: e.target.value || null }));
+                        }}
+                        placeholder="/etc/letsencrypt/live/exemple.fr/fullchain.pem"
+                        className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
+                      />
+                      <Button size="sm" variant="outline" disabled={!model.certPath} onClick={checkCertPath}>
+                        Vérifier
+                      </Button>
+                    </div>
+                    {certCheck === "checking" && <p className="mt-1 text-xs text-muted-foreground">Vérification…</p>}
+                    {certCheck === "found" && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-primary">
+                        <CheckCircle2 className="h-3 w-3" /> Fichier trouvé.
+                      </p>
+                    )}
+                    {certCheck === "missing" && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-destructive">
+                        <XCircle className="h-3 w-3" /> Fichier introuvable à cet emplacement.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Chemin de la clé privée</label>
+                    <input
+                      type="text"
+                      value={model.certKeyPath ?? ""}
+                      onChange={(e) => setModel((m) => ({ ...m, certKeyPath: e.target.value || null }))}
+                      placeholder="/etc/letsencrypt/live/exemple.fr/privkey.pem"
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="mb-1 block font-medium">Taille maximale des requêtes</label>
+              <p className="mb-1 text-xs text-muted-foreground">
+                Limite la taille des fichiers/formulaires envoyés par les visiteurs (ex : 20m pour 20 Mo). Laisser
+                vide pour garder la valeur par défaut de Nginx (1 Mo).
+              </p>
+              <input
+                type="text"
+                value={model.clientMaxBodySize ?? ""}
+                onChange={(e) => setModel((m) => ({ ...m, clientMaxBodySize: e.target.value || null }))}
+                placeholder="20m"
+                className="w-32 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+
+            <div>
+              <p className="mb-1 font-medium">En-têtes de sécurité</p>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={model.headers.frameOptions}
+                    onChange={(e) =>
+                      setModel((m) => ({ ...m, headers: { ...m.headers, frameOptions: e.target.checked } }))
+                    }
+                  />
+                  <span>
+                    <span className="block">X-Frame-Options</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Empêche le site d'être affiché dans un iframe sur un autre domaine (anti-clickjacking).
+                    </span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={model.headers.contentTypeOptions}
+                    onChange={(e) =>
+                      setModel((m) => ({ ...m, headers: { ...m.headers, contentTypeOptions: e.target.checked } }))
+                    }
+                  />
+                  <span>
+                    <span className="block">X-Content-Type-Options</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Empêche le navigateur de deviner le type d'un fichier différemment de ce que déclare le
+                      serveur.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={model.headers.referrerPolicy}
+                    onChange={(e) =>
+                      setModel((m) => ({ ...m, headers: { ...m.headers, referrerPolicy: e.target.checked } }))
+                    }
+                  />
+                  <span>
+                    <span className="block">Referrer-Policy</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Limite les informations envoyées aux autres sites quand un visiteur clique sur un lien sortant.
+                    </span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={model.headers.hsts}
+                    onChange={(e) => setModel((m) => ({ ...m, headers: { ...m.headers, hsts: e.target.checked } }))}
+                  />
+                  <span>
+                    <span className="block">Strict-Transport-Security (HSTS)</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Force les navigateurs à toujours utiliser HTTPS pour ce site. À activer seulement si SSL est
+                      bien configuré.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-1 font-medium">Mode de service</p>
+              <p className="mb-1 text-xs text-muted-foreground">
+                « Fichiers statiques » sert directement un dossier du serveur ; « Proxy » relaie les requêtes vers
+                une autre adresse (ex : une application Node.js/Docker sur un port local).
+              </p>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-1.5 text-xs">
+                  <input
+                    type="radio"
+                    checked={model.mode === "root"}
+                    onChange={() => setModel((m) => ({ ...m, mode: "root" }))}
+                  />
+                  Fichiers statiques
+                </label>
+                <label className="flex items-center gap-1.5 text-xs">
+                  <input
+                    type="radio"
+                    checked={model.mode === "proxy_pass"}
+                    onChange={() => setModel((m) => ({ ...m, mode: "proxy_pass" }))}
+                  />
+                  Proxy
+                </label>
+              </div>
+              {model.mode === "root" && (
+                <input
+                  type="text"
+                  value={model.rootPath ?? ""}
+                  onChange={(e) => setModel((m) => ({ ...m, rootPath: e.target.value || null }))}
+                  placeholder="/var/www/mon-site"
+                  className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
+                />
+              )}
+              {model.mode === "proxy_pass" && (
+                <input
+                  type="text"
+                  value={model.proxyPassTarget ?? ""}
+                  onChange={(e) => setModel((m) => ({ ...m, proxyPassTarget: e.target.value || null }))}
+                  placeholder="http://127.0.0.1:3000"
+                  className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
+                />
+              )}
+            </div>
+
+            {error && <p className="text-xs text-destructive">{error}</p>}
+          </div>
+
+          <div className="mt-4 flex justify-end gap-2">
+            <Dialog.Close asChild>
+              <Button variant="outline" size="sm" disabled={saving}>
+                Annuler
+              </Button>
+            </Dialog.Close>
+            <Button size="sm" disabled={saving} onClick={submit}>
+              {saving ? "..." : props.mode === "create" ? "Créer le site" : "Appliquer"}
+            </Button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+

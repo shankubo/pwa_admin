@@ -12,6 +12,7 @@ import type {
   MigrationManifest,
   MigrationRestoreRun,
   MigrationRestorePlan,
+  MigrationManifestFileList,
   WsServerFrame,
 } from "@pwa-admin/shared";
 import { apiJson, apiFetch } from "@/lib/api";
@@ -35,6 +36,8 @@ import {
   Shuffle,
   ChevronDown,
   ChevronUp,
+  FileText,
+  Download,
 } from "lucide-react";
 
 type SelectedItem =
@@ -1052,6 +1055,73 @@ function ManifestTile({ manifest: m, onSelect }: { manifest: MigrationManifest; 
   );
 }
 
+async function downloadManifestFile(manifestId: string, fileId: string) {
+  const { token } = await apiJson<{ token: string }>(`/migration/manifests/${manifestId}/files/download-token`, {
+    method: "POST",
+    body: JSON.stringify({ fileId }),
+  });
+  window.location.href = `/api/migration/manifests/${manifestId}/files/download?token=${encodeURIComponent(token)}`;
+}
+
+/** Read-only export view for a migration manifest — lets the admin see and
+ * download the exact archives an automated restore would use, for a manual
+ * SSH-based install instead. Never mutates anything. */
+function MigrationFileListPanel({ manifestId }: { manifestId: string }) {
+  const [list, setList] = useState<MigrationManifestFileList | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setList(null);
+    setError(null);
+    apiJson<MigrationManifestFileList>(`/migration/manifests/${manifestId}/files`)
+      .then(setList)
+      .catch((err) => setError((err as Error).message));
+  }, [manifestId]);
+
+  return (
+    <div className="mt-2 rounded-md border border-border p-3">
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      {!list && !error && (
+        <p className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Chargement…
+        </p>
+      )}
+      {list && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground">
+            Tous ces fichiers se trouvent déjà ensemble dans le même dossier sur le disque USB — pour une
+            installation manuelle complète, copiez-le directement (<code className="font-mono">scp -r</code> ou
+            disque monté) :
+          </p>
+          <p className="break-all rounded-md bg-muted p-2 font-mono text-[11px]">{list.usbRoot}</p>
+          {list.files.length === 0 && <p className="text-xs text-muted-foreground">Aucun fichier disponible.</p>}
+          {list.files.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {list.files.map((f) => (
+                <div
+                  key={f.fileId}
+                  className="flex items-center justify-between gap-2 rounded-md border border-border p-2 text-xs"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{f.label}</p>
+                    {f.destinationPath && <p className="truncate text-muted-foreground">→ {f.destinationPath}</p>}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {f.sizeBytes != null && <span className="text-muted-foreground">{formatBytes(f.sizeBytes)}</span>}
+                    <Button size="sm" variant="outline" onClick={() => downloadManifestFile(manifestId, f.fileId)}>
+                      <Download className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StepMigrationConfirm({ manifest, onReset }: { manifest: MigrationManifest; onReset: () => void }) {
   const [includeOsPackages, setIncludeOsPackages] = useState(false);
   const [restoreId, setRestoreId] = useState<string | null>(null);
@@ -1065,6 +1135,9 @@ function StepMigrationConfirm({ manifest, onReset }: { manifest: MigrationManife
   // unchecks specific lines/packages they don't want touched this run.
   const [uncheckedLabels, setUncheckedLabels] = useState<Set<string>>(new Set());
   const [uncheckedPackages, setUncheckedPackages] = useState<Set<string>>(new Set());
+  // Independent of the plan/checkbox state above — a purely read-only export
+  // view, never touches what gets restored.
+  const [showFiles, setShowFiles] = useState(false);
 
   // Pre-flight, read-only: shows exactly what the restore is about to do
   // (installer/mettre à jour/ignorer par paquet, remplacer/ignorer par
@@ -1219,6 +1292,11 @@ function StepMigrationConfirm({ manifest, onReset }: { manifest: MigrationManife
         {manifest.scope.type === "site" ? `Site : ${manifest.scope.siteName}` : `Serveur complet (${manifest.hostname})`}{" "}
         · {new Date(manifest.createdAt).toLocaleString()}
       </p>
+
+      <Button size="sm" variant="outline" className="mt-2" onClick={() => setShowFiles((v) => !v)}>
+        <FileText className="h-3.5 w-3.5" /> {showFiles ? "Masquer les fichiers" : "Voir les fichiers"}
+      </Button>
+      {showFiles && <MigrationFileListPanel manifestId={manifest.manifestId} />}
 
       {planError && <p className="mt-2 text-xs text-destructive">{planError}</p>}
 

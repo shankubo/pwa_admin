@@ -1,6 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { NginxService } from "./nginx.service.js";
+import { parseGuidedFields, applyGuidedFields, buildInitialVhostConfig } from "./nginx.guidedEditor.js";
 import { withAudit } from "../../middleware/auditLog.js";
+import type { NginxGuidedFormModel } from "@pwa-admin/shared";
 
 export default async function nginxRoutes(app: FastifyInstance) {
   const auth = { preHandler: (app as any).requireAuth };
@@ -70,6 +72,101 @@ export default async function nginxRoutes(app: FastifyInstance) {
         reply.send({ ok: true });
       } catch (err) {
         reply.code(400).send({ error: (err as Error).message });
+      }
+    }
+  );
+
+  // --- Guided config editor: stateless parse/apply, never writes anything —
+  // the frontend still saves through PUT /nginx/vhosts/:name/config above,
+  // this only produces the candidate text for that existing write path.
+  app.post(
+    "/nginx/vhosts/:name/guided/parse",
+    {
+      preHandler: (app as any).requireAuth,
+      schema: {
+        body: { type: "object", required: ["content"], properties: { content: { type: "string", maxLength: 200000 } } },
+      },
+    },
+    async (req, reply) => {
+      const { content } = req.body as { content: string };
+      reply.send(parseGuidedFields(content));
+    }
+  );
+
+  app.post(
+    "/nginx/vhosts/:name/guided/apply",
+    {
+      preHandler: (app as any).requireAuth,
+      schema: {
+        body: {
+          type: "object",
+          required: ["content", "model"],
+          properties: { content: { type: "string", maxLength: 200000 }, model: { type: "object" } },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { content, model } = req.body as { content: string; model: NginxGuidedFormModel };
+      try {
+        reply.send({ content: applyGuidedFields(content, model) });
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      }
+    }
+  );
+
+  app.post(
+    "/nginx/vhosts/guided/build",
+    {
+      preHandler: (app as any).requireAuth,
+      schema: {
+        body: {
+          type: "object",
+          required: ["model", "serverName", "listenPort"],
+          properties: {
+            model: { type: "object" },
+            serverName: { type: "string", maxLength: 500 },
+            listenPort: { type: "number" },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { model, serverName, listenPort } = req.body as {
+        model: NginxGuidedFormModel;
+        serverName: string;
+        listenPort: number;
+      };
+      reply.send({ content: buildInitialVhostConfig({ ...model, serverName, listenPort }) });
+    }
+  );
+
+  app.get("/nginx/cert-paths/check", auth, async (req, reply) => {
+    const { path } = req.query as { path?: string };
+    if (!path) return reply.code(400).send({ error: "path_required" });
+    reply.send({ exists: await NginxService.checkCertPathExists(path) });
+  });
+
+  app.post(
+    "/nginx/vhosts",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("nginx.vhost.create", (r) => (r.body as any)?.name)],
+      schema: {
+        body: {
+          type: "object",
+          required: ["name", "content"],
+          properties: { name: { type: "string", maxLength: 200 }, content: { type: "string", maxLength: 200000 } },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { name, content } = req.body as { name: string; content: string };
+      try {
+        await NginxService.createVhost(name, content);
+        reply.send({ ok: true });
+      } catch (err) {
+        const message = (err as Error).message;
+        reply.code(message === "vhost_already_exists" ? 409 : 400).send({ error: message });
       }
     }
   );

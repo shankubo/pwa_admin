@@ -51,7 +51,7 @@ export function parseVhostSummary(
  * depth (nginx configs can nest braces inside e.g. `location` or `if`),
  * returning each block's full text plus its start/end offsets in the source.
  */
-function splitServerBlocks(rawConfig: string): { start: number; end: number; text: string }[] {
+export function splitServerBlocks(rawConfig: string): { start: number; end: number; text: string }[] {
   const blocks: { start: number; end: number; text: string }[] = [];
   const re = /server\s*\{/g;
   let match: RegExpExecArray | null;
@@ -78,7 +78,7 @@ function splitServerBlocks(rawConfig: string): { start: number; end: number; tex
  * no-op for visitors anyway (they'd just get redirected again), so it's
  * left untouched.
  */
-function isRedirectOnlyBlock(blockText: string): boolean {
+export function isRedirectOnlyBlock(blockText: string): boolean {
   const withoutLocations = stripLocationBlocks(blockText);
   // Whatever remains outside location{} blocks must contain no directive
   // besides the handful that are safe on a bare server{} (listen,
