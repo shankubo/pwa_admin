@@ -23,12 +23,13 @@ export class ExecError extends Error {
 export async function runCommand(
   bin: string,
   args: string[],
-  opts: { timeoutMs?: number } = {}
+  opts: { timeoutMs?: number; env?: NodeJS.ProcessEnv } = {}
 ): Promise<{ stdout: string; stderr: string }> {
   try {
     const { stdout, stderr } = await execFileAsync(bin, args, {
       timeout: opts.timeoutMs ?? 15_000,
       maxBuffer: 10 * 1024 * 1024,
+      env: opts.env ? { ...process.env, ...opts.env } : process.env,
     });
     return { stdout, stderr };
   } catch (err) {

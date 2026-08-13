@@ -487,8 +487,15 @@ export const ApacheService: WebServerService = {
     try {
       // sudo: apache2ctl configtest must read every cert referenced in every
       // vhost, including root-only Let's Encrypt files, same reasoning as
-      // nginx -t.
-      const { stdout, stderr } = await runCommand("sudo", [env.APACHE_CTL_PATH, "configtest"], { timeoutMs: 10000 });
+      // nginx -t. LC_ALL=C: apache2ctl's "Syntax OK" string goes through
+      // APR's gettext catalog and is translated on non-English locales
+      // (same class of bug as os.service.ts's apt list --upgradable parser)
+      // — without it, a French/German/etc. system locale would make every
+      // valid config look like a failed test.
+      const { stdout, stderr } = await runCommand("sudo", [env.APACHE_CTL_PATH, "configtest"], {
+        timeoutMs: 10000,
+        env: { LC_ALL: "C" },
+      });
       const output = `${stdout}${stderr}`;
       // apache2ctl configtest prints "Syntax OK" (unlike nginx, which only
       // ever prints to stderr) — check for that marker rather than relying

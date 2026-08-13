@@ -45,7 +45,17 @@ export const OsService = {
   },
 
   async listUpgradablePackages(): Promise<UpgradablePackage[]> {
-    const { stdout } = await runCommand("apt", ["list", "--upgradable"], { timeoutMs: 15000 });
+    // LC_ALL=C forces apt's own output to English regardless of the system's
+    // configured locale — a server with e.g. LANG=fr_FR.UTF-8 prints
+    // "[pouvant être mis à jour depuis: ...]" instead of "[upgradable
+    // from: ...]", which silently made this parser match zero lines (still
+    // exit code 0, no error — the admin just saw "0 paquets" on a server
+    // that genuinely had updates). Same idiom apt/dpkg tooling itself
+    // recommends for scripting against their output.
+    const { stdout } = await runCommand("apt", ["list", "--upgradable"], {
+      timeoutMs: 15000,
+      env: { LC_ALL: "C" },
+    });
     const results: UpgradablePackage[] = [];
     for (const line of stdout.split("\n")) {
       const match = /^([^/]+)\/\S+\s+(\S+)\s+\S+\s+\[upgradable from:\s*([^\]]+)\]/.exec(line);

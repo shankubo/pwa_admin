@@ -21,7 +21,16 @@ export const SecurityService = {
   async getUfwStatus(): Promise<UfwStatus> {
     try {
       // sudo: `ufw status` reads the live netfilter ruleset, root-only.
-      const { stdout } = await runCommand("sudo", ["ufw", "status", "verbose"], { timeoutMs: 5000 });
+      // LC_ALL=C: ufw is a gettext-driven Python script and ships translated
+      // catalogs (e.g. "Status: active" becomes non-English prose on a
+      // French/German/etc. system locale) — without this, every regex below
+      // silently fails to match and this function reports a firewall that's
+      // actually on as installed:false/active:false, indistinguishable from
+      // ufw genuinely not being installed.
+      const { stdout } = await runCommand("sudo", ["ufw", "status", "verbose"], {
+        timeoutMs: 5000,
+        env: { LC_ALL: "C" },
+      });
       const active = /^Status:\s*active/im.test(stdout);
       const defaultMatch = /^Default:\s*(.+)$/im.exec(stdout);
       let defaultIncoming: string | null = null;
@@ -175,7 +184,15 @@ export const SecurityService = {
 
     let pendingSecurityUpdates = 0;
     try {
-      const { stdout } = await runCommand("apt", ["list", "--upgradable"], { timeoutMs: 15000 });
+      // LC_ALL=C: same locale-safety reasoning as os.service.ts's
+      // listUpgradablePackages — kept consistent here even though this
+      // particular filter (repo/suite substring "-security", not the
+      // bracketed English phrase) is less exposed to translation than that
+      // one was.
+      const { stdout } = await runCommand("apt", ["list", "--upgradable"], {
+        timeoutMs: 15000,
+        env: { LC_ALL: "C" },
+      });
       pendingSecurityUpdates = stdout.split("\n").filter((l) => /-security/i.test(l)).length;
     } catch {
       pendingSecurityUpdates = 0;
