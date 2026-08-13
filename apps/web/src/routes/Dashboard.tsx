@@ -5,6 +5,7 @@ import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { StatusLed, type StatusLedTone } from "@/components/ui/StatusLed";
 import { useWsChannel } from "@/lib/ws";
 import { formatBytes } from "./Docker";
 import { useHostname } from "@/lib/useHostname";
@@ -36,25 +37,20 @@ function GaugeCard({
   severity?: "warning" | "critical";
   subtext?: string;
 }) {
+  const tone: StatusLedTone = severity === "critical" ? "critical" : severity === "warning" ? "warning" : "ok";
+
   return (
     <Card>
       <div className="flex items-center gap-2">
-        <Icon
-          className={
-            severity === "critical"
-              ? "h-5 w-5 text-destructive"
-              : severity === "warning"
-                ? "h-5 w-5 text-warning"
-                : "h-5 w-5 text-primary"
-          }
-        />
-        <CardTitle className="mb-0">{label}</CardTitle>
+        <Icon className="h-4 w-4 text-muted-foreground" />
+        <CardTitle className="mb-0 flex-1">{label}</CardTitle>
+        <StatusLed tone={tone} />
       </div>
-      <p className="mt-1 text-2xl font-semibold">
+      <p className="mt-1.5 font-display text-2xl font-semibold tabular-nums">
         {value}
-        {unit && <span className="ml-0.5 text-sm font-normal text-muted-foreground">{unit}</span>}
+        {unit && <span className="ml-0.5 font-body text-sm font-normal text-muted-foreground">{unit}</span>}
       </p>
-      {subtext && <p className="text-xs text-muted-foreground">{subtext}</p>}
+      {subtext && <p className="font-display text-xs text-muted-foreground">{subtext}</p>}
     </Card>
   );
 }
