@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Shell } from "@/components/layout/Shell";
 import { RequireAuth } from "@/components/layout/RequireAuth";
@@ -21,8 +22,21 @@ import { Settings } from "@/routes/Settings";
 import { About } from "@/routes/About";
 import { Help } from "@/routes/Help";
 import { externalRoutes } from "@/routes/external";
+import { useLanguageStore } from "@/stores/language.store";
+import i18n from "@/lib/i18n";
 
 export default function App() {
+  const language = useLanguageStore((s) => s.language);
+
+  useEffect(() => {
+    // language === null signifie "pas de choix explicite" : on laisse
+    // i18next-browser-languagedetector gérer la détection initiale déjà
+    // effectuée dans lib/i18n.ts, sans forcer de changeLanguage ici.
+    if (language) {
+      i18n.changeLanguage(language);
+    }
+  }, [language]);
+
   return (
     <BrowserRouter>
       <Routes>
