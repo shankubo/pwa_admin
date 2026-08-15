@@ -11,6 +11,7 @@ import { useAuthStore } from "@/stores/auth.store";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 import {
   ShieldCheck,
   ShieldOff,
@@ -73,6 +74,8 @@ export function Settings() {
           <p className="text-sm text-muted-foreground">Chargement…</p>
         )}
       </Card>
+
+      <LanguageSwitcher />
 
       {user && !user.twoFactorEnabled && (
         <TwoFactorEnrollCard onEnrolled={() => setUser({ ...user, twoFactorEnabled: true })} />
