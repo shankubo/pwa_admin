@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Server, Plus, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useServerConnectionsStore } from "@/stores/serverConnections.store";
 import { Button } from "@/components/ui/Button";
 
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/Button";
  * proxy. Switching navigates to the other server's own /login, since a
  * refresh-token cookie doesn't cross origins. */
 export function ServerSwitcher() {
+  const { t } = useTranslation("common");
   const { servers, addServer, removeServer } = useServerConnectionsStore();
   const [open, setOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -33,7 +35,7 @@ export function ServerSwitcher() {
     <div className="relative">
       <button
         type="button"
-        aria-label="Changer de serveur"
+        aria-label={t("serverSwitcher.openLabel")}
         onClick={() => setOpen((v) => !v)}
         className="rounded-md p-2 hover:bg-muted"
       >
@@ -42,12 +44,12 @@ export function ServerSwitcher() {
 
       {open && (
         <div className="absolute right-0 top-full z-40 mt-1 w-72 rounded-md border border-border bg-card p-2 shadow-lg">
-          <p className="px-1 text-xs font-medium text-muted-foreground">Serveur actuel</p>
+          <p className="px-1 text-xs font-medium text-muted-foreground">{t("serverSwitcher.currentServer")}</p>
           <p className="mb-2 truncate px-1 text-sm">{currentOrigin}</p>
 
           {servers.length > 0 && (
             <>
-              <p className="px-1 text-xs font-medium text-muted-foreground">Autres serveurs</p>
+              <p className="px-1 text-xs font-medium text-muted-foreground">{t("serverSwitcher.otherServers")}</p>
               <div className="mb-2 flex flex-col gap-1">
                 {servers.map((s) => (
                   <div key={s.id} className="flex items-center gap-1">
@@ -61,7 +63,7 @@ export function ServerSwitcher() {
                     </button>
                     <button
                       type="button"
-                      aria-label={`Retirer ${s.label}`}
+                      aria-label={t("serverSwitcher.removeServer", { label: s.label })}
                       onClick={() => removeServer(s.id)}
                       className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
                     >
@@ -77,30 +79,30 @@ export function ServerSwitcher() {
             <form onSubmit={submitAdd} className="flex flex-col gap-1">
               <input
                 type="text"
-                placeholder="Nom (ex: Pi)"
+                placeholder={t("serverSwitcher.namePlaceholder")}
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary"
               />
               <input
                 type="text"
-                placeholder="https://…tailnet.ts.net:8443"
+                placeholder={t("serverSwitcher.urlPlaceholder")}
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary"
               />
               <div className="flex gap-1">
                 <Button type="submit" size="sm">
-                  Ajouter
+                  {t("actions.add")}
                 </Button>
                 <Button type="button" size="sm" variant="ghost" onClick={() => setShowAddForm(false)}>
-                  Annuler
+                  {t("actions.cancel")}
                 </Button>
               </div>
             </form>
           ) : (
             <Button size="sm" variant="outline" className="w-full" onClick={() => setShowAddForm(true)}>
-              <Plus className="h-3.5 w-3.5" /> Ajouter un serveur
+              <Plus className="h-3.5 w-3.5" /> {t("serverSwitcher.addServer")}
             </Button>
           )}
         </div>
