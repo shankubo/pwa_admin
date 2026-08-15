@@ -1,5 +1,6 @@
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { RefreshCw, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 /**
  * Surfaces the service worker's "new version ready" state instead of
@@ -11,6 +12,7 @@ import { RefreshCw, X } from "lucide-react";
  * invisibly with nothing for this component to hook into).
  */
 export function UpdateBanner() {
+  const { t } = useTranslation("common");
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
@@ -22,7 +24,7 @@ export function UpdateBanner() {
     <div className="sticky top-0 z-40 flex items-center justify-between gap-2 bg-primary px-3 py-2 text-sm text-primary-foreground">
       <div className="flex items-center gap-2">
         <RefreshCw className="h-4 w-4 shrink-0" />
-        <span>Nouvelle version disponible.</span>
+        <span>{t("update.available")}</span>
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <button
@@ -30,11 +32,11 @@ export function UpdateBanner() {
           onClick={() => updateServiceWorker(true)}
           className="rounded-md bg-primary-foreground/20 px-3 py-1 font-medium hover:bg-primary-foreground/30"
         >
-          Mettre à jour
+          {t("actions.update")}
         </button>
         <button
           type="button"
-          aria-label="Ignorer"
+          aria-label={t("actions.dismiss")}
           onClick={() => setNeedRefresh(false)}
           className="rounded-md p-1 hover:bg-primary-foreground/20"
         >
