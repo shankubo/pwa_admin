@@ -1,0 +1,21 @@
+{
+  "title": "Server Admin — உள்நுழைவு",
+  "usernamePlaceholder": "பயனர்பெயர்",
+  "passwordPlaceholder": "கடவுச்சொல்",
+  "codePlaceholder": "123456",
+  "tokenPlaceholder": "அணுகல் டோக்கன்",
+  "connecting": "இணைக்கிறது…",
+  "verifying": "சரிபார்க்கிறது…",
+  "signIn": "உள்நுழை",
+  "validate": "உறுதிப்படுத்து",
+  "tokenSignIn": "டோக்கன் மூலம் உள்நுழை",
+  "backToPassword": "கடவுச்சொல்லுக்குத் திரும்பு",
+  "twoFactorPrompt": "உங்கள் 2FA பயன்பாட்டின் குறியீட்டை உள்ளிடவும்.",
+  "tokenPrompt": "மற்றொரு இணைக்கப்பட்ட சாதனத்திலிருந்து உருவாக்கப்பட்ட அணுகல் டோக்கனை ஒட்டவும் (அமைப்புகள் → அணுகல் டோக்கன்கள்).",
+  "errors": {
+    "loginFailed": "உள்நுழைவு தோல்வியடைந்தது",
+    "invalidToken": "தவறான டோக்கன்",
+    "invalidCode": "தவறான குறியீடு",
+    "network": "நெட்வொர்க் பிழை"
+  }
+}

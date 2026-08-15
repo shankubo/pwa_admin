@@ -1,0 +1,21 @@
+{
+  "title": "Server Admin — Sign in",
+  "usernamePlaceholder": "Username",
+  "passwordPlaceholder": "Password",
+  "codePlaceholder": "123456",
+  "tokenPlaceholder": "Access token",
+  "connecting": "Signing in…",
+  "verifying": "Verifying…",
+  "signIn": "Sign in",
+  "validate": "Validate",
+  "tokenSignIn": "Sign in with token",
+  "backToPassword": "Back to password",
+  "twoFactorPrompt": "Enter the code from your 2FA app.",
+  "tokenPrompt": "Paste the access token generated from another connected device (Settings → Access tokens).",
+  "errors": {
+    "loginFailed": "Sign-in failed",
+    "invalidToken": "Invalid token",
+    "invalidCode": "Invalid code",
+    "network": "Network error"
+  }
+}

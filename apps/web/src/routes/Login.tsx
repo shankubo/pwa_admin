@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { useAuthStore } from "@/stores/auth.store";
@@ -7,6 +8,7 @@ import { useAuthStore } from "@/stores/auth.store";
 const API_BASE = "/api";
 
 export function Login() {
+  const { t } = useTranslation("login");
   const navigate = useNavigate();
   const setSession = useAuthStore((s) => s.setSession);
   const [step, setStep] = useState<"credentials" | "2fa" | "token">("credentials");
@@ -31,7 +33,7 @@ export function Login() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Échec de connexion");
+        setError(data.error ?? t("errors.loginFailed"));
         return;
       }
       if (data.requires2fa) {
@@ -42,7 +44,7 @@ export function Login() {
         navigate("/");
       }
     } catch {
-      setError("Erreur réseau");
+      setError(t("errors.network"));
     } finally {
       setLoading(false);
     }
@@ -61,13 +63,13 @@ export function Login() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Jeton invalide");
+        setError(data.error ?? t("errors.invalidToken"));
         return;
       }
       setSession(data.accessToken, null);
       navigate("/");
     } catch {
-      setError("Erreur réseau");
+      setError(t("errors.network"));
     } finally {
       setLoading(false);
     }
@@ -86,13 +88,13 @@ export function Login() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Code invalide");
+        setError(data.error ?? t("errors.invalidCode"));
         return;
       }
       setSession(data.accessToken, null);
       navigate("/");
     } catch {
-      setError("Erreur réseau");
+      setError(t("errors.network"));
     } finally {
       setLoading(false);
     }
@@ -101,12 +103,12 @@ export function Login() {
   return (
     <div className="flex min-h-dvh items-center justify-center p-4">
       <Card className="w-full max-w-sm">
-        <CardTitle>Server Admin — Connexion</CardTitle>
+        <CardTitle>{t("title")}</CardTitle>
         {step === "credentials" ? (
           <form onSubmit={handleCredentialsSubmit} className="flex flex-col gap-3">
             <input
               type="text"
-              placeholder="Identifiant"
+              placeholder={t("usernamePlaceholder")}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
@@ -115,7 +117,7 @@ export function Login() {
             />
             <input
               type="password"
-              placeholder="Mot de passe"
+              placeholder={t("passwordPlaceholder")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
@@ -124,7 +126,7 @@ export function Login() {
             />
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" disabled={loading}>
-              {loading ? "Connexion…" : "Se connecter"}
+              {loading ? t("connecting") : t("signIn")}
             </Button>
             <button
               type="button"
@@ -134,16 +136,16 @@ export function Login() {
               }}
               className="text-sm text-muted-foreground underline underline-offset-2"
             >
-              Connexion par jeton
+              {t("tokenSignIn")}
             </button>
           </form>
         ) : step === "2fa" ? (
           <form onSubmit={handle2faSubmit} className="flex flex-col gap-3">
-            <p className="text-sm text-muted-foreground">Entrez le code de votre application 2FA.</p>
+            <p className="text-sm text-muted-foreground">{t("twoFactorPrompt")}</p>
             <input
               type="text"
               inputMode="numeric"
-              placeholder="123456"
+              placeholder={t("codePlaceholder")}
               value={code}
               onChange={(e) => setCode(e.target.value)}
               maxLength={6}
@@ -152,17 +154,15 @@ export function Login() {
             />
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" disabled={loading}>
-              {loading ? "Vérification…" : "Valider"}
+              {loading ? t("verifying") : t("validate")}
             </Button>
           </form>
         ) : (
           <form onSubmit={handleTokenSubmit} className="flex flex-col gap-3">
-            <p className="text-sm text-muted-foreground">
-              Collez le jeton d'accès généré depuis un autre appareil connecté (Paramètres → Jetons d'accès).
-            </p>
+            <p className="text-sm text-muted-foreground">{t("tokenPrompt")}</p>
             <input
               type="password"
-              placeholder="Jeton d'accès"
+              placeholder={t("tokenPlaceholder")}
               value={accessToken}
               onChange={(e) => setAccessToken(e.target.value)}
               autoComplete="off"
@@ -171,7 +171,7 @@ export function Login() {
             />
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" disabled={loading}>
-              {loading ? "Connexion…" : "Se connecter"}
+              {loading ? t("connecting") : t("signIn")}
             </Button>
             <button
               type="button"
@@ -181,7 +181,7 @@ export function Login() {
               }}
               className="text-sm text-muted-foreground underline underline-offset-2"
             >
-              Retour au mot de passe
+              {t("backToPassword")}
             </button>
           </form>
         )}

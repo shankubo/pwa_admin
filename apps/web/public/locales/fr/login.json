@@ -1,0 +1,21 @@
+{
+  "title": "Server Admin — Connexion",
+  "usernamePlaceholder": "Identifiant",
+  "passwordPlaceholder": "Mot de passe",
+  "codePlaceholder": "123456",
+  "tokenPlaceholder": "Jeton d'accès",
+  "connecting": "Connexion…",
+  "verifying": "Vérification…",
+  "signIn": "Se connecter",
+  "validate": "Valider",
+  "tokenSignIn": "Connexion par jeton",
+  "backToPassword": "Retour au mot de passe",
+  "twoFactorPrompt": "Entrez le code de votre application 2FA.",
+  "tokenPrompt": "Collez le jeton d'accès généré depuis un autre appareil connecté (Paramètres → Jetons d'accès).",
+  "errors": {
+    "loginFailed": "Échec de connexion",
+    "invalidToken": "Jeton invalide",
+    "invalidCode": "Code invalide",
+    "network": "Erreur réseau"
+  }
+}
