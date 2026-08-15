@@ -1,0 +1,27 @@
+{
+  "actions": {
+    "add": "சேர்",
+    "cancel": "ரத்துசெய்",
+    "confirm": "உறுதிப்படுத்து",
+    "remove": "அகற்று",
+    "save": "சேமி",
+    "update": "புதுப்பி",
+    "dismiss": "தவிர்",
+    "back": "பின்செல்"
+  },
+  "app": {
+    "name": "Server Admin"
+  },
+  "update": {
+    "available": "புதிய பதிப்பு கிடைக்கிறது."
+  },
+  "serverSwitcher": {
+    "openLabel": "சேவையகத்தை மாற்று",
+    "currentServer": "தற்போதைய சேவையகம்",
+    "otherServers": "மற்ற சேவையகங்கள்",
+    "removeServer": "{{label}} ஐ அகற்று",
+    "addServer": "சேவையகம் சேர்",
+    "namePlaceholder": "பெயர் (எ.கா. Pi)",
+    "urlPlaceholder": "https://…tailnet.ts.net:8443"
+  }
+}

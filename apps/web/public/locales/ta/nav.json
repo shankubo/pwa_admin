@@ -1,0 +1,29 @@
+{
+  "dashboard": "டாஷ்போர்டு",
+  "docker": "Docker",
+  "nginx": "Nginx",
+  "sites": "தளங்கள்",
+  "os": "OS / தொகுப்புகள்",
+  "pm2": "Node.js (PM2)",
+  "network": "நெட்வொர்க் & பாதுகாப்பு",
+  "security": "சேவையக பாதுகாப்பு",
+  "wizard": "வழிகாட்டி",
+  "applications": "பயன்பாடுகள்",
+  "backups": "காப்புப்பிரதிகள்",
+  "restore": "மீட்டமை",
+  "usbExplorer": "வெளிப்புற USB வட்டு",
+  "system": "System",
+  "services": "சேவைகள்",
+  "help": "உதவி",
+  "about": "பற்றி",
+  "settings": "அமைப்புகள்",
+  "menu": {
+    "open": "மெனுவைத் திற",
+    "close": "மூடு"
+  },
+  "alerts": "எச்சரிக்கைகள்",
+  "easyMode": {
+    "switchToAdvanced": "மேம்பட்ட பயன்முறைக்குத் திரும்பு",
+    "switchToEasy": "எளிய பயன்முறைக்கு மாறு"
+  }
+}

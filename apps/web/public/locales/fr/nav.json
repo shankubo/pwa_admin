@@ -1,0 +1,29 @@
+{
+  "dashboard": "Dashboard",
+  "docker": "Docker",
+  "nginx": "Nginx",
+  "sites": "Sites",
+  "os": "OS / Paquets",
+  "pm2": "Node.js (PM2)",
+  "network": "Réseau & Sécurité",
+  "security": "Sécurité serveur",
+  "wizard": "Assistant",
+  "applications": "Applications",
+  "backups": "Backups",
+  "restore": "Restore",
+  "usbExplorer": "Disque externe USB",
+  "system": "System",
+  "services": "Services",
+  "help": "Aide",
+  "about": "À propos",
+  "settings": "Settings",
+  "menu": {
+    "open": "Ouvrir le menu",
+    "close": "Fermer"
+  },
+  "alerts": "Alertes",
+  "easyMode": {
+    "switchToAdvanced": "Revenir au mode avancé",
+    "switchToEasy": "Passer en mode simplifié"
+  }
+}

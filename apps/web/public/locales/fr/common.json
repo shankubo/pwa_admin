@@ -1,0 +1,27 @@
+{
+  "actions": {
+    "add": "Ajouter",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "remove": "Retirer",
+    "save": "Enregistrer",
+    "update": "Mettre à jour",
+    "dismiss": "Ignorer",
+    "back": "Retour"
+  },
+  "app": {
+    "name": "Server Admin"
+  },
+  "update": {
+    "available": "Nouvelle version disponible."
+  },
+  "serverSwitcher": {
+    "openLabel": "Changer de serveur",
+    "currentServer": "Serveur actuel",
+    "otherServers": "Autres serveurs",
+    "removeServer": "Retirer {{label}}",
+    "addServer": "Ajouter un serveur",
+    "namePlaceholder": "Nom (ex: Pi)",
+    "urlPlaceholder": "https://…tailnet.ts.net:8443"
+  }
+}
