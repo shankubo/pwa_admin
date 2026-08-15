@@ -1,6 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { NavLink } from "react-router-dom";
 import { X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { navItems } from "./navItems";
 import { cn } from "@/lib/utils";
 import { useHostname } from "@/lib/useHostname";
@@ -30,6 +31,7 @@ function NavGroup({
   mode: UiMode;
   onNavigate: () => void;
 }) {
+  const { t } = useTranslation("nav");
   const items = navItems.filter(
     (i) =>
       i.group === group &&
@@ -57,7 +59,7 @@ function NavGroup({
           }
         >
           <item.icon className="h-5 w-5 shrink-0" />
-          {item.label}
+          {t(item.labelKey)}
         </NavLink>
       ))}
     </div>
@@ -65,6 +67,7 @@ function NavGroup({
 }
 
 export function AppDrawer({ open, onOpenChange }: AppDrawerProps) {
+  const { t } = useTranslation("common");
   const hostname = useHostname();
   const installedServices = useInstalledServices();
   const mode = useUiModeStore((s) => s.mode);
@@ -80,7 +83,7 @@ export function AppDrawer({ open, onOpenChange }: AppDrawerProps) {
         >
           <div className="flex items-center justify-between">
             <div>
-              <Dialog.Title className="text-lg font-semibold">Server Admin</Dialog.Title>
+              <Dialog.Title className="text-lg font-semibold">{t("app.name")}</Dialog.Title>
               {hostname && <p className="text-xs text-muted-foreground">{hostname}</p>}
             </div>
             <Dialog.Close className="rounded-md p-1 hover:bg-muted">

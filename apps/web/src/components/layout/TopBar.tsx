@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Menu, Bell, Wand2 } from "lucide-react";
 import { useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { navItems } from "./navItems";
 import { ServerSwitcher } from "./ServerSwitcher";
 import { useHostname } from "@/lib/useHostname";
@@ -14,6 +15,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ onMenuClick, alertCount = 0 }: TopBarProps) {
+  const { t } = useTranslation(["nav", "common"]);
   const location = useLocation();
   const current = navItems.find((i) => (i.to === "/" ? location.pathname === "/" : location.pathname.startsWith(i.to)));
   const hostname = useHostname();
@@ -24,7 +26,11 @@ export function TopBar({ onMenuClick, alertCount = 0 }: TopBarProps) {
   // doc comment) — only the page title, which is actually visible while the
   // admin is looking at this exact screen, reflects the real detected engine.
   const pageLabel =
-    current?.to === "/nginx" && webServerEngine === "apache" ? "Apache" : current?.label ?? "Server Admin";
+    current?.to === "/nginx" && webServerEngine === "apache"
+      ? "Apache"
+      : current
+        ? t(current.labelKey, { ns: "nav" })
+        : t("app.name", { ns: "common" });
 
   useEffect(() => {
     document.title = hostname ? `${pageLabel} — ${hostname}` : pageLabel;
@@ -38,7 +44,7 @@ export function TopBar({ onMenuClick, alertCount = 0 }: TopBarProps) {
       <button
         type="button"
         onClick={onMenuClick}
-        aria-label="Ouvrir le menu"
+        aria-label={t("menu.open", { ns: "nav" })}
         className="rounded-md p-2 hover:bg-muted"
       >
         <Menu className="h-6 w-6" />
@@ -51,8 +57,8 @@ export function TopBar({ onMenuClick, alertCount = 0 }: TopBarProps) {
         <button
           type="button"
           onClick={toggleMode}
-          aria-label={mode === "easy" ? "Revenir au mode avancé" : "Passer en mode simplifié"}
-          title={mode === "easy" ? "Revenir au mode avancé" : "Passer en mode simplifié"}
+          aria-label={mode === "easy" ? t("easyMode.switchToAdvanced", { ns: "nav" }) : t("easyMode.switchToEasy", { ns: "nav" })}
+          title={mode === "easy" ? t("easyMode.switchToAdvanced", { ns: "nav" }) : t("easyMode.switchToEasy", { ns: "nav" })}
           className={cn("rounded-md p-2 hover:bg-muted", mode === "easy" && "text-primary")}
         >
           <Wand2 className="h-5 w-5" />
@@ -60,7 +66,7 @@ export function TopBar({ onMenuClick, alertCount = 0 }: TopBarProps) {
         <ServerSwitcher />
         <button
           type="button"
-          aria-label="Alertes"
+          aria-label={t("alerts", { ns: "nav" })}
           className="relative rounded-md p-2 hover:bg-muted"
         >
           <Bell className="h-5 w-5" />

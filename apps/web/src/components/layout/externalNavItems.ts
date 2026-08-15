@@ -1,8 +1,7 @@
+// GÉNÉRÉ par pwa-admin-plugin-imanote/install.sh — ne pas éditer à la main
 import type { NavItem } from "./navItems";
+import { Clock } from "lucide-react";
 
-// Point d'extension pour un plugin externe privé (ex: pwa-admin-plugin-imanote).
-// Vide par défaut — un installeur de plugin réécrit ce fichier pour ajouter
-// ses propres entrées de menu. Reste versionné avec ce contenu vide pour
-// qu'un `git checkout -f origin/master` sur pwa_admin ne casse jamais le
-// build : au pire le plugin redevient invisible jusqu'au prochain `install.sh`.
-export const externalNavItems: NavItem[] = [];
+export const externalNavItems: NavItem[] = [
+  { to: "/imanote", labelKey: "imanote", icon: Clock, group: "ops" },
+];
