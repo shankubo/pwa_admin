@@ -5,19 +5,29 @@ import { navItems } from "./navItems";
 import { cn } from "@/lib/utils";
 import { useHostname } from "@/lib/useHostname";
 import { useInstalledServices } from "@/lib/useInstalledServices";
+import { useUiModeStore, type UiMode } from "@/stores/uiMode.store";
 
 interface AppDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+// Easy Mode's deliberately closed set of screens — a non-technical operator
+// sees only these plus the Wizard. Explicit allowlist rather than a NavItem
+// field: keeps all mode-filtering logic in one place and requires no changes
+// to externalNavItems.ts's generation contract (imanote is hidden by
+// omission, not by a special case).
+const EASY_MODE_PATHS = new Set(["/", "/help", "/about", "/settings", "/wizard"]);
+
 function NavGroup({
   group,
   installedServices,
+  mode,
   onNavigate,
 }: {
   group: "top" | "management" | "ops" | "bottom";
   installedServices: ReturnType<typeof useInstalledServices>;
+  mode: UiMode;
   onNavigate: () => void;
 }) {
   const items = navItems.filter(
@@ -26,7 +36,8 @@ function NavGroup({
       // Until the first /services/overview answer arrives, installedServices
       // is null — show every item rather than hiding docker/pm2 during that
       // brief window (see useInstalledServices's own doc comment).
-      (!i.requiresService || !installedServices || installedServices.has(i.requiresService))
+      (!i.requiresService || !installedServices || installedServices.has(i.requiresService)) &&
+      (mode === "advanced" || EASY_MODE_PATHS.has(i.to))
   );
   return (
     <div className="flex flex-col gap-1">
@@ -56,6 +67,7 @@ function NavGroup({
 export function AppDrawer({ open, onOpenChange }: AppDrawerProps) {
   const hostname = useHostname();
   const installedServices = useInstalledServices();
+  const mode = useUiModeStore((s) => s.mode);
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -76,13 +88,13 @@ export function AppDrawer({ open, onOpenChange }: AppDrawerProps) {
             </Dialog.Close>
           </div>
 
-          <NavGroup group="top" installedServices={installedServices} onNavigate={() => onOpenChange(false)} />
+          <NavGroup group="top" installedServices={installedServices} mode={mode} onNavigate={() => onOpenChange(false)} />
           <div className="h-px bg-border" />
-          <NavGroup group="management" installedServices={installedServices} onNavigate={() => onOpenChange(false)} />
+          <NavGroup group="management" installedServices={installedServices} mode={mode} onNavigate={() => onOpenChange(false)} />
           <div className="h-px bg-border" />
-          <NavGroup group="ops" installedServices={installedServices} onNavigate={() => onOpenChange(false)} />
+          <NavGroup group="ops" installedServices={installedServices} mode={mode} onNavigate={() => onOpenChange(false)} />
           <div className="mt-auto h-px bg-border" />
-          <NavGroup group="bottom" installedServices={installedServices} onNavigate={() => onOpenChange(false)} />
+          <NavGroup group="bottom" installedServices={installedServices} mode={mode} onNavigate={() => onOpenChange(false)} />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

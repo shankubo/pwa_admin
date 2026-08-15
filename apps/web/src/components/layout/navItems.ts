@@ -18,6 +18,7 @@ import {
   RotateCcw,
   Wrench,
   Usb,
+  Wand2,
 } from "lucide-react";
 import { externalNavItems } from "./externalNavItems";
 
@@ -42,6 +43,7 @@ export const navItems: NavItem[] = [
   { to: "/pm2", label: "Node.js (PM2)", icon: Hexagon, group: "management", requiresService: "pm2" },
   { to: "/network", label: "Réseau & Sécurité", icon: Network, group: "management" },
   { to: "/security", label: "Sécurité serveur", icon: ShieldCheck, group: "management" },
+  { to: "/wizard", label: "Assistant", icon: Wand2, group: "ops" },
   { to: "/applications", label: "Applications", icon: Boxes, group: "ops" },
   { to: "/backups", label: "Backups", icon: DatabaseBackup, group: "ops" },
   { to: "/restore", label: "Restore", icon: RotateCcw, group: "ops" },

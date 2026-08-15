@@ -12,13 +12,14 @@ import type {
   GDriveComparisonResult,
   UsbStatus,
   UsbBackupArchive,
-  MigrationSnapshotRun,
 } from "@pwa-admin/shared";
 import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatBytes } from "./Docker";
+import { triggerBackupDownload, pollBackupRun } from "@/lib/pollBackupRun";
+import { useMigrationSnapshot } from "@/lib/useMigrationSnapshot";
 import {
   Play,
   Trash2,
@@ -47,26 +48,6 @@ function historyCardClass(status: BackupRunStatus): string | undefined {
   if (status === "success") return "border-primary/40 bg-primary/5";
   if (status === "failed") return "border-destructive/50 bg-destructive/5";
   return undefined; // pending/running — no verdict yet
-}
-
-async function triggerDownload(runId: string) {
-  const { token } = await apiJson<{ token: string }>(`/backups/history/${runId}/download-token`, {
-    method: "POST",
-  });
-  window.location.href = `/api/backups/history/${runId}/download?token=${encodeURIComponent(token)}`;
-}
-
-/** Polls a run until it leaves running/pending, then optionally triggers a
- * browser download — shared by the generic Backups flow. */
-async function pollThenMaybeDownload(runId: string, download: boolean) {
-  for (;;) {
-    const entry = await apiJson<BackupHistoryEntry>(`/backups/history/${runId}`);
-    if (entry.status !== "running") {
-      if (download && entry.status === "success") await triggerDownload(runId);
-      return entry;
-    }
-    await new Promise((r) => setTimeout(r, 2000));
-  }
 }
 
 export function Backups() {
@@ -148,7 +129,7 @@ export function Backups() {
         { method: "POST", body: JSON.stringify({ targets }) }
       );
       await loadHistory();
-      await pollThenMaybeDownload(runId, download);
+      await pollBackupRun(runId, download);
       await loadHistory();
     } catch (err) {
       setError((err as Error).message);
@@ -369,7 +350,7 @@ export function Backups() {
                   </div>
                   <div className="flex gap-1">
                     {h.status === "success" && h.target === "local" && (
-                      <Button size="sm" variant="outline" onClick={() => triggerDownload(h.runId)} title="Télécharger">
+                      <Button size="sm" variant="outline" onClick={() => triggerBackupDownload(h.runId)} title="Télécharger">
                         <Download className="h-3.5 w-3.5" />
                       </Button>
                     )}
@@ -495,7 +476,7 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
       });
       if (downloadAfter) {
         const { runId } = await apiJson<{ runId: string }>(`/backups/jobs/${job.id}/run`, { method: "POST" });
-        pollThenMaybeDownload(runId, true).catch(() => {});
+        pollBackupRun(runId, true).catch(() => {});
       }
       onCreated();
     } catch (err) {
@@ -1046,61 +1027,22 @@ function UsbConnection() {
  * separation as every other backup category in this app. */
 function MigrationSnapshotCard() {
   const [usbConfigured, setUsbConfigured] = useState(false);
-  const [snapshots, setSnapshots] = useState<MigrationSnapshotRun[] | null>(null);
-  const [starting, setStarting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [activeManifestId, setActiveManifestId] = useState<string | null>(null);
   // Décoché par défaut — un conteneur "-duplicate" est un clone de bascule
   // manuelle permanent (voir Sites > Dupliquer), identique à son original
   // au moment de la capture ; l'inclure double le temps/l'espace USB pour
   // un artefact qui n'a de sens que sur CE serveur, pas pour une
   // restauration sur une machine neuve.
   const [includeDuplicates, setIncludeDuplicates] = useState(false);
-
-  function loadSnapshots() {
-    apiJson<MigrationSnapshotRun[]>("/migration/snapshots")
-      .then(setSnapshots)
-      .catch(() => setSnapshots([]));
-  }
+  const { snapshots, starting, activeManifestId, error, startWholeServerSnapshot } = useMigrationSnapshot();
 
   useEffect(() => {
     apiJson<UsbStatus>("/backups/usb/status")
       .then((s) => setUsbConfigured(s.drives.some((d) => d.isBackupConfigured)))
       .catch(() => setUsbConfigured(false));
-    loadSnapshots();
   }, []);
 
-  useEffect(() => {
-    if (!activeManifestId) return;
-    const interval = setInterval(async () => {
-      try {
-        const run = await apiJson<MigrationSnapshotRun>(`/migration/snapshot/${activeManifestId}`);
-        if (run.status !== "running" && run.status !== "pending") {
-          setActiveManifestId(null);
-          loadSnapshots();
-        }
-      } catch {
-        setActiveManifestId(null);
-      }
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [activeManifestId]);
-
-  async function startSnapshot() {
-    setStarting(true);
-    setError(null);
-    try {
-      const { manifestId } = await apiJson<{ manifestId: string }>("/migration/snapshot", {
-        method: "POST",
-        body: JSON.stringify({ confirm: true, includeDuplicates }),
-      });
-      setActiveManifestId(manifestId);
-      loadSnapshots();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setStarting(false);
-    }
+  function startSnapshot() {
+    startWholeServerSnapshot(includeDuplicates).catch(() => {});
   }
 
   return (

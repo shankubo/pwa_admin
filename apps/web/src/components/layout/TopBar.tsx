@@ -1,10 +1,12 @@
 import { useEffect } from "react";
-import { Menu, Bell } from "lucide-react";
+import { Menu, Bell, Wand2 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { navItems } from "./navItems";
 import { ServerSwitcher } from "./ServerSwitcher";
 import { useHostname } from "@/lib/useHostname";
 import { useWebServerEngine } from "@/lib/useWebServerEngine";
+import { useUiModeStore } from "@/stores/uiMode.store";
+import { cn } from "@/lib/utils";
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -16,6 +18,8 @@ export function TopBar({ onMenuClick, alertCount = 0 }: TopBarProps) {
   const current = navItems.find((i) => (i.to === "/" ? location.pathname === "/" : location.pathname.startsWith(i.to)));
   const hostname = useHostname();
   const webServerEngine = useWebServerEngine();
+  const mode = useUiModeStore((s) => s.mode);
+  const toggleMode = useUiModeStore((s) => s.toggleMode);
   // The nav menu's own "Nginx" label stays static (see useWebServerEngine's
   // doc comment) — only the page title, which is actually visible while the
   // admin is looking at this exact screen, reflects the real detected engine.
@@ -44,6 +48,15 @@ export function TopBar({ onMenuClick, alertCount = 0 }: TopBarProps) {
         {hostname && <span className="text-[11px] text-muted-foreground">{hostname}</span>}
       </div>
       <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={toggleMode}
+          aria-label={mode === "easy" ? "Revenir au mode avancé" : "Passer en mode simplifié"}
+          title={mode === "easy" ? "Revenir au mode avancé" : "Passer en mode simplifié"}
+          className={cn("rounded-md p-2 hover:bg-muted", mode === "easy" && "text-primary")}
+        >
+          <Wand2 className="h-5 w-5" />
+        </button>
         <ServerSwitcher />
         <button
           type="button"
