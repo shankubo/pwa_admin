@@ -581,6 +581,7 @@ function NewAppForm({
   onCreated: () => void;
   prefillContainer?: string | null;
 }) {
+  const { t } = useTranslation("applications");
   const [name, setName] = useState(prefillContainer ?? "");
   const [containers, setContainers] = useState<ContainerSummary[] | null>(null);
   const [selectedContainers, setSelectedContainers] = useState<string[]>(
@@ -605,13 +606,13 @@ function NewAppForm({
   useEffect(() => {
     apiJson<ContainerSummary[]>("/docker/containers")
       .then(setContainers)
-      .catch(() => setError("Impossible de charger la liste des conteneurs"));
+      .catch(() => setError(t("newAppForm.loadContainersError")));
     apiJson<DetectedBindMount[]>("/backups/bind-mounts")
       .then(setBindMounts)
-      .catch(() => setError("Impossible de charger la liste des dossiers montés"));
+      .catch(() => setError(t("newAppForm.loadMountsError")));
     apiJson<DetectedVolumeMount[]>("/backups/volume-mounts")
       .then(setVolumeMounts)
-      .catch(() => setError("Impossible de charger la liste des volumes Docker"));
+      .catch(() => setError(t("newAppForm.loadVolumesError")));
     apiJson<DetectedDatabase[]>("/dbbackup/detect")
       .then(setDetectedDbs)
       .catch(() => setDetectedDbs([]));
@@ -635,8 +636,8 @@ function NewAppForm({
     setSelectedVolumes((prev) => (prev.includes(volumeName) ? prev.filter((v) => v !== volumeName) : [...prev, volumeName]));
   }
 
-  function toggleTarget(t: BackupTarget) {
-    setTargets((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+  function toggleTarget(tgt: BackupTarget) {
+    setTargets((prev) => (prev.includes(tgt) ? prev.filter((x) => x !== tgt) : [...prev, tgt]));
   }
 
   const visibleMounts = useMemo(() => {
@@ -666,7 +667,7 @@ function NewAppForm({
     e.preventDefault();
     setError(null);
     if (!name.trim() || (selectedPaths.length === 0 && selectedVolumes.length === 0 && !dbValue) || targets.length === 0) {
-      setError("Nom, au moins une cible, et au moins un chemin, volume ou une base de données sont requis");
+      setError(t("newAppForm.validationError"));
       return;
     }
     setSubmitting(true);
@@ -692,11 +693,9 @@ function NewAppForm({
     } catch (err) {
       const message = (err as Error).message;
       if (message === "paths_not_detected_bind_mounts") {
-        setError(
-          "Un ou plusieurs chemins sélectionnés ne correspondent plus à un dossier monté détecté. Rafraîchissez la liste et réessayez."
-        );
+        setError(t("newAppForm.errorPathsNotDetected"));
       } else if (message === "application_name_already_exists") {
-        setError("Une application avec ce nom existe déjà. Choisissez un autre nom ou modifiez l'application existante.");
+        setError(t("newAppForm.errorNameExists"));
       } else {
         setError(message);
       }
@@ -710,17 +709,17 @@ function NewAppForm({
       <form onSubmit={submit} className="flex flex-col gap-3">
         <input
           type="text"
-          placeholder="Nom de l'application"
+          placeholder={t("newAppForm.namePlaceholder")}
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
         />
 
         <div>
-          <p className="mb-1 text-xs font-medium text-muted-foreground">Conteneurs</p>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">{t("newAppForm.containersLabel")}</p>
           <div className="flex flex-col gap-1 rounded-md border border-border p-2">
-            {!containers && <p className="text-xs text-muted-foreground">Chargement…</p>}
-            {containers?.length === 0 && <p className="text-xs text-muted-foreground">Aucun conteneur détecté.</p>}
+            {!containers && <p className="text-xs text-muted-foreground">{t("newAppForm.loading")}</p>}
+            {containers?.length === 0 && <p className="text-xs text-muted-foreground">{t("newAppForm.noContainersDetected")}</p>}
             {containers?.map((c) => (
               <label key={c.id} className="flex items-center gap-2 text-sm">
                 <input
@@ -737,16 +736,13 @@ function NewAppForm({
 
         <div>
           <p className="mb-1 text-xs font-medium text-muted-foreground">
-            Chemins (dossiers montés)
-            {selectedContainers.length > 0 ? " · filtrés par conteneur(s) sélectionné(s)" : ""}
+            {t("newAppForm.pathsLabel")}
+            {selectedContainers.length > 0 ? t("newAppForm.filteredSuffix") : ""}
           </p>
           <div className="flex flex-col gap-1 rounded-md border border-border p-2">
-            {!bindMounts && <p className="text-xs text-muted-foreground">Chargement…</p>}
+            {!bindMounts && <p className="text-xs text-muted-foreground">{t("newAppForm.loading")}</p>}
             {bindMounts && visibleMounts.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                Aucun dossier monté détecté pour cette sélection (conteneur sans données persistées sur disque — ok
-                si un volume Docker ou une base de données est sélectionné ci-dessous).
-              </p>
+              <p className="text-xs text-muted-foreground">{t("newAppForm.noMountsDetected")}</p>
             )}
             {visibleMounts.map((m) => (
               <label key={`${m.containerName}:${m.hostPath}`} className="flex items-center gap-2 text-sm">
@@ -765,13 +761,13 @@ function NewAppForm({
 
         <div>
           <p className="mb-1 text-xs font-medium text-muted-foreground">
-            Volumes Docker (nommés)
-            {selectedContainers.length > 0 ? " · filtrés par conteneur(s) sélectionné(s)" : ""}
+            {t("newAppForm.volumesLabel")}
+            {selectedContainers.length > 0 ? t("newAppForm.filteredSuffix") : ""}
           </p>
           <div className="flex flex-col gap-1 rounded-md border border-border p-2">
-            {!volumeMounts && <p className="text-xs text-muted-foreground">Chargement…</p>}
+            {!volumeMounts && <p className="text-xs text-muted-foreground">{t("newAppForm.loading")}</p>}
             {volumeMounts && visibleVolumeMounts.length === 0 && (
-              <p className="text-xs text-muted-foreground">Aucun volume Docker nommé détecté pour cette sélection.</p>
+              <p className="text-xs text-muted-foreground">{t("newAppForm.noVolumesDetected")}</p>
             )}
             {visibleVolumeMounts.map((m) => (
               <label key={`${m.containerName}:${m.volumeName}`} className="flex items-center gap-2 text-sm">
@@ -792,13 +788,13 @@ function NewAppForm({
         </div>
 
         <div>
-          <p className="mb-1 text-xs font-medium text-muted-foreground">Base de données (optionnel)</p>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">{t("newAppForm.dbLabel")}</p>
           <select
             value={dbValue}
             onChange={(e) => setDbValue(e.target.value)}
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
           >
-            <option value="">Aucune</option>
+            <option value="">{t("newAppForm.dbNone")}</option>
             {detectedDbs?.map((d) => (
               <option key={`${d.location}:${d.ref}`} value={`${d.location}:${d.ref}`}>
                 {d.displayName} ({d.engine})
@@ -810,7 +806,7 @@ function NewAppForm({
         <div className="flex gap-3 text-sm">
           <label className="flex items-center gap-1">
             <input type="checkbox" checked={targets.includes("local")} onChange={() => toggleTarget("local")} />
-            <HardDrive className="h-3.5 w-3.5" /> local
+            <HardDrive className="h-3.5 w-3.5" /> {t("newAppForm.targetLocal")}
           </label>
           <label className="flex items-center gap-1">
             <input
@@ -819,8 +815,8 @@ function NewAppForm({
               onChange={() => toggleTarget("gdrive")}
               disabled={!gdriveAuthorized}
             />
-            <Cloud className="h-3.5 w-3.5" /> gdrive
-            {!gdriveAuthorized && <span className="text-xs text-muted-foreground">(non connecté)</span>}
+            <Cloud className="h-3.5 w-3.5" /> {t("newAppForm.targetGdrive")}
+            {!gdriveAuthorized && <span className="text-xs text-muted-foreground">{t("newAppForm.targetGdriveNotConnected")}</span>}
           </label>
           <label className="flex items-center gap-1">
             <input
@@ -829,21 +825,18 @@ function NewAppForm({
               onChange={() => toggleTarget("usb")}
               disabled={!usbAvailable}
             />
-            <Usb className="h-3.5 w-3.5" /> usb
+            <Usb className="h-3.5 w-3.5" /> {t("newAppForm.targetUsb")}
             {!usbAvailable && (
-              <span className="text-xs text-muted-foreground">(aucun disque configuré — voir Backups)</span>
+              <span className="text-xs text-muted-foreground">{t("newAppForm.targetUsbNotConfigured")}</span>
             )}
           </label>
         </div>
 
-        <p className="text-xs text-muted-foreground">
-          Le backup complet prend un instantané complet ; le backup partiel ne copie que les fichiers modifiés depuis
-          le dernier instantané (liens durs pour le reste). Exemple : partiel quotidien, complet hebdomadaire.
-        </p>
+        <p className="text-xs text-muted-foreground">{t("newAppForm.backupExplanation")}</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <CronPicker label="Planification backup complet" value={scheduleFullCron} onChange={setScheduleFullCron} />
+          <CronPicker label={t("newAppForm.fullScheduleLabel")} value={scheduleFullCron} onChange={setScheduleFullCron} />
           <CronPicker
-            label="Planification backup partiel"
+            label={t("newAppForm.partialScheduleLabel")}
             value={schedulePartialCron}
             onChange={setSchedulePartialCron}
           />
@@ -853,7 +846,7 @@ function NewAppForm({
           <input
             type="number"
             min={0}
-            placeholder="Rétention (jours, optionnel)"
+            placeholder={t("newAppForm.retentionDaysPlaceholder")}
             value={retentionDays}
             onChange={(e) => setRetentionDays(e.target.value)}
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
@@ -861,7 +854,7 @@ function NewAppForm({
           <input
             type="number"
             min={0}
-            placeholder="Copies minimum à conserver (optionnel)"
+            placeholder={t("newAppForm.retentionCopiesPlaceholder")}
             value={retentionMinCopies}
             onChange={(e) => setRetentionMinCopies(e.target.value)}
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
@@ -870,7 +863,7 @@ function NewAppForm({
 
         {error && <p className="text-xs text-destructive">{error}</p>}
         <Button type="submit" size="sm" disabled={submitting}>
-          {submitting ? "Création…" : "Créer"}
+          {submitting ? t("newAppForm.creating") : t("newAppForm.create")}
         </Button>
       </form>
     </Card>
