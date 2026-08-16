@@ -1,0 +1,77 @@
+{
+  "tabs": {
+    "containers": "Conteneurs",
+    "images": "Images",
+    "volumes": "Volumes",
+    "networks": "Réseaux"
+  },
+  "containers": {
+    "loading": "Chargement…",
+    "empty": "Aucun conteneur.",
+    "duplicateBadge": "duplicata",
+    "linkedSite": "site : {{name}}",
+    "actions": {
+      "start": "Démarrer",
+      "stop": "Arrêter",
+      "restart": "Redémarrer",
+      "remove": "Supprimer",
+      "backup": "Sauvegarde"
+    },
+    "stopConfirm": {
+      "title": "Arrêter {{name}} ?",
+      "description": "Le conteneur sera arrêté proprement."
+    },
+    "restartConfirm": {
+      "title": "Redémarrer {{name}} ?"
+    },
+    "removeConfirm": {
+      "title": "Supprimer {{name}} ?",
+      "description": "Cette action est irréversible."
+    },
+    "backupButtonTitle": "Configurer une sauvegarde complète (conteneur + dossiers + base de données) dans Applications"
+  },
+  "detail": {
+    "cpu": "CPU",
+    "memory": "Mémoire",
+    "command": "Commande : {{command}}",
+    "network": "Réseau : {{network}}",
+    "restartPolicy": "Politique de redémarrage : {{policy}}",
+    "mounts": "Montages",
+    "liveLogs": "Logs (temps réel)"
+  },
+  "images": {
+    "importing": "Import en cours…",
+    "importPrompt": "Importer une image (.tar)",
+    "loading": "Chargement…",
+    "empty": "Aucune image.",
+    "exportButtonTitle": "Exporter en .tar (local)",
+    "exporting": "Export…",
+    "exportingNote": "Export en cours (peut prendre plusieurs minutes pour une grosse image)…",
+    "removeConfirmTitle": "Supprimer cette image ?",
+    "remove": "Supprimer",
+    "exported": "Exportée ({{size}})",
+    "downloading": "Téléchargement…",
+    "download": "Télécharger le fichier",
+    "exportFailed": "Échec de l'export : {{error}}"
+  },
+  "volumes": {
+    "loading": "Chargement…",
+    "empty": "Aucun volume.",
+    "lastBackup": "Dernière sauvegarde : {{date}}",
+    "backupButtonTitle": "Sauvegarder maintenant (local)",
+    "restoreButtonTitle": "Restaurer la dernière sauvegarde",
+    "restoreConfirm": {
+      "title": "Restaurer le volume {{name}} ?",
+      "description": "Écrase le contenu actuel avec la sauvegarde du {{date}}."
+    },
+    "restore": "Restaurer",
+    "removeConfirm": {
+      "title": "Supprimer le volume {{name}} ?",
+      "description": "Toutes les données de ce volume seront perdues."
+    }
+  },
+  "networks": {
+    "loading": "Chargement…",
+    "empty": "Aucun réseau."
+  }
+}

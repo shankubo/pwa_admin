@@ -1,0 +1,77 @@
+{
+  "tabs": {
+    "containers": "கொள்கலன்கள்",
+    "images": "படங்கள்",
+    "volumes": "தொகுதிகள்",
+    "networks": "நெட்வொர்க்குகள்"
+  },
+  "containers": {
+    "loading": "ஏற்றுகிறது…",
+    "empty": "கொள்கலன் இல்லை.",
+    "duplicateBadge": "நகல்",
+    "linkedSite": "தளம்: {{name}}",
+    "actions": {
+      "start": "தொடங்கு",
+      "stop": "நிறுத்து",
+      "restart": "மறுதொடக்கு",
+      "remove": "அகற்று",
+      "backup": "காப்புப்பிரதி"
+    },
+    "stopConfirm": {
+      "title": "{{name}} ஐ நிறுத்தவா?",
+      "description": "கொள்கலன் சரியாக நிறுத்தப்படும்."
+    },
+    "restartConfirm": {
+      "title": "{{name}} ஐ மறுதொடக்கம் செய்யவா?"
+    },
+    "removeConfirm": {
+      "title": "{{name}} ஐ அகற்றவா?",
+      "description": "இந்த செயலை மீட்டெடுக்க முடியாது."
+    },
+    "backupButtonTitle": "Applications இல் முழுமையான காப்புப்பிரதியை (கொள்கலன் + கோப்புறைகள் + தரவுத்தளம்) கட்டமைக்கவும்"
+  },
+  "detail": {
+    "cpu": "CPU",
+    "memory": "நினைவகம்",
+    "command": "கட்டளை: {{command}}",
+    "network": "நெட்வொர்க்: {{network}}",
+    "restartPolicy": "மறுதொடக்கக் கொள்கை: {{policy}}",
+    "mounts": "ஏற்றங்கள்",
+    "liveLogs": "நேரடி பதிவுகள்"
+  },
+  "images": {
+    "importing": "இறக்குமதி செய்கிறது…",
+    "importPrompt": "ஒரு படத்தை இறக்குமதி செய் (.tar)",
+    "loading": "ஏற்றுகிறது…",
+    "empty": "படம் இல்லை.",
+    "exportButtonTitle": ".tar ஆக ஏற்றுமதி செய் (உள்ளூர்)",
+    "exporting": "ஏற்றுமதி செய்கிறது…",
+    "exportingNote": "ஏற்றுமதி நடந்துகொண்டிருக்கிறது (பெரிய படத்திற்கு பல நிமிடங்கள் ஆகலாம்)…",
+    "removeConfirmTitle": "இந்த படத்தை அகற்றவா?",
+    "remove": "அகற்று",
+    "exported": "ஏற்றுமதி செய்யப்பட்டது ({{size}})",
+    "downloading": "பதிவிறக்குகிறது…",
+    "download": "கோப்பைப் பதிவிறக்கு",
+    "exportFailed": "ஏற்றுமதி தோல்வியடைந்தது: {{error}}"
+  },
+  "volumes": {
+    "loading": "ஏற்றுகிறது…",
+    "empty": "தொகுதி இல்லை.",
+    "lastBackup": "கடைசி காப்புப்பிரதி: {{date}}",
+    "backupButtonTitle": "இப்போது காப்புப்பிரதி எடு (உள்ளூர்)",
+    "restoreButtonTitle": "கடைசி காப்புப்பிரதியை மீட்டமை",
+    "restoreConfirm": {
+      "title": "தொகுதி {{name}} ஐ மீட்டமைக்கவா?",
+      "description": "தற்போதைய உள்ளடக்கத்தை {{date}} அன்றைய காப்புப்பிரதியுடன் மேலெழுதும்."
+    },
+    "restore": "மீட்டமை",
+    "removeConfirm": {
+      "title": "தொகுதி {{name}} ஐ அகற்றவா?",
+      "description": "இந்த தொகுதியின் அனைத்து தரவும் இழக்கப்படும்."
+    }
+  },
+  "networks": {
+    "loading": "ஏற்றுகிறது…",
+    "empty": "நெட்வொர்க் இல்லை."
+  }
+}

@@ -10,6 +10,7 @@ import type {
   SiteSummary,
   VhostAccessibility,
 } from "@pwa-admin/shared";
+import { useTranslation } from "react-i18next";
 import { apiJson, apiFetch } from "@/lib/api";
 import { useWsChannel } from "@/lib/ws";
 import { Card } from "@/components/ui/Card";
@@ -33,29 +34,30 @@ import {
 
 type Tab = "containers" | "images" | "volumes" | "networks";
 
-const TABS: { key: Tab; label: string }[] = [
-  { key: "containers", label: "Conteneurs" },
-  { key: "images", label: "Images" },
-  { key: "volumes", label: "Volumes" },
-  { key: "networks", label: "Réseaux" },
+const TABS: { key: Tab; labelKey: string }[] = [
+  { key: "containers", labelKey: "tabs.containers" },
+  { key: "images", labelKey: "tabs.images" },
+  { key: "volumes", labelKey: "tabs.volumes" },
+  { key: "networks", labelKey: "tabs.networks" },
 ];
 
 export function Docker() {
+  const { t } = useTranslation("docker");
   const [tab, setTab] = useState<Tab>("containers");
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex gap-1 overflow-x-auto rounded-md border border-border bg-card p-1">
-        {TABS.map((t) => (
+        {TABS.map((tb) => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
+            key={tb.key}
+            onClick={() => setTab(tb.key)}
             className={
               "flex-1 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors " +
-              (tab === t.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")
+              (tab === tb.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")
             }
           >
-            {t.label}
+            {t(tb.labelKey)}
           </button>
         ))}
       </div>
@@ -100,6 +102,7 @@ function siteLinkedCardClass(
 }
 
 function ContainersTab() {
+  const { t } = useTranslation("docker");
   const navigate = useNavigate();
   const [containers, setContainers] = useState<ContainerSummary[] | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -178,8 +181,8 @@ function ContainersTab() {
   }
 
   if (error) return <Card className="text-sm text-destructive">{error}</Card>;
-  if (!containers) return <Card className="text-sm text-muted-foreground">Chargement…</Card>;
-  if (containers.length === 0) return <Card className="text-sm text-muted-foreground">Aucun conteneur.</Card>;
+  if (!containers) return <Card className="text-sm text-muted-foreground">{t("containers.loading")}</Card>;
+  if (containers.length === 0) return <Card className="text-sm text-muted-foreground">{t("containers.empty")}</Card>;
 
   return (
     <div className="flex flex-col gap-3">
@@ -202,12 +205,12 @@ function ContainersTab() {
                 <span className="truncate font-medium">{c.name}</span>
                 {isDuplicate && (
                   <span className="shrink-0 rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
-                    duplicata
+                    {t("containers.duplicateBadge")}
                   </span>
                 )}
                 {linkedSite && (
                   <span className="shrink-0 truncate rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                    site : {linkedSite.name}
+                    {t("containers.linkedSite", { name: linkedSite.name })}
                   </span>
                 )}
               </div>
@@ -236,47 +239,47 @@ function ContainersTab() {
 
           <div className="mt-3 flex flex-wrap gap-2" onClick={(e) => e.stopPropagation()}>
             <Button size="sm" variant="outline" disabled={busyId === c.id} onClick={() => runAction(c.id, "start")}>
-              <Play className="h-3.5 w-3.5" /> Démarrer
+              <Play className="h-3.5 w-3.5" /> {t("containers.actions.start")}
             </Button>
             <ConfirmDialog
               trigger={
                 <Button size="sm" variant="outline" disabled={busyId === c.id}>
-                  <Square className="h-3.5 w-3.5" /> Arrêter
+                  <Square className="h-3.5 w-3.5" /> {t("containers.actions.stop")}
                 </Button>
               }
-              title={`Arrêter ${c.name} ?`}
-              description="Le conteneur sera arrêté proprement."
-              confirmLabel="Arrêter"
+              title={t("containers.stopConfirm.title", { name: c.name })}
+              description={t("containers.stopConfirm.description")}
+              confirmLabel={t("containers.actions.stop")}
               onConfirm={() => runAction(c.id, "stop")}
             />
             <ConfirmDialog
               trigger={
                 <Button size="sm" variant="outline" disabled={busyId === c.id}>
-                  <RotateCw className="h-3.5 w-3.5" /> Redémarrer
+                  <RotateCw className="h-3.5 w-3.5" /> {t("containers.actions.restart")}
                 </Button>
               }
-              title={`Redémarrer ${c.name} ?`}
-              confirmLabel="Redémarrer"
+              title={t("containers.restartConfirm.title", { name: c.name })}
+              confirmLabel={t("containers.actions.restart")}
               onConfirm={() => runAction(c.id, "restart")}
             />
             <ConfirmDialog
               trigger={
                 <Button size="sm" variant="destructive" disabled={busyId === c.id}>
-                  <Trash2 className="h-3.5 w-3.5" /> Supprimer
+                  <Trash2 className="h-3.5 w-3.5" /> {t("containers.actions.remove")}
                 </Button>
               }
-              title={`Supprimer ${c.name} ?`}
-              description="Cette action est irréversible."
-              confirmLabel="Supprimer"
+              title={t("containers.removeConfirm.title", { name: c.name })}
+              description={t("containers.removeConfirm.description")}
+              confirmLabel={t("containers.actions.remove")}
               onConfirm={() => removeContainer(c.id)}
             />
             <Button
               size="sm"
               variant="outline"
               onClick={() => navigate(`/applications?container=${encodeURIComponent(c.name)}`)}
-              title="Configurer une sauvegarde complète (conteneur + dossiers + base de données) dans Applications"
+              title={t("containers.backupButtonTitle")}
             >
-              <DatabaseBackup className="h-3.5 w-3.5" /> Sauvegarde
+              <DatabaseBackup className="h-3.5 w-3.5" /> {t("containers.actions.backup")}
             </Button>
           </div>
 
@@ -289,6 +292,7 @@ function ContainersTab() {
 }
 
 function ContainerDetailPanel({ id }: { id: string }) {
+  const { t } = useTranslation("docker");
   const [detail, setDetail] = useState<ContainerDetail | null>(null);
   const [stats, setStats] = useState<{ cpuPercent: number; memUsageBytes: number; memLimitBytes: number } | null>(
     null
@@ -312,11 +316,11 @@ function ContainerDetailPanel({ id }: { id: string }) {
     <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3">
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div>
-          <p className="text-xs text-muted-foreground">CPU</p>
+          <p className="text-xs text-muted-foreground">{t("detail.cpu")}</p>
           <p className="font-medium">{stats ? `${stats.cpuPercent.toFixed(1)}%` : "…"}</p>
         </div>
         <div>
-          <p className="text-xs text-muted-foreground">Mémoire</p>
+          <p className="text-xs text-muted-foreground">{t("detail.memory")}</p>
           <p className="font-medium">
             {stats ? `${formatBytes(stats.memUsageBytes)} / ${formatBytes(stats.memLimitBytes)}` : "…"}
           </p>
@@ -325,12 +329,15 @@ function ContainerDetailPanel({ id }: { id: string }) {
 
       {detail && (
         <div className="text-xs text-muted-foreground">
-          <p>Commande : <span className="font-mono">{detail.command}</span></p>
-          <p>Réseau : {detail.networkMode}</p>
-          <p>Politique de redémarrage : {detail.restartPolicy}</p>
+          <p>
+            {t("detail.command", { command: "" })}
+            <span className="font-mono">{detail.command}</span>
+          </p>
+          <p>{t("detail.network", { network: detail.networkMode })}</p>
+          <p>{t("detail.restartPolicy", { policy: detail.restartPolicy })}</p>
           {detail.mounts.length > 0 && (
             <div className="mt-1">
-              <p className="font-medium text-foreground">Montages</p>
+              <p className="font-medium text-foreground">{t("detail.mounts")}</p>
               {detail.mounts.map((m, i) => (
                 <p key={i} className="truncate font-mono">
                   {m.source} → {m.destination} ({m.mode})
@@ -342,7 +349,7 @@ function ContainerDetailPanel({ id }: { id: string }) {
       )}
 
       <div>
-        <p className="mb-1 text-xs font-medium text-muted-foreground">Logs (temps réel)</p>
+        <p className="mb-1 text-xs font-medium text-muted-foreground">{t("detail.liveLogs")}</p>
         <LiveLogPanel chunk={logChunk} />
       </div>
     </div>
@@ -350,6 +357,7 @@ function ContainerDetailPanel({ id }: { id: string }) {
 }
 
 function ImagesTab() {
+  const { t } = useTranslation("docker");
   const [images, setImages] = useState<ImageSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -448,7 +456,7 @@ function ImagesTab() {
       <Card>
         <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground hover:bg-muted">
           <Upload className="h-4 w-4" />
-          {importing ? "Import en cours…" : "Importer une image (.tar)"}
+          {importing ? t("images.importing") : t("images.importPrompt")}
           <input
             type="file"
             accept=".tar"
@@ -464,8 +472,8 @@ function ImagesTab() {
       </Card>
 
       {error && <Card className="text-sm text-destructive">{error}</Card>}
-      {!images && <Card className="text-sm text-muted-foreground">Chargement…</Card>}
-      {images?.length === 0 && <Card className="text-sm text-muted-foreground">Aucune image.</Card>}
+      {!images && <Card className="text-sm text-muted-foreground">{t("images.loading")}</Card>}
+      {images?.length === 0 && <Card className="text-sm text-muted-foreground">{t("images.empty")}</Card>}
 
       {images?.map((img) => {
         const result = exportResult[img.id];
@@ -484,10 +492,10 @@ function ImagesTab() {
                 variant="outline"
                 disabled={exporting}
                 onClick={() => exportImage(img)}
-                title="Exporter en .tar (local)"
+                title={t("images.exportButtonTitle")}
               >
                 {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                {exporting && <span className="ml-1">Export…</span>}
+                {exporting && <span className="ml-1">{t("images.exporting")}</span>}
               </Button>
               <ConfirmDialog
                 trigger={
@@ -495,21 +503,19 @@ function ImagesTab() {
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 }
-                title="Supprimer cette image ?"
-                confirmLabel="Supprimer"
+                title={t("images.removeConfirmTitle")}
+                confirmLabel={t("images.remove")}
                 onConfirm={() => remove(img.id)}
               />
             </div>
           </div>
           {exporting && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Export en cours (peut prendre plusieurs minutes pour une grosse image)…
-            </p>
+            <p className="mt-2 text-xs text-muted-foreground">{t("images.exportingNote")}</p>
           )}
           {result?.status === "success" && (
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <p className="flex items-center gap-1 text-xs text-primary">
-                <CheckCircle2 className="h-3.5 w-3.5" /> Exportée ({formatBytes(result.sizeBytes ?? 0)})
+                <CheckCircle2 className="h-3.5 w-3.5" /> {t("images.exported", { size: formatBytes(result.sizeBytes ?? 0) })}
               </p>
               <Button
                 size="sm"
@@ -522,12 +528,12 @@ function ImagesTab() {
                 ) : (
                   <Download className="h-3.5 w-3.5" />
                 )}
-                {downloadingId === img.id ? "Téléchargement…" : "Télécharger le fichier"}
+                {downloadingId === img.id ? t("images.downloading") : t("images.download")}
               </Button>
             </div>
           )}
           {result?.status === "failed" && (
-            <p className="mt-2 text-xs text-destructive">Échec de l'export : {result.error}</p>
+            <p className="mt-2 text-xs text-destructive">{t("images.exportFailed", { error: result.error })}</p>
           )}
         </Card>
         );
@@ -537,6 +543,7 @@ function ImagesTab() {
 }
 
 function VolumesTab() {
+  const { t } = useTranslation("docker");
   const [volumes, setVolumes] = useState<VolumeSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyName, setBusyName] = useState<string | null>(null);
@@ -602,8 +609,8 @@ function VolumesTab() {
   }
 
   if (error) return <Card className="text-sm text-destructive">{error}</Card>;
-  if (!volumes) return <Card className="text-sm text-muted-foreground">Chargement…</Card>;
-  if (volumes.length === 0) return <Card className="text-sm text-muted-foreground">Aucun volume.</Card>;
+  if (!volumes) return <Card className="text-sm text-muted-foreground">{t("volumes.loading")}</Card>;
+  if (volumes.length === 0) return <Card className="text-sm text-muted-foreground">{t("volumes.empty")}</Card>;
 
   return (
     <div className="flex flex-col gap-3">
@@ -618,7 +625,7 @@ function VolumesTab() {
               {v.sizeBytes != null && <p className="text-xs text-muted-foreground">{formatBytes(v.sizeBytes)}</p>}
               {lastRun && (
                 <p className="text-xs text-muted-foreground">
-                  Dernière sauvegarde : {new Date(lastRun.startedAt).toLocaleString()}
+                  {t("volumes.lastBackup", { date: new Date(lastRun.startedAt).toLocaleString() })}
                   {lastRun.sizeBytes != null && ` · ${formatBytes(lastRun.sizeBytes)}`}
                 </p>
               )}
@@ -629,20 +636,22 @@ function VolumesTab() {
                 variant="outline"
                 disabled={busyName === v.name}
                 onClick={() => backup(v.name)}
-                title="Sauvegarder maintenant (local)"
+                title={t("volumes.backupButtonTitle")}
               >
                 <DatabaseBackup className="h-3.5 w-3.5" />
               </Button>
               {lastRun && (
                 <ConfirmDialog
                   trigger={
-                    <Button size="sm" variant="outline" disabled={busyName === v.name} title="Restaurer la dernière sauvegarde">
+                    <Button size="sm" variant="outline" disabled={busyName === v.name} title={t("volumes.restoreButtonTitle")}>
                       <RotateCw className="h-3.5 w-3.5" />
                     </Button>
                   }
-                  title={`Restaurer le volume ${v.name} ?`}
-                  description={`Écrase le contenu actuel avec la sauvegarde du ${new Date(lastRun.startedAt).toLocaleString()}.`}
-                  confirmLabel="Restaurer"
+                  title={t("volumes.restoreConfirm.title", { name: v.name })}
+                  description={t("volumes.restoreConfirm.description", {
+                    date: new Date(lastRun.startedAt).toLocaleString(),
+                  })}
+                  confirmLabel={t("volumes.restore")}
                   onConfirm={() => restore(v.name)}
                 />
               )}
@@ -652,9 +661,9 @@ function VolumesTab() {
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 }
-                title={`Supprimer le volume ${v.name} ?`}
-                description="Toutes les données de ce volume seront perdues."
-                confirmLabel="Supprimer"
+                title={t("volumes.removeConfirm.title", { name: v.name })}
+                description={t("volumes.removeConfirm.description")}
+                confirmLabel={t("images.remove")}
                 onConfirm={() => remove(v.name)}
               />
             </div>
@@ -667,6 +676,7 @@ function VolumesTab() {
 }
 
 function NetworksTab() {
+  const { t } = useTranslation("docker");
   const [networks, setNetworks] = useState<NetworkSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -677,8 +687,8 @@ function NetworksTab() {
   }, []);
 
   if (error) return <Card className="text-sm text-destructive">{error}</Card>;
-  if (!networks) return <Card className="text-sm text-muted-foreground">Chargement…</Card>;
-  if (networks.length === 0) return <Card className="text-sm text-muted-foreground">Aucun réseau.</Card>;
+  if (!networks) return <Card className="text-sm text-muted-foreground">{t("networks.loading")}</Card>;
+  if (networks.length === 0) return <Card className="text-sm text-muted-foreground">{t("networks.empty")}</Card>;
 
   return (
     <div className="flex flex-col gap-3">

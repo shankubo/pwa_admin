@@ -1,0 +1,77 @@
+{
+  "tabs": {
+    "containers": "Containers",
+    "images": "Images",
+    "volumes": "Volumes",
+    "networks": "Networks"
+  },
+  "containers": {
+    "loading": "Loading…",
+    "empty": "No container.",
+    "duplicateBadge": "duplicate",
+    "linkedSite": "site: {{name}}",
+    "actions": {
+      "start": "Start",
+      "stop": "Stop",
+      "restart": "Restart",
+      "remove": "Remove",
+      "backup": "Backup"
+    },
+    "stopConfirm": {
+      "title": "Stop {{name}}?",
+      "description": "The container will be stopped cleanly."
+    },
+    "restartConfirm": {
+      "title": "Restart {{name}}?"
+    },
+    "removeConfirm": {
+      "title": "Remove {{name}}?",
+      "description": "This action is irreversible."
+    },
+    "backupButtonTitle": "Configure a full backup (container + folders + database) in Applications"
+  },
+  "detail": {
+    "cpu": "CPU",
+    "memory": "Memory",
+    "command": "Command: {{command}}",
+    "network": "Network: {{network}}",
+    "restartPolicy": "Restart policy: {{policy}}",
+    "mounts": "Mounts",
+    "liveLogs": "Live logs"
+  },
+  "images": {
+    "importing": "Importing…",
+    "importPrompt": "Import an image (.tar)",
+    "loading": "Loading…",
+    "empty": "No image.",
+    "exportButtonTitle": "Export as .tar (local)",
+    "exporting": "Exporting…",
+    "exportingNote": "Export in progress (can take several minutes for a large image)…",
+    "removeConfirmTitle": "Remove this image?",
+    "remove": "Remove",
+    "exported": "Exported ({{size}})",
+    "downloading": "Downloading…",
+    "download": "Download the file",
+    "exportFailed": "Export failed: {{error}}"
+  },
+  "volumes": {
+    "loading": "Loading…",
+    "empty": "No volume.",
+    "lastBackup": "Last backup: {{date}}",
+    "backupButtonTitle": "Back up now (local)",
+    "restoreButtonTitle": "Restore the latest backup",
+    "restoreConfirm": {
+      "title": "Restore volume {{name}}?",
+      "description": "Overwrites the current content with the backup from {{date}}."
+    },
+    "restore": "Restore",
+    "removeConfirm": {
+      "title": "Remove volume {{name}}?",
+      "description": "All data in this volume will be lost."
+    }
+  },
+  "networks": {
+    "loading": "Loading…",
+    "empty": "No network."
+  }
+}
