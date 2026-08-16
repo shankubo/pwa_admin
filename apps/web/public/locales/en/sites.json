@@ -1,0 +1,88 @@
+{
+  "loading": "Loading…",
+  "empty": "No site.",
+  "openInNewTab": "Open {{name}} in a new tab",
+  "linkedContainer": "container: {{name}} ({{state}})",
+  "failoverActive": "failover active",
+  "maintenanceBadge": "maintenance",
+  "enabled": "enabled",
+  "disabled": "disabled",
+  "actions": {
+    "disable": "Disable",
+    "enable": "Enable",
+    "maintenance": "Maintenance",
+    "exitMaintenance": "Exit maintenance",
+    "clone": "Clone",
+    "migration": "Migration",
+    "switchToDuplicate": "Switch to duplicate",
+    "revertToPrimary": "Revert to primary site"
+  },
+  "disableConfirm": {
+    "title": "Disable {{name}}?",
+    "description": "The site will no longer be accessible."
+  },
+  "maintenanceConfirm": {
+    "title": "Put {{name}} into maintenance mode?",
+    "description": "Visitors will see a \"under construction\" page instead of the site."
+  },
+  "switchConfirm": {
+    "title": "Switch {{name}} to its duplicate?",
+    "description": "All traffic will be routed to the backup copy. Use in case of failure or system error. Reversible."
+  },
+  "migrationTitleReady": "Captures this site (container, volumes, database, Nginx config) to the backup USB drive, for migration to a new server",
+  "migrationTitleNotReady": "Connect and configure a backup USB drive (Backups screen) to enable migration",
+  "migrationStarted": "Migration capture started for {{name}} — follow progress in Backups.",
+  "failoverErrors": {
+    "vhost_in_maintenance": "This site is in maintenance mode — exit maintenance before switching to the duplicate.",
+    "no_duplicate_found": "No duplicate exists for this site.",
+    "duplicate_not_ready": "The duplicate isn't ready yet (creation or refresh in progress).",
+    "duplicate_container_unavailable": "The duplicate's container couldn't be started — check its status on the Docker screen.",
+    "vhost_not_switched_to_duplicate": "This site is not currently switched to its duplicate.",
+    "snapshot_not_found": "The site's previous configuration couldn't be found — cannot revert automatically."
+  },
+  "detail": {
+    "loading": "Loading…",
+    "root": "Root: {{root}}",
+    "proxy": "Proxy: {{proxy}}",
+    "ports": "Ports: {{ports}}",
+    "certExpires": "cert. expires in {{days}}d",
+    "certPresent": "cert. present",
+    "certMissing": "no certificate",
+    "tabAccess": "Nginx access",
+    "tabError": "Nginx errors",
+    "tabContainer": "Container",
+    "noLogs": "No logs."
+  },
+  "duplicate": {
+    "title": "Duplicate",
+    "processing": "Processing…",
+    "failed": "Failed: {{error}}",
+    "content": "Content: {{path}}",
+    "size": "Size (files): {{size}}",
+    "container": "Container: {{name}} (port {{port}})",
+    "database": "Database: {{name}}",
+    "lastSynced": "Last synced: {{date}}",
+    "explanation": "The duplicate is frozen at the moment it was created — changes made to the original since then aren't reflected automatically. \"Update\" makes a fresh, complete copy (files + database) from the current original.",
+    "refresh": "Update from original",
+    "delete": "Delete",
+    "deleteConfirm": {
+      "title": "Delete the duplicate?",
+      "description": "The duplicated content, database, and container (if any) will be permanently deleted."
+    },
+    "none": "No duplicate for this site. Create one to be able to switch traffic to it in case of failure.",
+    "create": "Create a duplicate"
+  },
+  "createDialog": {
+    "introContent": "The site's folder content will be copied. ",
+    "introContainer": "A second container (same image, different port) will be created and started. ",
+    "introSelectDb": "Select a database below if this site uses one.",
+    "dbLabel": "Database (optional)",
+    "dbNone": "None",
+    "dbPreciseLabel": "Specific database",
+    "dbChoose": "Choose…",
+    "dbNoneDetected": "No database detected on this instance.",
+    "creating": "Creating…",
+    "create": "Create",
+    "cancel": "Cancel"
+  }
+}

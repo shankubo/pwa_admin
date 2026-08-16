@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { SiteSummary, SiteDetail, DetectedDatabase, UsbStatus } from "@pwa-admin/shared";
+import { useTranslation } from "react-i18next";
 import { apiFetch, apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -16,18 +17,14 @@ function siteUrl(s: SiteSummary): string | null {
   return `${scheme}://${host}/`;
 }
 
-function translateFailoverError(message: string): string {
-  const known: Record<string, string> = {
-    vhost_in_maintenance: "Ce site est en mode maintenance — quittez la maintenance avant de basculer vers le duplicata.",
-    no_duplicate_found: "Aucun duplicata n'existe pour ce site.",
-    duplicate_not_ready: "Le duplicata n'est pas encore prêt (création ou rafraîchissement en cours).",
-    duplicate_container_unavailable: "Le conteneur du duplicata n'a pas pu être démarré — vérifiez son état dans l'écran Docker.",
-    vhost_not_switched_to_duplicate: "Ce site n'est pas actuellement basculé vers son duplicata.",
-    snapshot_not_found: "L'ancienne configuration du site est introuvable — impossible de revenir en arrière automatiquement.",
-  };
-  const errorCode = message.split(":")[0].trim();
-  return known[errorCode] ?? message;
-}
+const FAILOVER_ERROR_KEYS = [
+  "vhost_in_maintenance",
+  "no_duplicate_found",
+  "duplicate_not_ready",
+  "duplicate_container_unavailable",
+  "vhost_not_switched_to_duplicate",
+  "snapshot_not_found",
+] as const;
 
 function certBadgeClass(daysRemaining: number | null) {
   if (daysRemaining == null) return "bg-muted text-muted-foreground";
@@ -43,6 +40,7 @@ function siteCardClass(s: SiteSummary): string {
 }
 
 export function Sites() {
+  const { t } = useTranslation("sites");
   const [sites, setSites] = useState<SiteSummary[] | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [expanded, setExpanded] = useState<string | null>(searchParams.get("site"));
@@ -53,6 +51,14 @@ export function Sites() {
   const [migratingFor, setMigratingFor] = useState<string | null>(null);
   const [migrationMessage, setMigrationMessage] = useState<string | null>(null);
   const scrolledToTarget = useRef(false);
+
+  function translateFailoverError(message: string): string {
+    const errorCode = message.split(":")[0].trim();
+    if ((FAILOVER_ERROR_KEYS as readonly string[]).includes(errorCode)) {
+      return t(`failoverErrors.${errorCode}`);
+    }
+    return message;
+  }
 
   async function load() {
     try {
@@ -77,9 +83,7 @@ export function Sites() {
         method: "POST",
         body: JSON.stringify({ confirm: true }),
       });
-      setMigrationMessage(
-        `Capture de migration démarrée pour ${name} — suivez la progression dans Backups.`
-      );
+      setMigrationMessage(t("migrationStarted", { name }));
     } catch (err) {
       setMigrationMessage((err as Error).message);
     } finally {
@@ -119,8 +123,8 @@ export function Sites() {
   }
 
   if (error) return <Card className="text-sm text-destructive">{error}</Card>;
-  if (!sites) return <Card className="text-sm text-muted-foreground">Chargement…</Card>;
-  if (sites.length === 0) return <Card className="text-sm text-muted-foreground">Aucun site.</Card>;
+  if (!sites) return <Card className="text-sm text-muted-foreground">{t("loading")}</Card>;
+  if (sites.length === 0) return <Card className="text-sm text-muted-foreground">{t("empty")}</Card>;
 
   return (
     <div className="flex flex-col gap-3">
@@ -142,7 +146,7 @@ export function Sites() {
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    aria-label={`Ouvrir ${s.name} dans un nouvel onglet`}
+                    aria-label={t("openInNewTab", { name: s.name })}
                     className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
@@ -152,19 +156,19 @@ export function Sites() {
               <p className="truncate text-xs text-muted-foreground">{s.serverNames.join(", ") || "—"}</p>
               {s.linkedContainer && (
                 <span className="mt-1 inline-block rounded-full bg-muted px-2 py-0.5 text-xs">
-                  conteneur : {s.linkedContainer.name} ({s.linkedContainer.state})
+                  {t("linkedContainer", { name: s.linkedContainer.name, state: s.linkedContainer.state })}
                 </span>
               )}
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {s.failoverActive && (
                 <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive">
-                  bascule active
+                  {t("failoverActive")}
                 </span>
               )}
               {s.maintenanceMode && (
                 <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
-                  maintenance
+                  {t("maintenanceBadge")}
                 </span>
               )}
               <span
@@ -173,7 +177,7 @@ export function Sites() {
                   (s.enabled ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground")
                 }
               >
-                {s.enabled ? "activé" : "désactivé"}
+                {s.enabled ? t("enabled") : t("disabled")}
               </span>
               {expanded === s.name ? (
                 <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -188,35 +192,35 @@ export function Sites() {
               <ConfirmDialog
                 trigger={
                   <Button size="sm" variant="destructive">
-                    Désactiver
+                    {t("actions.disable")}
                   </Button>
                 }
-                title={`Désactiver ${s.name} ?`}
-                description="Le site ne sera plus accessible."
-                confirmLabel="Désactiver"
+                title={t("disableConfirm.title", { name: s.name })}
+                description={t("disableConfirm.description")}
+                confirmLabel={t("actions.disable")}
                 onConfirm={() => toggle(s.name, s.enabled)}
               />
             ) : (
               <Button size="sm" variant="outline" onClick={() => toggle(s.name, s.enabled)}>
-                Activer
+                {t("actions.enable")}
               </Button>
             )}
 
             {s.enabled && (
               s.maintenanceMode ? (
                 <Button size="sm" variant="outline" onClick={() => toggleMaintenance(s.name, s.maintenanceMode)}>
-                  Quitter maintenance
+                  {t("actions.exitMaintenance")}
                 </Button>
               ) : (
                 <ConfirmDialog
                   trigger={
                     <Button size="sm" variant="outline">
-                      Maintenance
+                      {t("actions.maintenance")}
                     </Button>
                   }
-                  title={`Passer ${s.name} en maintenance ?`}
-                  description="Les visiteurs verront une page « en construction » à la place du site."
-                  confirmLabel="Activer la maintenance"
+                  title={t("maintenanceConfirm.title", { name: s.name })}
+                  description={t("maintenanceConfirm.description")}
+                  confirmLabel={t("actions.maintenance")}
                   onConfirm={() => toggleMaintenance(s.name, s.maintenanceMode)}
                 />
               )
@@ -224,7 +228,7 @@ export function Sites() {
 
             {!s.hasDuplicate && (s.root || s.linkedContainer) && (
               <Button size="sm" variant="outline" onClick={() => setCloningFor(s.name)}>
-                <Copy className="h-3.5 w-3.5" /> Cloner
+                <Copy className="h-3.5 w-3.5" /> {t("actions.clone")}
               </Button>
             )}
             <Button
@@ -232,35 +236,31 @@ export function Sites() {
               variant="outline"
               disabled={!usbConfigured || migratingFor === s.name}
               onClick={() => captureSiteMigration(s.name)}
-              title={
-                usbConfigured
-                  ? "Capture ce site (conteneur, volumes, base de données, config Nginx) sur le disque USB de sauvegarde, en vue d'une migration vers un nouveau serveur"
-                  : "Connectez et configurez un disque USB de sauvegarde (écran Backups) pour activer la migration"
-              }
+              title={usbConfigured ? t("migrationTitleReady") : t("migrationTitleNotReady")}
             >
               {migratingFor === s.name ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <HardDriveUpload className="h-3.5 w-3.5" />
               )}{" "}
-              Migration
+              {t("actions.migration")}
             </Button>
             {s.hasDuplicate && !s.failoverActive && (
               <ConfirmDialog
                 trigger={
                   <Button size="sm" variant="destructive">
-                    Basculer vers le duplicata
+                    {t("actions.switchToDuplicate")}
                   </Button>
                 }
-                title={`Basculer ${s.name} vers son duplicata ?`}
-                description="Tout le trafic sera routé vers la copie de secours. À utiliser en cas de panne ou d'erreur système. Réversible."
-                confirmLabel="Basculer"
+                title={t("switchConfirm.title", { name: s.name })}
+                description={t("switchConfirm.description")}
+                confirmLabel={t("actions.switchToDuplicate")}
                 onConfirm={() => switchFailover(s.name, "switch")}
               />
             )}
             {s.failoverActive && (
               <Button size="sm" variant="outline" onClick={() => switchFailover(s.name, "revert")}>
-                Revenir au site principal
+                {t("actions.revertToPrimary")}
               </Button>
             )}
           </div>
@@ -288,6 +288,7 @@ export function Sites() {
 }
 
 function SiteDetailPanel({ name }: { name: string }) {
+  const { t } = useTranslation("sites");
   const [detail, setDetail] = useState<SiteDetail | null>(null);
   const [logTab, setLogTab] = useState<"nginx-access" | "nginx-error" | "docker">("nginx-error");
   const [logText, setLogText] = useState("");
@@ -317,23 +318,23 @@ function SiteDetailPanel({ name }: { name: string }) {
     }
   }, [logTab, name, detail?.linkedContainer]);
 
-  if (!detail) return <p className="mt-3 border-t border-border pt-3 text-sm text-muted-foreground">Chargement…</p>;
+  if (!detail) return <p className="mt-3 border-t border-border pt-3 text-sm text-muted-foreground">{t("detail.loading")}</p>;
 
   return (
     <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3 text-sm">
       <div>
-        <p className="text-xs text-muted-foreground">Racine : {detail.vhost.root ?? "—"}</p>
-        <p className="text-xs text-muted-foreground">Proxy : {detail.vhost.proxyPassTarget ?? "—"}</p>
-        <p className="text-xs text-muted-foreground">Ports : {detail.vhost.listenPorts.join(", ")}</p>
+        <p className="text-xs text-muted-foreground">{t("detail.root", { root: detail.vhost.root ?? "—" })}</p>
+        <p className="text-xs text-muted-foreground">{t("detail.proxy", { proxy: detail.vhost.proxyPassTarget ?? "—" })}</p>
+        <p className="text-xs text-muted-foreground">{t("detail.ports", { ports: detail.vhost.listenPorts.join(", ") })}</p>
       </div>
 
       <div>
         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${certBadgeClass(detail.cert.daysRemaining)}`}>
           {detail.cert.found
             ? detail.cert.daysRemaining != null
-              ? `cert. expire dans ${detail.cert.daysRemaining}j`
-              : "cert. présent"
-            : "pas de certificat"}
+              ? t("detail.certExpires", { days: detail.cert.daysRemaining })
+              : t("detail.certPresent")
+            : t("detail.certMissing")}
         </span>
       </div>
 
@@ -346,7 +347,7 @@ function SiteDetailPanel({ name }: { name: string }) {
               (logTab === "nginx-access" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")
             }
           >
-            Accès Nginx
+            {t("detail.tabAccess")}
           </button>
           <button
             onClick={() => setLogTab("nginx-error")}
@@ -355,7 +356,7 @@ function SiteDetailPanel({ name }: { name: string }) {
               (logTab === "nginx-error" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")
             }
           >
-            Erreurs Nginx
+            {t("detail.tabError")}
           </button>
           {detail.linkedContainer && (
             <button
@@ -365,11 +366,11 @@ function SiteDetailPanel({ name }: { name: string }) {
                 (logTab === "docker" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")
               }
             >
-              Conteneur
+              {t("detail.tabContainer")}
             </button>
           )}
         </div>
-        <LiveLogPanel key={logTab} initialText={logText} emptyLabel="Aucun log." />
+        <LiveLogPanel key={logTab} initialText={logText} emptyLabel={t("detail.noLogs")} />
       </div>
 
       <SiteDuplicateSection name={name} detail={detail} onChanged={loadDetail} />
@@ -386,6 +387,7 @@ function SiteDuplicateSection({
   detail: SiteDetail;
   onChanged: () => void;
 }) {
+  const { t } = useTranslation("sites");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -433,61 +435,60 @@ function SiteDuplicateSection({
 
   return (
     <div className="border-t border-border pt-3">
-      <CardTitle>Duplicata</CardTitle>
+      <CardTitle>{t("duplicate.title")}</CardTitle>
       {isRefreshing ? (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          {detail.duplicate?.progressStep ?? "Traitement…"}
+          {detail.duplicate?.progressStep ?? t("duplicate.processing")}
         </div>
       ) : detail.duplicate ? (
         <div className="flex flex-col gap-1 text-xs text-muted-foreground">
           {detail.duplicate.status === "failed" && detail.duplicate.error && (
-            <p className="text-destructive">Échec : {detail.duplicate.error}</p>
+            <p className="text-destructive">{t("duplicate.failed", { error: detail.duplicate.error })}</p>
           )}
-          {detail.duplicate.contentPath && <p>Contenu : {detail.duplicate.contentPath}</p>}
-          {detail.duplicate.sizeBytes != null && <p>Taille (fichiers) : {formatBytes(detail.duplicate.sizeBytes)}</p>}
+          {detail.duplicate.contentPath && <p>{t("duplicate.content", { path: detail.duplicate.contentPath })}</p>}
+          {detail.duplicate.sizeBytes != null && (
+            <p>{t("duplicate.size", { size: formatBytes(detail.duplicate.sizeBytes) })}</p>
+          )}
           {detail.duplicate.duplicateContainerName && (
             <p>
-              Conteneur : {detail.duplicate.duplicateContainerName} (port {detail.duplicate.duplicatePort})
+              {t("duplicate.container", {
+                name: detail.duplicate.duplicateContainerName,
+                port: detail.duplicate.duplicatePort,
+              })}
             </p>
           )}
           {detail.duplicate.duplicateDbName && (
             <p>
-              Base de données : {detail.duplicate.duplicateDbName}
+              {t("duplicate.database", { name: detail.duplicate.duplicateDbName })}
               {detail.duplicate.dbSizeBytes != null && ` (${formatBytes(detail.duplicate.dbSizeBytes)})`}
             </p>
           )}
-          <p>Dernière synchro : {new Date(detail.duplicate.lastSyncedAt).toLocaleString()}</p>
-          <p className="mt-1">
-            Le duplicata est figé au moment de sa création — les modifications faites sur l'original depuis ne s'y
-            reflètent pas automatiquement. "Mettre à jour" refait une copie complète et à jour (fichiers + base de
-            données) à partir de l'original actuel.
-          </p>
+          <p>{t("duplicate.lastSynced", { date: new Date(detail.duplicate.lastSyncedAt).toLocaleString() })}</p>
+          <p className="mt-1">{t("duplicate.explanation")}</p>
 
           <div className="mt-2 flex gap-2">
             <Button size="sm" variant="outline" disabled={detail.failoverActive} onClick={startRefresh}>
-              Mettre à jour depuis l'original
+              {t("duplicate.refresh")}
             </Button>
             <ConfirmDialog
               trigger={
                 <Button size="sm" variant="destructive" disabled={deleting || detail.failoverActive}>
-                  Supprimer
+                  {t("duplicate.delete")}
                 </Button>
               }
-              title="Supprimer le duplicata ?"
-              description="Le contenu, la base de données et le conteneur dupliqués (le cas échéant) seront définitivement supprimés."
-              confirmLabel="Supprimer"
+              title={t("duplicate.deleteConfirm.title")}
+              description={t("duplicate.deleteConfirm.description")}
+              confirmLabel={t("duplicate.delete")}
               onConfirm={deleteDuplicate}
             />
           </div>
         </div>
       ) : (
         <>
-          <p className="mb-2 text-xs text-muted-foreground">
-            Aucun duplicata pour ce site. Créez-en un pour pouvoir basculer le trafic dessus en cas de panne.
-          </p>
+          <p className="mb-2 text-xs text-muted-foreground">{t("duplicate.none")}</p>
           <Button size="sm" variant="outline" onClick={() => setShowCreateDialog(true)}>
-            <Copy className="h-3.5 w-3.5" /> Créer un duplicata
+            <Copy className="h-3.5 w-3.5" /> {t("duplicate.create")}
           </Button>
         </>
       )}
@@ -521,6 +522,7 @@ function CreateDuplicateDialog({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const { t } = useTranslation("sites");
   const [detectedDbs, setDetectedDbs] = useState<DetectedDatabase[] | null>(null);
   const [dbValue, setDbValue] = useState("");
   const [dbName, setDbName] = useState("");
@@ -566,13 +568,13 @@ function CreateDuplicateDialog({
   return (
     <div className="mt-3 rounded-md border border-border p-3">
       <p className="mb-2 text-xs text-muted-foreground">
-        {hasRoot && "Le contenu du dossier du site sera copié. "}
-        {hasLinkedContainer && "Un second conteneur (même image, port différent) sera créé et démarré. "}
-        Sélectionnez une base de données ci-dessous si ce site en utilise une.
+        {hasRoot && t("createDialog.introContent")}
+        {hasLinkedContainer && t("createDialog.introContainer")}
+        {t("createDialog.introSelectDb")}
       </p>
 
       <div className="mb-2">
-        <p className="mb-1 text-xs font-medium text-muted-foreground">Base de données (optionnel)</p>
+        <p className="mb-1 text-xs font-medium text-muted-foreground">{t("createDialog.dbLabel")}</p>
         <select
           value={dbValue}
           onChange={(e) => {
@@ -581,7 +583,7 @@ function CreateDuplicateDialog({
           }}
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
         >
-          <option value="">Aucune</option>
+          <option value="">{t("createDialog.dbNone")}</option>
           {detectedDbs?.map((d) => (
             <option key={`${d.location}:${d.ref}`} value={`${d.location}:${d.ref}`}>
               {d.displayName} ({d.engine})
@@ -592,13 +594,13 @@ function CreateDuplicateDialog({
 
       {selectedDb && (selectedDb.databases?.length ?? 0) > 1 && (
         <div className="mb-2">
-          <p className="mb-1 text-xs font-medium text-muted-foreground">Base précise</p>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">{t("createDialog.dbPreciseLabel")}</p>
           <select
             value={dbName}
             onChange={(e) => setDbName(e.target.value)}
             className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
           >
-            <option value="">Choisir…</option>
+            <option value="">{t("createDialog.dbChoose")}</option>
             {selectedDb.databases?.map((n) => (
               <option key={n} value={n}>
                 {n}
@@ -609,17 +611,17 @@ function CreateDuplicateDialog({
       )}
 
       {selectedDb && (selectedDb.databases?.length ?? 0) === 0 && (
-        <p className="mb-2 text-xs text-destructive">Aucune base détectée sur cette instance.</p>
+        <p className="mb-2 text-xs text-destructive">{t("createDialog.dbNoneDetected")}</p>
       )}
 
       {error && <p className="mb-2 text-xs text-destructive">{error}</p>}
 
       <div className="flex gap-2">
         <Button size="sm" onClick={submit} disabled={submitting || (!!selectedDb && !dbName)}>
-          {submitting ? "Création…" : "Créer"}
+          {submitting ? t("createDialog.creating") : t("createDialog.create")}
         </Button>
         <Button size="sm" variant="outline" onClick={onClose} disabled={submitting}>
-          Annuler
+          {t("createDialog.cancel")}
         </Button>
       </div>
     </div>

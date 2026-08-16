@@ -1,0 +1,88 @@
+{
+  "loading": "Chargement…",
+  "empty": "Aucun site.",
+  "openInNewTab": "Ouvrir {{name}} dans un nouvel onglet",
+  "linkedContainer": "conteneur : {{name}} ({{state}})",
+  "failoverActive": "bascule active",
+  "maintenanceBadge": "maintenance",
+  "enabled": "activé",
+  "disabled": "désactivé",
+  "actions": {
+    "disable": "Désactiver",
+    "enable": "Activer",
+    "maintenance": "Maintenance",
+    "exitMaintenance": "Quitter maintenance",
+    "clone": "Cloner",
+    "migration": "Migration",
+    "switchToDuplicate": "Basculer vers le duplicata",
+    "revertToPrimary": "Revenir au site principal"
+  },
+  "disableConfirm": {
+    "title": "Désactiver {{name}} ?",
+    "description": "Le site ne sera plus accessible."
+  },
+  "maintenanceConfirm": {
+    "title": "Passer {{name}} en maintenance ?",
+    "description": "Les visiteurs verront une page « en construction » à la place du site."
+  },
+  "switchConfirm": {
+    "title": "Basculer {{name}} vers son duplicata ?",
+    "description": "Tout le trafic sera routé vers la copie de secours. À utiliser en cas de panne ou d'erreur système. Réversible."
+  },
+  "migrationTitleReady": "Capture ce site (conteneur, volumes, base de données, config Nginx) sur le disque USB de sauvegarde, en vue d'une migration vers un nouveau serveur",
+  "migrationTitleNotReady": "Connectez et configurez un disque USB de sauvegarde (écran Backups) pour activer la migration",
+  "migrationStarted": "Capture de migration démarrée pour {{name}} — suivez la progression dans Backups.",
+  "failoverErrors": {
+    "vhost_in_maintenance": "Ce site est en mode maintenance — quittez la maintenance avant de basculer vers le duplicata.",
+    "no_duplicate_found": "Aucun duplicata n'existe pour ce site.",
+    "duplicate_not_ready": "Le duplicata n'est pas encore prêt (création ou rafraîchissement en cours).",
+    "duplicate_container_unavailable": "Le conteneur du duplicata n'a pas pu être démarré — vérifiez son état dans l'écran Docker.",
+    "vhost_not_switched_to_duplicate": "Ce site n'est pas actuellement basculé vers son duplicata.",
+    "snapshot_not_found": "L'ancienne configuration du site est introuvable — impossible de revenir en arrière automatiquement."
+  },
+  "detail": {
+    "loading": "Chargement…",
+    "root": "Racine : {{root}}",
+    "proxy": "Proxy : {{proxy}}",
+    "ports": "Ports : {{ports}}",
+    "certExpires": "cert. expire dans {{days}}j",
+    "certPresent": "cert. présent",
+    "certMissing": "pas de certificat",
+    "tabAccess": "Accès Nginx",
+    "tabError": "Erreurs Nginx",
+    "tabContainer": "Conteneur",
+    "noLogs": "Aucun log."
+  },
+  "duplicate": {
+    "title": "Duplicata",
+    "processing": "Traitement…",
+    "failed": "Échec : {{error}}",
+    "content": "Contenu : {{path}}",
+    "size": "Taille (fichiers) : {{size}}",
+    "container": "Conteneur : {{name}} (port {{port}})",
+    "database": "Base de données : {{name}}",
+    "lastSynced": "Dernière synchro : {{date}}",
+    "explanation": "Le duplicata est figé au moment de sa création — les modifications faites sur l'original depuis ne s'y reflètent pas automatiquement. \"Mettre à jour\" refait une copie complète et à jour (fichiers + base de données) à partir de l'original actuel.",
+    "refresh": "Mettre à jour depuis l'original",
+    "delete": "Supprimer",
+    "deleteConfirm": {
+      "title": "Supprimer le duplicata ?",
+      "description": "Le contenu, la base de données et le conteneur dupliqués (le cas échéant) seront définitivement supprimés."
+    },
+    "none": "Aucun duplicata pour ce site. Créez-en un pour pouvoir basculer le trafic dessus en cas de panne.",
+    "create": "Créer un duplicata"
+  },
+  "createDialog": {
+    "introContent": "Le contenu du dossier du site sera copié. ",
+    "introContainer": "Un second conteneur (même image, port différent) sera créé et démarré. ",
+    "introSelectDb": "Sélectionnez une base de données ci-dessous si ce site en utilise une.",
+    "dbLabel": "Base de données (optionnel)",
+    "dbNone": "Aucune",
+    "dbPreciseLabel": "Base précise",
+    "dbChoose": "Choisir…",
+    "dbNoneDetected": "Aucune base détectée sur cette instance.",
+    "creating": "Création…",
+    "create": "Créer",
+    "cancel": "Annuler"
+  }
+}
