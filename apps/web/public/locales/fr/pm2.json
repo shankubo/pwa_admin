@@ -1,0 +1,28 @@
+{
+  "title": "Processus Node.js (PM2)",
+  "description": "Applications Node.js gérées par PM2 directement sur l'hôte (hors Docker). Les applications qui tournent dans des conteneurs Docker sont gérées depuis l'écran Docker.",
+  "notInstalled": "PM2 n'est pas installé sur ce serveur.",
+  "loading": "Chargement…",
+  "empty": "Aucun processus PM2 détecté.",
+  "status": {
+    "online": "en ligne",
+    "stopped": "arrêté",
+    "stopping": "arrêt en cours",
+    "launching": "démarrage",
+    "errored": "en erreur",
+    "one-launch-status": "unique"
+  },
+  "restarts_one": "{{count}} redémarrage",
+  "restarts_other": "{{count}} redémarrages",
+  "actions": {
+    "restart": "Redémarrer",
+    "stop": "Arrêter",
+    "start": "Démarrer",
+    "logs": "Logs"
+  },
+  "stopConfirm": {
+    "title": "Arrêter {{name}} ?",
+    "description": "Le processus ne répondra plus tant qu'il n'est pas redémarré."
+  },
+  "liveLogs": "Logs en direct"
+}

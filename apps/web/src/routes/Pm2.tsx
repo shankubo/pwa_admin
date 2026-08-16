@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Pm2Process, Pm2Status } from "@pwa-admin/shared";
+import { useTranslation } from "react-i18next";
 import { apiJson, apiFetch } from "@/lib/api";
 import { useWsChannel } from "@/lib/ws";
 import { Card, CardTitle } from "@/components/ui/Card";
@@ -16,15 +17,6 @@ const STATUS_STYLES: Record<Pm2Status, string> = {
   launching: "bg-warning/15 text-warning",
   errored: "bg-destructive/15 text-destructive",
   "one-launch-status": "bg-muted text-muted-foreground",
-};
-
-const STATUS_LABELS: Record<Pm2Status, string> = {
-  online: "en ligne",
-  stopped: "arrêté",
-  stopping: "arrêt en cours",
-  launching: "démarrage",
-  errored: "en erreur",
-  "one-launch-status": "unique",
 };
 
 const CARD_STYLES: Record<Pm2Status, string> = {
@@ -48,6 +40,7 @@ function formatUptime(ms: number | null): string {
 }
 
 export function Pm2() {
+  const { t } = useTranslation("pm2");
   const [processes, setProcesses] = useState<Pm2Process[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyName, setBusyName] = useState<string | null>(null);
@@ -58,11 +51,7 @@ export function Pm2() {
       .then(setProcesses)
       .catch((err) => {
         const message = (err as Error).message;
-        setError(
-          message === "pm2_not_installed"
-            ? "PM2 n'est pas installé sur ce serveur."
-            : message
-        );
+        setError(message === "pm2_not_installed" ? t("notInstalled") : message);
       });
   }
 
@@ -89,20 +78,15 @@ export function Pm2() {
     <div className="flex flex-col gap-4">
       <Card>
         <CardTitle className="flex items-center gap-1">
-          <Hexagon className="h-4 w-4" /> Processus Node.js (PM2)
+          <Hexagon className="h-4 w-4" /> {t("title")}
         </CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Applications Node.js gérées par PM2 directement sur l'hôte (hors Docker). Les applications qui tournent
-          dans des conteneurs Docker sont gérées depuis l'écran Docker.
-        </p>
+        <p className="text-xs text-muted-foreground">{t("description")}</p>
       </Card>
 
       {error && <Card className="text-sm text-destructive">{error}</Card>}
 
-      {!processes && !error && <Card className="text-sm text-muted-foreground">Chargement…</Card>}
-      {processes?.length === 0 && (
-        <Card className="text-sm text-muted-foreground">Aucun processus PM2 détecté.</Card>
-      )}
+      {!processes && !error && <Card className="text-sm text-muted-foreground">{t("loading")}</Card>}
+      {processes?.length === 0 && <Card className="text-sm text-muted-foreground">{t("empty")}</Card>}
 
       <div className="flex flex-col gap-3">
         {processes?.map((p) => (
@@ -115,7 +99,7 @@ export function Pm2() {
                 <p className="flex items-center gap-2 truncate font-medium">
                   {p.name}
                   <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[p.status]}`}>
-                    {STATUS_LABELS[p.status]}
+                    {t(`status.${p.status}`)}
                   </span>
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -127,7 +111,7 @@ export function Pm2() {
                   ) : (
                     "—"
                   )}
-                  {p.restarts > 0 ? ` · ${p.restarts} redémarrage${p.restarts > 1 ? "s" : ""}` : ""}
+                  {p.restarts > 0 ? ` · ${t("restarts", { count: p.restarts })}` : ""}
                 </p>
                 {p.scriptPath && (
                   <p className="mt-1 truncate text-xs text-muted-foreground">{p.scriptPath}</p>
@@ -141,19 +125,19 @@ export function Pm2() {
                       variant="outline"
                       disabled={busyName === p.name}
                       onClick={() => runAction(p.name, "restart")}
-                      title="Redémarrer"
+                      title={t("actions.restart")}
                     >
                       <RotateCw className="h-3.5 w-3.5" />
                     </Button>
                     <ConfirmDialog
                       trigger={
-                        <Button size="sm" variant="destructive" disabled={busyName === p.name} title="Arrêter">
+                        <Button size="sm" variant="destructive" disabled={busyName === p.name} title={t("actions.stop")}>
                           <Square className="h-3.5 w-3.5" />
                         </Button>
                       }
-                      title={`Arrêter ${p.name} ?`}
-                      description="Le processus ne répondra plus tant qu'il n'est pas redémarré."
-                      confirmLabel="Arrêter"
+                      title={t("stopConfirm.title", { name: p.name })}
+                      description={t("stopConfirm.description")}
+                      confirmLabel={t("actions.stop")}
                       onConfirm={() => runAction(p.name, "stop")}
                     />
                   </>
@@ -163,7 +147,7 @@ export function Pm2() {
                     variant="outline"
                     disabled={busyName === p.name}
                     onClick={() => runAction(p.name, "start")}
-                    title="Démarrer"
+                    title={t("actions.start")}
                   >
                     <Play className="h-3.5 w-3.5" />
                   </Button>
@@ -172,7 +156,7 @@ export function Pm2() {
                   size="sm"
                   variant="outline"
                   onClick={() => setExpandedName((prev) => (prev === p.name ? null : p.name))}
-                  title="Logs"
+                  title={t("actions.logs")}
                 >
                   <FileText className="h-3.5 w-3.5" />
                 </Button>
@@ -188,11 +172,11 @@ export function Pm2() {
 }
 
 function Pm2ProcessDetail({ name }: { name: string }) {
+  const { t } = useTranslation("pm2");
   const [initialLogs, setInitialLogs] = useState<string>("");
   const [liveChunk, setLiveChunk] = useState<string | null>(null);
 
   useEffect(() => {
-    // Logs are served as text/plain, not JSON — use apiFetch directly rather than apiJson.
     apiFetch(`/pm2/processes/${encodeURIComponent(name)}/logs?lines=200`)
       .then((res) => res.text())
       .then(setInitialLogs)
@@ -210,7 +194,7 @@ function Pm2ProcessDetail({ name }: { name: string }) {
   return (
     <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
       <p className="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
-        <RefreshCw className="h-3.5 w-3.5" /> Logs en direct
+        <RefreshCw className="h-3.5 w-3.5" /> {t("liveLogs")}
       </p>
       <LiveLogPanel initialText={initialLogs} chunk={liveChunk} />
     </div>

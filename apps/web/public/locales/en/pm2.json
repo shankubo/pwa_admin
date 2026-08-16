@@ -1,0 +1,28 @@
+{
+  "title": "Node.js processes (PM2)",
+  "description": "Node.js applications managed by PM2 directly on the host (outside Docker). Applications running in Docker containers are managed from the Docker screen.",
+  "notInstalled": "PM2 is not installed on this server.",
+  "loading": "Loading…",
+  "empty": "No PM2 process detected.",
+  "status": {
+    "online": "online",
+    "stopped": "stopped",
+    "stopping": "stopping",
+    "launching": "starting",
+    "errored": "errored",
+    "one-launch-status": "one-off"
+  },
+  "restarts_one": "{{count}} restart",
+  "restarts_other": "{{count}} restarts",
+  "actions": {
+    "restart": "Restart",
+    "stop": "Stop",
+    "start": "Start",
+    "logs": "Logs"
+  },
+  "stopConfirm": {
+    "title": "Stop {{name}}?",
+    "description": "The process will stop responding until it is restarted."
+  },
+  "liveLogs": "Live logs"
+}
