@@ -1,0 +1,79 @@
+{
+  "statusFilters": {
+    "all": "All",
+    "success": "Success",
+    "failed": "Failed",
+    "running": "Running"
+  },
+  "localStorage": "Local storage",
+  "newBackup": "New backup",
+  "cancel": "Cancel",
+  "newJob": "New job",
+  "loading": "Loading…",
+  "noJobConfigured": "No job configured.",
+  "targetsLabel": "targets: {{targets}}",
+  "deleteJobConfirm": {
+    "title": "Delete job {{name}}?",
+    "confirmLabel": "Delete"
+  },
+  "detectedDbs": {
+    "title": "Partial backup — detected databases",
+    "explanation": "A database dump is fast and behaves like a \"partial\" backup — unlike a full volume/folder snapshot.",
+    "locationContainer": "container",
+    "locationHost": "host",
+    "dump": "Dump",
+    "dumpAndDownloadTitle": "Dump then download",
+    "databasesLabel": "Databases: {{list}}",
+    "noAppDatabases": "No application database (excluding system databases)",
+    "none": "No database detected."
+  },
+  "history": {
+    "title": "History",
+    "restorePrompt": "To restore a backup, go to",
+    "restoreLink": "Restore",
+    "empty": "No history.",
+    "downloadTitle": "Download",
+    "deleteConfirm": {
+      "title": "Delete this backup?",
+      "description": "The local file will be deleted (existing USB/Drive copies are not affected). Irreversible action.",
+      "confirmLabel": "Delete"
+    }
+  },
+  "newJobForm": {
+    "step1Title": "Step 1 — Type",
+    "kindFull": "Full",
+    "kindPartial": "Partial (database)",
+    "sourceTypeVolume": "Docker volume",
+    "sourceTypePath": "folder (bind mount)",
+    "jobNamePlaceholder": "Job name",
+    "loadVolumesError": "Unable to load the volume list",
+    "loadDbsError": "Unable to load the database list",
+    "loadMountsError": "Unable to load the mounted folder list",
+    "sourceRefVolumePlaceholder": "Source reference (volume name)",
+    "sourceRefPathPlaceholder": "Absolute path (e.g. /opt/docker-data/my-app)",
+    "chooseFromList": "Choose from the list",
+    "selectVolumePrompt": "Select a volume…",
+    "selectMountPrompt": "Select a mounted folder…",
+    "enterManually": "Enter manually",
+    "partialExplanation": "For a one-off dump, use the \"Dump\" button in the \"Detected databases\" card below. This form creates a schedulable job — the source is a detected database.",
+    "sourceRefDbPlaceholder": "Source reference (location:ref, e.g. native:mariadb)",
+    "selectDbPrompt": "Select a database…",
+    "step2Title": "Step 2 — Destination",
+    "targetLocal": "local",
+    "targetGdrive": "gdrive",
+    "targetGdriveNotConnected": "(not connected)",
+    "targetUsb": "usb",
+    "targetUsbNotConfigured": "(not configured — see below)",
+    "downloadAfter": "download after backup",
+    "cronPlaceholder": "Cron expression (optional)",
+    "validationError": "Name, reference, and at least one target are required",
+    "creating": "Creating…",
+    "create": "Create"
+  },
+  "driveStatus": {
+    "verified": "verified on Drive",
+    "sizeMismatch": "different size on Drive",
+    "missing": "missing from Drive",
+    "notUploaded": "never sent to Drive"
+  }
+}

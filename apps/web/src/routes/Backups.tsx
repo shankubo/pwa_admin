@@ -13,6 +13,7 @@ import type {
   UsbStatus,
   UsbBackupArchive,
 } from "@pwa-admin/shared";
+import { useTranslation } from "react-i18next";
 import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -37,11 +38,11 @@ import {
   HardDriveUpload,
 } from "lucide-react";
 
-const STATUS_FILTERS: { key: "all" | BackupRunStatus; label: string }[] = [
-  { key: "all", label: "Tous" },
-  { key: "success", label: "Succès" },
-  { key: "failed", label: "Échec" },
-  { key: "running", label: "En cours" },
+const STATUS_FILTERS: { key: "all" | BackupRunStatus; labelKey: string }[] = [
+  { key: "all", labelKey: "statusFilters.all" },
+  { key: "success", labelKey: "statusFilters.success" },
+  { key: "failed", labelKey: "statusFilters.failed" },
+  { key: "running", labelKey: "statusFilters.running" },
 ];
 
 function historyCardClass(status: BackupRunStatus): string | undefined {
@@ -51,6 +52,7 @@ function historyCardClass(status: BackupRunStatus): string | undefined {
 }
 
 export function Backups() {
+  const { t } = useTranslation("backups");
   const [jobs, setJobs] = useState<BackupJob[] | null>(null);
   const [history, setHistory] = useState<BackupHistoryEntry[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | BackupRunStatus>("all");
@@ -162,7 +164,7 @@ export function Backups() {
 
       <Card>
         <CardTitle className="flex items-center gap-1">
-          <HardDrive className="h-4 w-4" /> Stockage local
+          <HardDrive className="h-4 w-4" /> {t("localStorage")}
         </CardTitle>
         <p className="text-lg font-medium">{storage ? formatBytes(storage.localUsedBytes) : "…"}</p>
       </Card>
@@ -180,9 +182,9 @@ export function Backups() {
 
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-muted-foreground">Nouvelle sauvegarde</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground">{t("newBackup")}</h2>
           <Button size="sm" variant="outline" onClick={() => setShowNewJob((v) => !v)}>
-            {showNewJob ? "Annuler" : "Nouveau job"}
+            {showNewJob ? t("cancel") : t("newJob")}
           </Button>
         </div>
 
@@ -196,8 +198,8 @@ export function Backups() {
         )}
 
         <div className="flex flex-col gap-3">
-          {!jobs && <Card className="text-sm text-muted-foreground">Chargement…</Card>}
-          {jobs?.length === 0 && <Card className="text-sm text-muted-foreground">Aucun job configuré.</Card>}
+          {!jobs && <Card className="text-sm text-muted-foreground">{t("loading")}</Card>}
+          {jobs?.length === 0 && <Card className="text-sm text-muted-foreground">{t("noJobConfigured")}</Card>}
           {jobs?.map((job) => (
             <Card key={job.id}>
               <div className="flex items-start justify-between gap-2">
@@ -207,7 +209,7 @@ export function Backups() {
                     {job.sourceType} · {job.sourceRef}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    cibles : {job.targets.join(", ")}
+                    {t("targetsLabel", { targets: job.targets.join(", ") })}
                     {job.scheduleCron ? ` · cron: ${job.scheduleCron}` : ""}
                   </p>
                 </div>
@@ -221,8 +223,8 @@ export function Backups() {
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     }
-                    title={`Supprimer le job ${job.name} ?`}
-                    confirmLabel="Supprimer"
+                    title={t("deleteJobConfirm.title", { name: job.name })}
+                    confirmLabel={t("deleteJobConfirm.confirmLabel")}
                     onConfirm={() => deleteJob(job.id)}
                   />
                 </div>
@@ -234,12 +236,9 @@ export function Backups() {
 
       <Card>
         <CardTitle className="flex items-center gap-1">
-          <Database className="h-4 w-4" /> Sauvegarde partielle — bases de données détectées
+          <Database className="h-4 w-4" /> {t("detectedDbs.title")}
         </CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Un dump de base de données est rapide et se comporte comme une sauvegarde « partielle » — à la
-          différence d'un instantané complet de volume/dossier.
-        </p>
+        <p className="text-xs text-muted-foreground">{t("detectedDbs.explanation")}</p>
         {detected && detected.length > 0 ? (
           <div className="mt-2 flex flex-col gap-3">
             {detected.map((d) => (
@@ -248,7 +247,7 @@ export function Backups() {
                   <span>
                     {d.displayName}{" "}
                     <span className="text-xs text-muted-foreground">
-                      ({d.engine} · {d.location === "docker" ? "conteneur" : "hôte"})
+                      ({d.engine} · {d.location === "docker" ? t("detectedDbs.locationContainer") : t("detectedDbs.locationHost")})
                     </span>
                   </span>
                   <div className="flex gap-1">
@@ -258,36 +257,36 @@ export function Backups() {
                       disabled={dumpingRef === d.ref}
                       onClick={() => dumpDb(d.location, d.ref, false)}
                     >
-                      {dumpingRef === d.ref ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Dump"}
+                      {dumpingRef === d.ref ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("detectedDbs.dump")}
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
                       disabled={dumpingRef === d.ref}
                       onClick={() => dumpDb(d.location, d.ref, true)}
-                      title="Dump puis télécharger"
+                      title={t("detectedDbs.dumpAndDownloadTitle")}
                     >
                       <Download className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 </div>
                 {d.databases && d.databases.length > 0 && (
-                  <p className="text-xs text-muted-foreground">Bases : {d.databases.join(", ")}</p>
+                  <p className="text-xs text-muted-foreground">{t("detectedDbs.databasesLabel", { list: d.databases.join(", ") })}</p>
                 )}
                 {d.databases && d.databases.length === 0 && (
-                  <p className="text-xs text-muted-foreground">Aucune base applicative (hors bases système)</p>
+                  <p className="text-xs text-muted-foreground">{t("detectedDbs.noAppDatabases")}</p>
                 )}
               </div>
             ))}
           </div>
         ) : (
-          <p className="mt-2 text-sm text-muted-foreground">Aucune base détectée.</p>
+          <p className="mt-2 text-sm text-muted-foreground">{t("detectedDbs.none")}</p>
         )}
       </Card>
 
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-muted-foreground">Historique</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground">{t("history.title")}</h2>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as "all" | BackupRunStatus)}
@@ -295,22 +294,22 @@ export function Backups() {
           >
             {STATUS_FILTERS.map((f) => (
               <option key={f.key} value={f.key}>
-                {f.label}
+                {t(f.labelKey)}
               </option>
             ))}
           </select>
         </div>
 
         <p className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
-          Pour restaurer une sauvegarde, rendez-vous sur{" "}
+          {t("history.restorePrompt")}{" "}
           <Link to="/restore" className="inline-flex items-center gap-0.5 text-primary underline">
-            Restore <ArrowRight className="h-3 w-3" />
+            {t("history.restoreLink")} <ArrowRight className="h-3 w-3" />
           </Link>
         </p>
 
         <div className="flex flex-col gap-2">
           {filteredHistory.length === 0 && (
-            <Card className="text-sm text-muted-foreground">Aucun historique.</Card>
+            <Card className="text-sm text-muted-foreground">{t("history.empty")}</Card>
           )}
           {filteredHistory.map((h) => {
             const driveStatus = driveStatusByRunId.get(h.runId);
@@ -350,7 +349,7 @@ export function Backups() {
                   </div>
                   <div className="flex gap-1">
                     {h.status === "success" && h.target === "local" && (
-                      <Button size="sm" variant="outline" onClick={() => triggerBackupDownload(h.runId)} title="Télécharger">
+                      <Button size="sm" variant="outline" onClick={() => triggerBackupDownload(h.runId)} title={t("history.downloadTitle")}>
                         <Download className="h-3.5 w-3.5" />
                       </Button>
                     )}
@@ -360,9 +359,9 @@ export function Backups() {
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       }
-                      title="Supprimer cette sauvegarde ?"
-                      description="Le fichier local sera supprimé (les copies USB/Drive existantes ne sont pas touchées). Action irréversible."
-                      confirmLabel="Supprimer"
+                      title={t("history.deleteConfirm.title")}
+                      description={t("history.deleteConfirm.description")}
+                      confirmLabel={t("history.deleteConfirm.confirmLabel")}
                       onConfirm={() => deleteRun(h.runId)}
                     />
                   </div>
@@ -377,6 +376,7 @@ export function Backups() {
 }
 
 function NewJobForm({ onCreated }: { onCreated: () => void }) {
+  const { t } = useTranslation("backups");
   const [step, setStep] = useState<1 | 2>(1);
   const [kind, setKind] = useState<"complet" | "partiel">("complet");
   const [name, setName] = useState("");
@@ -421,17 +421,17 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
     if (sourceType === "volume") {
       apiJson<VolumeSummary[]>("/docker/volumes")
         .then(setVolumes)
-        .catch(() => setError("Impossible de charger la liste des volumes"))
+        .catch(() => setError(t("newJobForm.loadVolumesError")))
         .finally(() => setRefsLoading(false));
     } else if (sourceType === "db") {
       apiJson<DetectedDatabase[]>("/dbbackup/detect")
         .then(setDetectedDbs)
-        .catch(() => setError("Impossible de charger la liste des bases de données"))
+        .catch(() => setError(t("newJobForm.loadDbsError")))
         .finally(() => setRefsLoading(false));
     } else if (sourceType === "path") {
       apiJson<DetectedBindMount[]>("/backups/bind-mounts")
         .then(setBindMounts)
-        .catch(() => setError("Impossible de charger la liste des dossiers montés"))
+        .catch(() => setError(t("newJobForm.loadMountsError")))
         .finally(() => setRefsLoading(false));
     }
   }, [sourceType]);
@@ -451,15 +451,15 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
             }))
           : [];
 
-  function toggleTarget(t: BackupTarget) {
-    setTargets((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+  function toggleTarget(tgt: BackupTarget) {
+    setTargets((prev) => (prev.includes(tgt) ? prev.filter((x) => x !== tgt) : [...prev, tgt]));
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (!name.trim() || !sourceRef.trim() || targets.length === 0) {
-      setError("Nom, référence et au moins une cible sont requis");
+      setError(t("newJobForm.validationError"));
       return;
     }
     setSubmitting(true);
@@ -490,7 +490,7 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
     <Card className="mb-3">
       <form onSubmit={submit} className="flex flex-col gap-3">
         <div>
-          <p className="mb-1 text-xs font-medium text-muted-foreground">Étape 1 — Type</p>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">{t("newJobForm.step1Title")}</p>
           <div className="flex overflow-hidden rounded-md border border-border text-sm">
             <button
               type="button"
@@ -500,7 +500,7 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
               }}
               className={`flex-1 px-3 py-2 ${kind === "complet" ? "bg-primary text-primary-foreground" : "bg-background"}`}
             >
-              Complet
+              {t("newJobForm.kindFull")}
             </button>
             <button
               type="button"
@@ -510,7 +510,7 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
               }}
               className={`flex-1 px-3 py-2 ${kind === "partiel" ? "bg-primary text-primary-foreground" : "bg-background"}`}
             >
-              Partiel (base de données)
+              {t("newJobForm.kindPartial")}
             </button>
           </div>
         </div>
@@ -522,12 +522,12 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
               onChange={(e) => setSourceType(e.target.value as BackupSourceType)}
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
             >
-              <option value="volume">volume Docker</option>
-              <option value="path">dossier (bind mount)</option>
+              <option value="volume">{t("newJobForm.sourceTypeVolume")}</option>
+              <option value="path">{t("newJobForm.sourceTypePath")}</option>
             </select>
             <input
               type="text"
-              placeholder="Nom du job"
+              placeholder={t("newJobForm.jobNamePlaceholder")}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
@@ -538,10 +538,10 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
                   type="text"
                   placeholder={
                     refsLoading
-                      ? "Chargement…"
+                      ? t("loading")
                       : sourceType === "volume"
-                        ? "Référence source (nom du volume)"
-                        : "Chemin absolu (ex: /opt/docker-data/mon-app)"
+                        ? t("newJobForm.sourceRefVolumePlaceholder")
+                        : t("newJobForm.sourceRefPathPlaceholder")
                   }
                   value={sourceRef}
                   onChange={(e) => setSourceRef(e.target.value)}
@@ -553,7 +553,7 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
                     onClick={() => setManualEntry(false)}
                     className="self-start text-xs text-primary underline"
                   >
-                    Choisir dans la liste
+                    {t("newJobForm.chooseFromList")}
                   </button>
                 )}
               </div>
@@ -565,7 +565,7 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
                 >
                   <option value="">
-                    {sourceType === "volume" ? "Sélectionner un volume…" : "Sélectionner un dossier monté…"}
+                    {sourceType === "volume" ? t("newJobForm.selectVolumePrompt") : t("newJobForm.selectMountPrompt")}
                   </option>
                   {refOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -578,23 +578,20 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
                   onClick={() => setManualEntry(true)}
                   className="self-start text-xs text-primary underline"
                 >
-                  Saisir manuellement
+                  {t("newJobForm.enterManually")}
                 </button>
               </div>
             )}
           </>
         ) : (
-          <p className="text-xs text-muted-foreground">
-            Pour un dump ponctuel, utilisez le bouton « Dump » dans la carte « Bases de données détectées »
-            ci-dessous. Ce formulaire crée un job planifiable — la source est une base de données détectée.
-          </p>
+          <p className="text-xs text-muted-foreground">{t("newJobForm.partialExplanation")}</p>
         )}
 
         {kind === "partiel" && (
           <>
             <input
               type="text"
-              placeholder="Nom du job"
+              placeholder={t("newJobForm.jobNamePlaceholder")}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
@@ -603,7 +600,7 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
               <div className="flex flex-col gap-1">
                 <input
                   type="text"
-                  placeholder={refsLoading ? "Chargement…" : "Référence source (location:ref, ex: native:mariadb)"}
+                  placeholder={refsLoading ? t("loading") : t("newJobForm.sourceRefDbPlaceholder")}
                   value={sourceRef}
                   onChange={(e) => setSourceRef(e.target.value)}
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
@@ -614,7 +611,7 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
                     onClick={() => setManualEntry(false)}
                     className="self-start text-xs text-primary underline"
                   >
-                    Choisir dans la liste
+                    {t("newJobForm.chooseFromList")}
                   </button>
                 )}
               </div>
@@ -625,7 +622,7 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
                   onChange={(e) => setSourceRef(e.target.value)}
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
                 >
-                  <option value="">Sélectionner une base de données…</option>
+                  <option value="">{t("newJobForm.selectDbPrompt")}</option>
                   {refOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
@@ -637,7 +634,7 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
                   onClick={() => setManualEntry(true)}
                   className="self-start text-xs text-primary underline"
                 >
-                  Saisir manuellement
+                  {t("newJobForm.enterManually")}
                 </button>
               </div>
             )}
@@ -645,11 +642,11 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
         )}
 
         <div>
-          <p className="mb-1 text-xs font-medium text-muted-foreground">Étape 2 — Destination</p>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">{t("newJobForm.step2Title")}</p>
           <div className="flex flex-wrap gap-3 text-sm">
             <label className="flex items-center gap-1">
               <input type="checkbox" checked={targets.includes("local")} onChange={() => toggleTarget("local")} />
-              local
+              {t("newJobForm.targetLocal")}
             </label>
             <label className="flex items-center gap-1">
               <input
@@ -658,8 +655,8 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
                 onChange={() => toggleTarget("gdrive")}
                 disabled={!gdriveAuthorized}
               />
-              gdrive
-              {!gdriveAuthorized && <span className="text-xs text-muted-foreground">(non connecté)</span>}
+              {t("newJobForm.targetGdrive")}
+              {!gdriveAuthorized && <span className="text-xs text-muted-foreground">{t("newJobForm.targetGdriveNotConnected")}</span>}
             </label>
             <label className="flex items-center gap-1">
               <input
@@ -668,26 +665,26 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
                 onChange={() => toggleTarget("usb")}
                 disabled={!usbAvailable}
               />
-              usb
-              {!usbAvailable && <span className="text-xs text-muted-foreground">(non configuré — voir plus bas)</span>}
+              {t("newJobForm.targetUsb")}
+              {!usbAvailable && <span className="text-xs text-muted-foreground">{t("newJobForm.targetUsbNotConfigured")}</span>}
             </label>
             <label className="flex items-center gap-1">
               <input type="checkbox" checked={downloadAfter} onChange={() => setDownloadAfter((v) => !v)} />
-              télécharger après la sauvegarde
+              {t("newJobForm.downloadAfter")}
             </label>
           </div>
         </div>
 
         <input
           type="text"
-          placeholder="Expression cron (optionnel)"
+          placeholder={t("newJobForm.cronPlaceholder")}
           value={cron}
           onChange={(e) => setCron(e.target.value)}
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
         />
         {error && <p className="text-xs text-destructive">{error}</p>}
         <Button type="submit" size="sm" disabled={submitting}>
-          {submitting ? "Création…" : "Créer"}
+          {submitting ? t("newJobForm.creating") : t("newJobForm.create")}
         </Button>
       </form>
     </Card>
@@ -695,16 +692,17 @@ function NewJobForm({ onCreated }: { onCreated: () => void }) {
 }
 
 function DriveStatusBadge({ status }: { status: "verified" | "missing" | "size-mismatch" | "not-uploaded" }) {
+  const { t } = useTranslation("backups");
   const config = {
-    verified: { label: "vérifié sur Drive", cls: "bg-primary/15 text-primary", icon: CheckCircle2 },
-    "size-mismatch": { label: "taille différente sur Drive", cls: "bg-warning/15 text-warning", icon: AlertTriangle },
-    missing: { label: "absent de Drive", cls: "bg-destructive/15 text-destructive", icon: XCircle },
-    "not-uploaded": { label: "jamais envoyé sur Drive", cls: "bg-destructive/15 text-destructive", icon: XCircle },
+    verified: { labelKey: "driveStatus.verified", cls: "bg-primary/15 text-primary", icon: CheckCircle2 },
+    "size-mismatch": { labelKey: "driveStatus.sizeMismatch", cls: "bg-warning/15 text-warning", icon: AlertTriangle },
+    missing: { labelKey: "driveStatus.missing", cls: "bg-destructive/15 text-destructive", icon: XCircle },
+    "not-uploaded": { labelKey: "driveStatus.notUploaded", cls: "bg-destructive/15 text-destructive", icon: XCircle },
   }[status];
   const Icon = config.icon;
   return (
     <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${config.cls}`}>
-      <Icon className="h-3 w-3" /> {config.label}
+      <Icon className="h-3 w-3" /> {t(config.labelKey)}
     </span>
   );
 }

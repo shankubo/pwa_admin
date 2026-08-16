@@ -1,0 +1,79 @@
+{
+  "statusFilters": {
+    "all": "Tous",
+    "success": "Succès",
+    "failed": "Échec",
+    "running": "En cours"
+  },
+  "localStorage": "Stockage local",
+  "newBackup": "Nouvelle sauvegarde",
+  "cancel": "Annuler",
+  "newJob": "Nouveau job",
+  "loading": "Chargement…",
+  "noJobConfigured": "Aucun job configuré.",
+  "targetsLabel": "cibles : {{targets}}",
+  "deleteJobConfirm": {
+    "title": "Supprimer le job {{name}} ?",
+    "confirmLabel": "Supprimer"
+  },
+  "detectedDbs": {
+    "title": "Sauvegarde partielle — bases de données détectées",
+    "explanation": "Un dump de base de données est rapide et se comporte comme une sauvegarde « partielle » — à la différence d'un instantané complet de volume/dossier.",
+    "locationContainer": "conteneur",
+    "locationHost": "hôte",
+    "dump": "Dump",
+    "dumpAndDownloadTitle": "Dump puis télécharger",
+    "databasesLabel": "Bases : {{list}}",
+    "noAppDatabases": "Aucune base applicative (hors bases système)",
+    "none": "Aucune base détectée."
+  },
+  "history": {
+    "title": "Historique",
+    "restorePrompt": "Pour restaurer une sauvegarde, rendez-vous sur",
+    "restoreLink": "Restore",
+    "empty": "Aucun historique.",
+    "downloadTitle": "Télécharger",
+    "deleteConfirm": {
+      "title": "Supprimer cette sauvegarde ?",
+      "description": "Le fichier local sera supprimé (les copies USB/Drive existantes ne sont pas touchées). Action irréversible.",
+      "confirmLabel": "Supprimer"
+    }
+  },
+  "newJobForm": {
+    "step1Title": "Étape 1 — Type",
+    "kindFull": "Complet",
+    "kindPartial": "Partiel (base de données)",
+    "sourceTypeVolume": "volume Docker",
+    "sourceTypePath": "dossier (bind mount)",
+    "jobNamePlaceholder": "Nom du job",
+    "loadVolumesError": "Impossible de charger la liste des volumes",
+    "loadDbsError": "Impossible de charger la liste des bases de données",
+    "loadMountsError": "Impossible de charger la liste des dossiers montés",
+    "sourceRefVolumePlaceholder": "Référence source (nom du volume)",
+    "sourceRefPathPlaceholder": "Chemin absolu (ex: /opt/docker-data/mon-app)",
+    "chooseFromList": "Choisir dans la liste",
+    "selectVolumePrompt": "Sélectionner un volume…",
+    "selectMountPrompt": "Sélectionner un dossier monté…",
+    "enterManually": "Saisir manuellement",
+    "partialExplanation": "Pour un dump ponctuel, utilisez le bouton « Dump » dans la carte « Bases de données détectées » ci-dessous. Ce formulaire crée un job planifiable — la source est une base de données détectée.",
+    "sourceRefDbPlaceholder": "Référence source (location:ref, ex: native:mariadb)",
+    "selectDbPrompt": "Sélectionner une base de données…",
+    "step2Title": "Étape 2 — Destination",
+    "targetLocal": "local",
+    "targetGdrive": "gdrive",
+    "targetGdriveNotConnected": "(non connecté)",
+    "targetUsb": "usb",
+    "targetUsbNotConfigured": "(non configuré — voir plus bas)",
+    "downloadAfter": "télécharger après la sauvegarde",
+    "cronPlaceholder": "Expression cron (optionnel)",
+    "validationError": "Nom, référence et au moins une cible sont requis",
+    "creating": "Création…",
+    "create": "Créer"
+  },
+  "driveStatus": {
+    "verified": "vérifié sur Drive",
+    "sizeMismatch": "taille différente sur Drive",
+    "missing": "absent de Drive",
+    "notUploaded": "jamais envoyé sur Drive"
+  }
+}
