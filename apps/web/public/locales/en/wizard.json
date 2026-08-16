@@ -28,5 +28,85 @@
       "security": "Server security"
     },
     "open": "Open"
+  },
+  "backupFlow": {
+    "step1Title": "Step 2 — What would you like to back up?",
+    "siteSource": {
+      "label": "A site",
+      "description": "Choose an existing Nginx/Apache site."
+    },
+    "genericSource": {
+      "label": "Volume / folder / database",
+      "description": "Choose a technical source directly."
+    },
+    "step2SiteTitle": "Step 2 — Choose a site",
+    "step2GenericTitle": "Step 2 — Choose a source",
+    "step3Title": "Step 3 — Destination",
+    "step4Title": "Step 4 — Confirmation",
+    "step5Title": "Step 5 — Execution",
+    "step6Title": "Step 6 — Result",
+    "loading": "Loading…",
+    "noSiteFound": "No site found.",
+    "disabledSites": "Disabled sites ({{count}})",
+    "sourceTypeVolume": "Docker volume",
+    "sourceTypePath": "Folder (bind mount)",
+    "sourceTypeDb": "Database",
+    "selectPrompt": "Select…",
+    "targetLocal": "Local",
+    "targetGdrive": "Google Drive",
+    "targetGdriveNotConnected": "(not connected)",
+    "targetUsb": "USB",
+    "targetUsbNotConfigured": "(not configured)",
+    "next": "Next",
+    "sourceLabel": "Source: ",
+    "destinationsLabel": "Destinations: ",
+    "launch": "Start backup",
+    "running": "Backup in progress…",
+    "success": "Backup completed successfully.",
+    "failed": "Backup failed{{suffix}}.",
+    "failedSuffix": ": {{error}}",
+    "viewInBackups": "View in Backups",
+    "newOperation": "New operation",
+    "siteSourceLabel": "Site: {{name}}"
+  },
+  "migrationFlow": {
+    "step2Title": "Step 2 — What would you like to do?",
+    "step3Title": "Step 3 — What scope?",
+    "step4Title": "Step 4 — Destination",
+    "step5Title": "Step 5 — Confirmation",
+    "step6Title": "Step 6 — Execution",
+    "step7Title": "Step 7 — Result",
+    "captureSnapshot": {
+      "label": "Create a snapshot",
+      "description": "Capture the server (or a site) to move or rebuild it elsewhere."
+    },
+    "restoreSnapshot": {
+      "label": "Restore a snapshot",
+      "description": "Reinstall a server from a previously captured snapshot."
+    },
+    "fullServer": {
+      "label": "Full server",
+      "description": "Docker images/volumes, databases, Nginx config, applications, system packages."
+    },
+    "singleSite": {
+      "label": "A site",
+      "description": "Capture limited to one site and its data."
+    },
+    "loading": "Loading…",
+    "usbConfigured": "The snapshot will be saved to the configured backup USB drive.",
+    "usbNotConfigured": "No USB drive configured as backup.",
+    "configureUsb": "Configure",
+    "next": "Next",
+    "scopeLabel": "Scope: ",
+    "scopeSite": "Site {{name}}",
+    "scopeServer": "Full server",
+    "includeDuplicates": "Include \"-duplicate\" containers (usually unnecessary for a new server)",
+    "start": "Start",
+    "capturing": "Capturing…",
+    "captureSuccess": "Snapshot captured successfully.",
+    "captureFailed": "Snapshot capture failed.",
+    "captureFinished": "Capture finished ({{status}}).",
+    "viewInBackups": "View in Backups",
+    "newOperation": "New operation"
   }
 }

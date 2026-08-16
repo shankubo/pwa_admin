@@ -28,5 +28,85 @@
       "security": "சேவையக பாதுகாப்பு"
     },
     "open": "திற"
+  },
+  "backupFlow": {
+    "step1Title": "படி 2 — நீங்கள் எதை காப்புப்பிரதி எடுக்க விரும்புகிறீர்கள்?",
+    "siteSource": {
+      "label": "ஒரு தளம்",
+      "description": "ஏற்கனவே உள்ள Nginx/Apache தளத்தைத் தேர்ந்தெடுக்கவும்."
+    },
+    "genericSource": {
+      "label": "தொகுதி / கோப்புறை / தரவுத்தளம்",
+      "description": "நேரடியாக ஒரு தொழில்நுட்ப மூலத்தைத் தேர்ந்தெடுக்கவும்."
+    },
+    "step2SiteTitle": "படி 2 — ஒரு தளத்தைத் தேர்ந்தெடுக்கவும்",
+    "step2GenericTitle": "படி 2 — ஒரு மூலத்தைத் தேர்ந்தெடுக்கவும்",
+    "step3Title": "படி 3 — இலக்கு",
+    "step4Title": "படி 4 — உறுதிப்படுத்தல்",
+    "step5Title": "படி 5 — செயல்படுத்தல்",
+    "step6Title": "படி 6 — முடிவு",
+    "loading": "ஏற்றுகிறது…",
+    "noSiteFound": "தளம் எதுவும் கிடைக்கவில்லை.",
+    "disabledSites": "முடக்கப்பட்ட தளங்கள் ({{count}})",
+    "sourceTypeVolume": "Docker தொகுதி",
+    "sourceTypePath": "கோப்புறை (bind mount)",
+    "sourceTypeDb": "தரவுத்தளம்",
+    "selectPrompt": "தேர்ந்தெடு…",
+    "targetLocal": "உள்ளூர்",
+    "targetGdrive": "Google Drive",
+    "targetGdriveNotConnected": "(இணைக்கப்படவில்லை)",
+    "targetUsb": "USB",
+    "targetUsbNotConfigured": "(கட்டமைக்கப்படவில்லை)",
+    "next": "அடுத்து",
+    "sourceLabel": "மூலம்: ",
+    "destinationsLabel": "இலக்குகள்: ",
+    "launch": "காப்புப்பிரதியைத் தொடங்கு",
+    "running": "காப்புப்பிரதி நடந்துகொண்டிருக்கிறது…",
+    "success": "காப்புப்பிரதி வெற்றிகரமாக முடிந்தது.",
+    "failed": "காப்புப்பிரதி தோல்வியடைந்தது{{suffix}}.",
+    "failedSuffix": ": {{error}}",
+    "viewInBackups": "Backups இல் காண்க",
+    "newOperation": "புதிய செயல்பாடு",
+    "siteSourceLabel": "தளம்: {{name}}"
+  },
+  "migrationFlow": {
+    "step2Title": "படி 2 — நீங்கள் என்ன செய்ய விரும்புகிறீர்கள்?",
+    "step3Title": "படி 3 — எந்த நோக்கம்?",
+    "step4Title": "படி 4 — இலக்கு",
+    "step5Title": "படி 5 — உறுதிப்படுத்தல்",
+    "step6Title": "படி 6 — செயல்படுத்தல்",
+    "step7Title": "படி 7 — முடிவு",
+    "captureSnapshot": {
+      "label": "ஸ்னாப்ஷாட் உருவாக்கு",
+      "description": "வேறு இடத்தில் நகர்த்த அல்லது மீண்டும் உருவாக்க சேவையகத்தை (அல்லது ஒரு தளத்தை) பிடிக்கவும்."
+    },
+    "restoreSnapshot": {
+      "label": "ஸ்னாப்ஷாட்டை மீட்டமை",
+      "description": "முன்பு பிடிக்கப்பட்ட ஸ்னாப்ஷாட்டிலிருந்து சேவையகத்தை மீண்டும் நிறுவவும்."
+    },
+    "fullServer": {
+      "label": "முழு சேவையகம்",
+      "description": "Docker படங்கள்/தொகுதிகள், தரவுத்தளங்கள், Nginx கட்டமைப்பு, பயன்பாடுகள், System தொகுப்புகள்."
+    },
+    "singleSite": {
+      "label": "ஒரு தளம்",
+      "description": "ஒரு தளம் மற்றும் அதன் தரவுக்கு மட்டும் பிடிப்பு வரம்பிடப்பட்டுள்ளது."
+    },
+    "loading": "ஏற்றுகிறது…",
+    "usbConfigured": "ஸ்னாப்ஷாட் கட்டமைக்கப்பட்ட காப்புப்பிரதி USB வட்டில் சேமிக்கப்படும்.",
+    "usbNotConfigured": "காப்புப்பிரதியாக எந்த USB வட்டும் கட்டமைக்கப்படவில்லை.",
+    "configureUsb": "கட்டமை",
+    "next": "அடுத்து",
+    "scopeLabel": "நோக்கம்: ",
+    "scopeSite": "தளம் {{name}}",
+    "scopeServer": "முழு சேவையகம்",
+    "includeDuplicates": "\"-duplicate\" கொள்கலன்களை சேர் (புதிய சேவையகத்திற்கு பொதுவாக தேவையில்லை)",
+    "start": "தொடங்கு",
+    "capturing": "பிடிக்கிறது…",
+    "captureSuccess": "ஸ்னாப்ஷாட் வெற்றிகரமாக பிடிக்கப்பட்டது.",
+    "captureFailed": "பிடிப்பு தோல்வியடைந்தது.",
+    "captureFinished": "பிடிப்பு முடிந்தது ({{status}}).",
+    "viewInBackups": "Backups இல் காண்க",
+    "newOperation": "புதிய செயல்பாடு"
   }
 }

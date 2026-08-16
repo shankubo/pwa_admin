@@ -28,5 +28,85 @@
       "security": "Sécurité serveur"
     },
     "open": "Ouvrir"
+  },
+  "backupFlow": {
+    "step1Title": "Étape 2 — Que voulez-vous sauvegarder ?",
+    "siteSource": {
+      "label": "Un site",
+      "description": "Choisir un site Nginx/Apache existant."
+    },
+    "genericSource": {
+      "label": "Volume / dossier / base de données",
+      "description": "Choisir directement une source technique."
+    },
+    "step2SiteTitle": "Étape 2 — Choisissez un site",
+    "step2GenericTitle": "Étape 2 — Choisissez une source",
+    "step3Title": "Étape 3 — Destination",
+    "step4Title": "Étape 4 — Confirmation",
+    "step5Title": "Étape 5 — Exécution",
+    "step6Title": "Étape 6 — Résultat",
+    "loading": "Chargement…",
+    "noSiteFound": "Aucun site trouvé.",
+    "disabledSites": "Sites désactivés ({{count}})",
+    "sourceTypeVolume": "Volume Docker",
+    "sourceTypePath": "Dossier (bind mount)",
+    "sourceTypeDb": "Base de données",
+    "selectPrompt": "Sélectionner…",
+    "targetLocal": "Local",
+    "targetGdrive": "Google Drive",
+    "targetGdriveNotConnected": "(non connecté)",
+    "targetUsb": "USB",
+    "targetUsbNotConfigured": "(non configuré)",
+    "next": "Suivant",
+    "sourceLabel": "Source : ",
+    "destinationsLabel": "Destinations : ",
+    "launch": "Lancer la sauvegarde",
+    "running": "Sauvegarde en cours…",
+    "success": "Sauvegarde terminée avec succès.",
+    "failed": "Échec de la sauvegarde{{suffix}}.",
+    "failedSuffix": " : {{error}}",
+    "viewInBackups": "Voir dans Backups",
+    "newOperation": "Nouvelle opération",
+    "siteSourceLabel": "Site : {{name}}"
+  },
+  "migrationFlow": {
+    "step2Title": "Étape 2 — Que voulez-vous faire ?",
+    "step3Title": "Étape 3 — Quelle portée ?",
+    "step4Title": "Étape 4 — Destination",
+    "step5Title": "Étape 5 — Confirmation",
+    "step6Title": "Étape 6 — Exécution",
+    "step7Title": "Étape 7 — Résultat",
+    "captureSnapshot": {
+      "label": "Créer un instantané",
+      "description": "Capturer le serveur (ou un site) pour le déplacer ou le reconstruire ailleurs."
+    },
+    "restoreSnapshot": {
+      "label": "Restaurer un instantané",
+      "description": "Réinstaller un serveur depuis un instantané capturé précédemment."
+    },
+    "fullServer": {
+      "label": "Serveur complet",
+      "description": "Images/volumes Docker, bases de données, config Nginx, applications, paquets système."
+    },
+    "singleSite": {
+      "label": "Un site",
+      "description": "Capture limitée à un site et à ses données."
+    },
+    "loading": "Chargement…",
+    "usbConfigured": "L'instantané sera enregistré sur le disque USB de sauvegarde configuré.",
+    "usbNotConfigured": "Aucun disque USB configuré comme sauvegarde.",
+    "configureUsb": "Configurer",
+    "next": "Suivant",
+    "scopeLabel": "Portée : ",
+    "scopeSite": "Site {{name}}",
+    "scopeServer": "Serveur complet",
+    "includeDuplicates": "Inclure les conteneurs \"-duplicate\" (généralement inutile pour un nouveau serveur)",
+    "start": "Démarrer",
+    "capturing": "Capture en cours…",
+    "captureSuccess": "Instantané capturé avec succès.",
+    "captureFailed": "Échec de la capture.",
+    "captureFinished": "Capture terminée ({{status}}).",
+    "viewInBackups": "Voir dans Backups",
+    "newOperation": "Nouvelle opération"
   }
 }

@@ -9,8 +9,9 @@ import type {
   BackupTarget,
   BackupHistoryEntry,
 } from "@pwa-admin/shared";
+import { useTranslation } from "react-i18next";
 import { apiJson } from "@/lib/api";
-import { Card, CardTitle } from "@/components/ui/Card";
+import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { WizardShell } from "@/components/wizard/WizardShell";
 import { ActionTile } from "@/components/wizard/ActionTile";
@@ -27,6 +28,7 @@ interface GenericSource {
 }
 
 export function BackupWizardFlow({ onExit }: { onExit: () => void }) {
+  const { t } = useTranslation("wizard");
   const navigate = useNavigate();
   const [stage, setStage] = useState<WizardStage>("source");
   const [sourceMode, setSourceMode] = useState<SourceMode>(null);
@@ -74,17 +76,25 @@ export function BackupWizardFlow({ onExit }: { onExit: () => void }) {
     }
   }, [sourceMode, genericType, volumes, detectedDbs, bindMounts]);
 
-  function toggleTarget(t: BackupTarget) {
-    setTargets((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+  function toggleTarget(tgt: BackupTarget) {
+    setTargets((prev) => (prev.includes(tgt) ? prev.filter((x) => x !== tgt) : [...prev, tgt]));
   }
 
   function sourceSummary(): { label: string; sourceType: BackupSourceType; sourceRef: string } | null {
     if (sourceMode === "site" && selectedSite) {
       if (selectedSite.linkedContainer) {
-        return { label: `Site : ${selectedSite.name}`, sourceType: "volume", sourceRef: selectedSite.name };
+        return {
+          label: t("backupFlow.siteSourceLabel", { name: selectedSite.name }),
+          sourceType: "volume",
+          sourceRef: selectedSite.name,
+        };
       }
       if (selectedSite.root) {
-        return { label: `Site : ${selectedSite.name}`, sourceType: "path", sourceRef: selectedSite.root };
+        return {
+          label: t("backupFlow.siteSourceLabel", { name: selectedSite.name }),
+          sourceType: "path",
+          sourceRef: selectedSite.root,
+        };
       }
       return null;
     }
@@ -125,19 +135,19 @@ export function BackupWizardFlow({ onExit }: { onExit: () => void }) {
   if (stage === "source") {
     if (!sourceMode) {
       return (
-        <WizardShell title="Sauvegarde" stepLabel="Étape 2 — Que voulez-vous sauvegarder ?" onBack={onExit}>
+        <WizardShell title={t("actions.backup.label")} stepLabel={t("backupFlow.step1Title")} onBack={onExit}>
           <div className="grid grid-cols-2 gap-3">
             <ActionTile
               icon={Globe}
-              label="Un site"
-              description="Choisir un site Nginx/Apache existant."
+              label={t("backupFlow.siteSource.label")}
+              description={t("backupFlow.siteSource.description")}
               enabled
               onClick={() => setSourceMode("site")}
             />
             <ActionTile
               icon={Boxes}
-              label="Volume / dossier / base de données"
-              description="Choisir directement une source technique."
+              label={t("backupFlow.genericSource.label")}
+              description={t("backupFlow.genericSource.description")}
               enabled
               onClick={() => setSourceMode("generic")}
             />
@@ -150,10 +160,10 @@ export function BackupWizardFlow({ onExit }: { onExit: () => void }) {
       const activeSites = (sites ?? []).filter((s) => s.enabled);
       const inactiveSites = (sites ?? []).filter((s) => !s.enabled);
       return (
-        <WizardShell title="Sauvegarde" stepLabel="Étape 2 — Choisissez un site" onBack={() => setSourceMode(null)}>
-          {sites === null && <p className="text-sm text-muted-foreground">Chargement…</p>}
+        <WizardShell title={t("actions.backup.label")} stepLabel={t("backupFlow.step2SiteTitle")} onBack={() => setSourceMode(null)}>
+          {sites === null && <p className="text-sm text-muted-foreground">{t("backupFlow.loading")}</p>}
           {sites !== null && sites.length === 0 && (
-            <p className="text-sm text-muted-foreground">Aucun site trouvé.</p>
+            <p className="text-sm text-muted-foreground">{t("backupFlow.noSiteFound")}</p>
           )}
           <div className="flex flex-col gap-1">
             {activeSites.map((s) => (
@@ -168,7 +178,7 @@ export function BackupWizardFlow({ onExit }: { onExit: () => void }) {
                 className="flex items-center gap-1 text-sm text-muted-foreground"
               >
                 {showInactive ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                Sites désactivés ({inactiveSites.length})
+                {t("backupFlow.disabledSites", { count: inactiveSites.length })}
               </button>
               {showInactive && (
                 <div className="mt-1 flex flex-col gap-1">
@@ -192,15 +202,15 @@ export function BackupWizardFlow({ onExit }: { onExit: () => void }) {
           : (bindMounts ?? []).map((m) => ({ value: m.hostPath, label: `${m.hostPath} (${m.containerName})` }));
 
     return (
-      <WizardShell title="Sauvegarde" stepLabel="Étape 2 — Choisissez une source" onBack={() => setSourceMode(null)}>
+      <WizardShell title={t("actions.backup.label")} stepLabel={t("backupFlow.step2GenericTitle")} onBack={() => setSourceMode(null)}>
         <select
           value={genericType}
           onChange={(e) => setGenericType(e.target.value as BackupSourceType)}
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
         >
-          <option value="volume">Volume Docker</option>
-          <option value="path">Dossier (bind mount)</option>
-          <option value="db">Base de données</option>
+          <option value="volume">{t("backupFlow.sourceTypeVolume")}</option>
+          <option value="path">{t("backupFlow.sourceTypePath")}</option>
+          <option value="db">{t("backupFlow.sourceTypeDb")}</option>
         </select>
         <select
           value={genericSource?.sourceRef ?? ""}
@@ -213,7 +223,7 @@ export function BackupWizardFlow({ onExit }: { onExit: () => void }) {
           }}
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
         >
-          <option value="">Sélectionner…</option>
+          <option value="">{t("backupFlow.selectPrompt")}</option>
           {refOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
@@ -226,11 +236,11 @@ export function BackupWizardFlow({ onExit }: { onExit: () => void }) {
 
   if (stage === "destination") {
     return (
-      <WizardShell title="Sauvegarde" stepLabel="Étape 3 — Destination" onBack={() => setStage("source")}>
+      <WizardShell title={t("actions.backup.label")} stepLabel={t("backupFlow.step3Title")} onBack={() => setStage("source")}>
         <div className="flex flex-wrap gap-3 text-sm">
           <label className="flex items-center gap-1">
             <input type="checkbox" checked={targets.includes("local")} onChange={() => toggleTarget("local")} />
-            Local
+            {t("backupFlow.targetLocal")}
           </label>
           <label className="flex items-center gap-1">
             <input
@@ -239,8 +249,8 @@ export function BackupWizardFlow({ onExit }: { onExit: () => void }) {
               onChange={() => toggleTarget("gdrive")}
               disabled={!gdriveAuthorized}
             />
-            Google Drive
-            {!gdriveAuthorized && <span className="text-xs text-muted-foreground">(non connecté)</span>}
+            {t("backupFlow.targetGdrive")}
+            {!gdriveAuthorized && <span className="text-xs text-muted-foreground">{t("backupFlow.targetGdriveNotConnected")}</span>}
           </label>
           <label className="flex items-center gap-1">
             <input
@@ -249,12 +259,12 @@ export function BackupWizardFlow({ onExit }: { onExit: () => void }) {
               onChange={() => toggleTarget("usb")}
               disabled={!usbAvailable}
             />
-            USB
-            {!usbAvailable && <span className="text-xs text-muted-foreground">(non configuré)</span>}
+            {t("backupFlow.targetUsb")}
+            {!usbAvailable && <span className="text-xs text-muted-foreground">{t("backupFlow.targetUsbNotConfigured")}</span>}
           </label>
         </div>
         <Button size="sm" disabled={targets.length === 0} onClick={() => setStage("confirmation")}>
-          Suivant
+          {t("backupFlow.next")}
         </Button>
       </WizardShell>
     );
@@ -263,22 +273,22 @@ export function BackupWizardFlow({ onExit }: { onExit: () => void }) {
   if (stage === "confirmation") {
     const summary = sourceSummary();
     return (
-      <WizardShell title="Sauvegarde" stepLabel="Étape 4 — Confirmation" onBack={() => setStage("destination")}>
+      <WizardShell title={t("actions.backup.label")} stepLabel={t("backupFlow.step4Title")} onBack={() => setStage("destination")}>
         <Card className="flex flex-col gap-1 text-sm">
-          <p><span className="text-muted-foreground">Source : </span>{summary?.label ?? "—"}</p>
-          <p><span className="text-muted-foreground">Destinations : </span>{targets.join(", ")}</p>
+          <p><span className="text-muted-foreground">{t("backupFlow.sourceLabel")}</span>{summary?.label ?? "—"}</p>
+          <p><span className="text-muted-foreground">{t("backupFlow.destinationsLabel")}</span>{targets.join(", ")}</p>
         </Card>
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button onClick={launch}>Lancer la sauvegarde</Button>
+        <Button onClick={launch}>{t("backupFlow.launch")}</Button>
       </WizardShell>
     );
   }
 
   if (stage === "execution") {
     return (
-      <WizardShell title="Sauvegarde" stepLabel="Étape 5 — Exécution">
+      <WizardShell title={t("actions.backup.label")} stepLabel={t("backupFlow.step5Title")}>
         <Card className="flex items-center gap-2 text-sm">
-          <Loader2 className="h-4 w-4 animate-spin" /> Sauvegarde en cours…
+          <Loader2 className="h-4 w-4 animate-spin" /> {t("backupFlow.running")}
         </Card>
       </WizardShell>
     );
@@ -286,7 +296,7 @@ export function BackupWizardFlow({ onExit }: { onExit: () => void }) {
 
   // result
   return (
-    <WizardShell title="Sauvegarde" stepLabel="Étape 6 — Résultat">
+    <WizardShell title={t("actions.backup.label")} stepLabel={t("backupFlow.step6Title")}>
       {error && (
         <Card className="flex items-center gap-2 text-sm text-destructive">
           <XCircle className="h-4 w-4" /> {error}
@@ -296,21 +306,24 @@ export function BackupWizardFlow({ onExit }: { onExit: () => void }) {
         <Card className="flex items-center gap-2 text-sm">
           {result.status === "success" ? (
             <>
-              <CheckCircle2 className="h-4 w-4 text-primary" /> Sauvegarde terminée avec succès.
+              <CheckCircle2 className="h-4 w-4 text-primary" /> {t("backupFlow.success")}
             </>
           ) : (
             <>
-              <XCircle className="h-4 w-4 text-destructive" /> Échec de la sauvegarde{result.error ? ` : ${result.error}` : ""}.
+              <XCircle className="h-4 w-4 text-destructive" />{" "}
+              {t("backupFlow.failed", {
+                suffix: result.error ? t("backupFlow.failedSuffix", { error: result.error }) : "",
+              })}
             </>
           )}
         </Card>
       )}
       <div className="flex gap-2">
         <Button variant="outline" onClick={() => navigate("/backups")}>
-          Voir dans Backups
+          {t("backupFlow.viewInBackups")}
         </Button>
         <Button variant="ghost" onClick={onExit}>
-          Nouvelle opération
+          {t("backupFlow.newOperation")}
         </Button>
       </div>
     </WizardShell>

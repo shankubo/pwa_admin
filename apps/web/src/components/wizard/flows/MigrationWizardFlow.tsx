@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { SiteSummary, UsbStatus } from "@pwa-admin/shared";
+import { useTranslation } from "react-i18next";
 import { apiJson } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -14,6 +15,7 @@ type Direction = "capture" | "restore" | null;
 type Scope = "server" | "site" | null;
 
 export function MigrationWizardFlow({ onExit }: { onExit: () => void }) {
+  const { t } = useTranslation("wizard");
   const navigate = useNavigate();
   const [direction, setDirection] = useState<Direction>(null);
   const [stage, setStage] = useState<WizardStage>("source");
@@ -67,19 +69,19 @@ export function MigrationWizardFlow({ onExit }: { onExit: () => void }) {
 
   if (!direction) {
     return (
-      <WizardShell title="Migration" stepLabel="Étape 2 — Que voulez-vous faire ?" onBack={onExit}>
+      <WizardShell title={t("actions.migration.label")} stepLabel={t("migrationFlow.step2Title")} onBack={onExit}>
         <div className="grid grid-cols-2 gap-3">
           <ActionTile
             icon={Camera}
-            label="Créer un instantané"
-            description="Capturer le serveur (ou un site) pour le déplacer ou le reconstruire ailleurs."
+            label={t("migrationFlow.captureSnapshot.label")}
+            description={t("migrationFlow.captureSnapshot.description")}
             enabled
             onClick={() => setDirection("capture")}
           />
           <ActionTile
             icon={Download}
-            label="Restaurer un instantané"
-            description="Réinstaller un serveur depuis un instantané capturé précédemment."
+            label={t("migrationFlow.restoreSnapshot.label")}
+            description={t("migrationFlow.restoreSnapshot.description")}
             enabled
             onClick={() => setDirection("restore")}
           />
@@ -91,26 +93,26 @@ export function MigrationWizardFlow({ onExit }: { onExit: () => void }) {
   // direction === "capture"
   if (stage === "source") {
     return (
-      <WizardShell title="Migration" stepLabel="Étape 3 — Quelle portée ?" onBack={() => setDirection(null)}>
+      <WizardShell title={t("actions.migration.label")} stepLabel={t("migrationFlow.step3Title")} onBack={() => setDirection(null)}>
         <div className="grid grid-cols-2 gap-3">
           <ActionTile
             icon={Server}
-            label="Serveur complet"
-            description="Images/volumes Docker, bases de données, config Nginx, applications, paquets système."
+            label={t("migrationFlow.fullServer.label")}
+            description={t("migrationFlow.fullServer.description")}
             enabled
             onClick={() => { setScope("server"); setStage("destination"); }}
           />
           <ActionTile
             icon={Globe}
-            label="Un site"
-            description="Capture limitée à un site et à ses données."
+            label={t("migrationFlow.singleSite.label")}
+            description={t("migrationFlow.singleSite.description")}
             enabled
             onClick={() => setScope("site")}
           />
         </div>
         {scope === "site" && (
           <div className="flex flex-col gap-1">
-            {sites === null && <p className="text-sm text-muted-foreground">Chargement…</p>}
+            {sites === null && <p className="text-sm text-muted-foreground">{t("migrationFlow.loading")}</p>}
             {(sites ?? []).map((s) => (
               <button
                 key={s.name}
@@ -129,21 +131,19 @@ export function MigrationWizardFlow({ onExit }: { onExit: () => void }) {
 
   if (stage === "destination") {
     return (
-      <WizardShell title="Migration" stepLabel="Étape 4 — Destination" onBack={() => setStage("source")}>
+      <WizardShell title={t("actions.migration.label")} stepLabel={t("migrationFlow.step4Title")} onBack={() => setStage("source")}>
         {usbConfigured ? (
-          <Card className="text-sm text-muted-foreground">
-            L'instantané sera enregistré sur le disque USB de sauvegarde configuré.
-          </Card>
+          <Card className="text-sm text-muted-foreground">{t("migrationFlow.usbConfigured")}</Card>
         ) : (
           <Card className="flex items-center gap-2 text-sm text-warning">
-            <AlertTriangle className="h-4 w-4" /> Aucun disque USB configuré comme sauvegarde.{" "}
+            <AlertTriangle className="h-4 w-4" /> {t("migrationFlow.usbNotConfigured")}{" "}
             <button type="button" className="underline" onClick={() => navigate("/backups")}>
-              Configurer
+              {t("migrationFlow.configureUsb")}
             </button>
           </Card>
         )}
         <Button size="sm" disabled={!usbConfigured} onClick={() => setStage("confirmation")}>
-          Suivant
+          {t("migrationFlow.next")}
         </Button>
       </WizardShell>
     );
@@ -151,9 +151,12 @@ export function MigrationWizardFlow({ onExit }: { onExit: () => void }) {
 
   if (stage === "confirmation") {
     return (
-      <WizardShell title="Migration" stepLabel="Étape 5 — Confirmation" onBack={() => setStage("destination")}>
+      <WizardShell title={t("actions.migration.label")} stepLabel={t("migrationFlow.step5Title")} onBack={() => setStage("destination")}>
         <Card className="flex flex-col gap-2 text-sm">
-          <p><span className="text-muted-foreground">Portée : </span>{scope === "site" ? `Site ${selectedSite?.name}` : "Serveur complet"}</p>
+          <p>
+            <span className="text-muted-foreground">{t("migrationFlow.scopeLabel")}</span>
+            {scope === "site" ? t("migrationFlow.scopeSite", { name: selectedSite?.name }) : t("migrationFlow.scopeServer")}
+          </p>
           {scope === "server" && (
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <input
@@ -161,21 +164,21 @@ export function MigrationWizardFlow({ onExit }: { onExit: () => void }) {
                 checked={includeDuplicates}
                 onChange={(e) => setIncludeDuplicates(e.target.checked)}
               />
-              Inclure les conteneurs "-duplicate" (généralement inutile pour un nouveau serveur)
+              {t("migrationFlow.includeDuplicates")}
             </label>
           )}
         </Card>
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button onClick={launch}>Démarrer</Button>
+        <Button onClick={launch}>{t("migrationFlow.start")}</Button>
       </WizardShell>
     );
   }
 
   if (stage === "execution") {
     return (
-      <WizardShell title="Migration" stepLabel="Étape 6 — Exécution">
+      <WizardShell title={t("actions.migration.label")} stepLabel={t("migrationFlow.step6Title")}>
         <Card className="flex items-center gap-2 text-sm">
-          <Loader2 className="h-4 w-4 animate-spin" /> Capture en cours…
+          <Loader2 className="h-4 w-4 animate-spin" /> {t("migrationFlow.capturing")}
         </Card>
       </WizardShell>
     );
@@ -183,7 +186,7 @@ export function MigrationWizardFlow({ onExit }: { onExit: () => void }) {
 
   // result
   return (
-    <WizardShell title="Migration" stepLabel="Étape 7 — Résultat">
+    <WizardShell title={t("actions.migration.label")} stepLabel={t("migrationFlow.step7Title")}>
       {error && (
         <Card className="flex items-center gap-2 text-sm text-destructive">
           <XCircle className="h-4 w-4" /> {error}
@@ -193,25 +196,25 @@ export function MigrationWizardFlow({ onExit }: { onExit: () => void }) {
         <Card className="flex items-center gap-2 text-sm">
           {lastStatus === "success" ? (
             <>
-              <CheckCircle2 className="h-4 w-4 text-primary" /> Instantané capturé avec succès.
+              <CheckCircle2 className="h-4 w-4 text-primary" /> {t("migrationFlow.captureSuccess")}
             </>
           ) : lastStatus === "failed" ? (
             <>
-              <XCircle className="h-4 w-4 text-destructive" /> Échec de la capture.
+              <XCircle className="h-4 w-4 text-destructive" /> {t("migrationFlow.captureFailed")}
             </>
           ) : (
             <>
-              <CheckCircle2 className="h-4 w-4 text-primary" /> Capture terminée ({lastStatus}).
+              <CheckCircle2 className="h-4 w-4 text-primary" /> {t("migrationFlow.captureFinished", { status: lastStatus })}
             </>
           )}
         </Card>
       )}
       <div className="flex gap-2">
         <Button variant="outline" onClick={() => navigate("/backups")}>
-          Voir dans Backups
+          {t("migrationFlow.viewInBackups")}
         </Button>
         <Button variant="ghost" onClick={onExit}>
-          Nouvelle opération
+          {t("migrationFlow.newOperation")}
         </Button>
       </div>
     </WizardShell>
