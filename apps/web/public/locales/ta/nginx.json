@@ -1,0 +1,79 @@
+{
+  "status": {
+    "title": "Nginx நிலை",
+    "active": "செயலில்",
+    "inactive": "செயலற்றது",
+    "configTest": "கட்டமைப்பு சோதனை: {{result}}",
+    "configTestOk": "OK",
+    "configTestFailed": "தோல்வி",
+    "connectionsInfo": "{{count}} செயலில் உள்ள இணைப்புகள் · {{rps}} req/s",
+    "loading": "ஏற்றுகிறது…",
+    "reload": "மீண்டும் ஏற்று",
+    "restart": "மறுதொடக்கு",
+    "restartConfirm": {
+      "title": "Nginx ஐ மறுதொடக்கம் செய்யவா?",
+      "description": "இது அனைத்து தளங்களையும் சிறிது நேரம் தடைபடச் செய்யலாம்."
+    }
+  },
+  "backup": {
+    "title": "Nginx கட்டமைப்பு காப்புப்பிரதி",
+    "description": "sites-available மற்றும் nginx.conf இன் முழுமையான காப்பகம் (உள்ளூர், மற்றும் இயக்கப்பட்டிருந்தால் Google Drive).",
+    "running": "காப்புப்பிரதி நடந்துகொண்டிருக்கிறது…",
+    "runNow": "இப்போது காப்புப்பிரதி எடு",
+    "includeDrive": "Google Drive ஐ சேர்",
+    "successWithSize": "OK · {{size}}",
+    "successDriveSuffix": " · Drive க்கு அனுப்பப்பட்டது",
+    "failed": "தோல்வி: {{error}}"
+  },
+  "vhosts": {
+    "sectionTitle": "Vhosts",
+    "newSite": "புதிய தளம்",
+    "loading": "ஏற்றுகிறது…",
+    "empty": "vhost இல்லை.",
+    "noServerName": "(server_name இல்லை)",
+    "ports": "போர்ட்கள் {{ports}}",
+    "proxySuffix": " · ப்ராக்ஸி → {{target}}",
+    "rootNotFound": "கண்டறியப்படவில்லை",
+    "maintenanceBadge": "பராமரிப்பு",
+    "enabled": "இயக்கப்பட்டது",
+    "disabled": "முடக்கப்பட்டது",
+    "disable": "முடக்கு",
+    "enable": "இயக்கு",
+    "disableConfirm": {
+      "title": "{{name}} ஐ முடக்கவா?",
+      "description": "மீண்டும் இயக்கப்படும் வரை தளம் இனி வழங்கப்படாது."
+    }
+  },
+  "detail": {
+    "certificate": "சான்றிதழ்",
+    "certExpires": "{{days}} நாட்களில் காலாவதியாகும்",
+    "certPresent": "உள்ளது",
+    "certAbsent": "இல்லை",
+    "accessibility": "அணுகல்தன்மை",
+    "accessible": "அணுகக்கூடியது · HTTP {{statusCode}}",
+    "inaccessible": "அணுக முடியாதது",
+    "testing": "சோதிக்கிறது…",
+    "retest": "மீண்டும் சோதி",
+    "testInProgress": "சோதனை நடந்துகொண்டிருக்கிறது…",
+    "traffic": "போக்குவரத்து (கடந்த 7 நாட்கள்)",
+    "uniqueVisitors_one": "{{count}} தனித்துவமான பார்வையாளர் · {{requests}} கோரிக்கைகள்",
+    "uniqueVisitors_other": "{{count}} தனித்துவமான பார்வையாளர்கள் · {{requests}} கோரிக்கைகள்",
+    "noLogData": "பதிவு தரவு எதுவும் இல்லை.",
+    "recentErrors": "சமீபத்திய பிழைகள் (24 மணி நேரம்)",
+    "noRecentErrors": "சமீபத்திய பிழைகள் இல்லை.",
+    "errorCount_one": "{{count}} பிழை",
+    "errorCount_other": "{{count}} பிழைகள்",
+    "rawConfigTitle": "மூல கட்டமைப்பு (எளிய திருத்தி — CodeMirror தள்ளிவைக்கப்பட்டது)",
+    "saving": "சேமிக்கிறது…",
+    "save": "சேமி",
+    "guidedEditor": "வழிகாட்டப்பட்ட திருத்தி",
+    "history": "வரலாறு",
+    "restore": "மீட்டமை",
+    "restoreConfirm": {
+      "title": "இந்த பதிப்பை மீட்டமைக்கவா?",
+      "description": "தற்போதைய கட்டமைப்பு மாற்றப்படும்."
+    },
+    "tabAccess": "அணுகல்",
+    "tabErrors": "பிழைகள்"
+  }
+}

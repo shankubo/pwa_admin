@@ -1,0 +1,79 @@
+{
+  "status": {
+    "title": "Nginx status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "configTest": "Config test: {{result}}",
+    "configTestOk": "OK",
+    "configTestFailed": "Failed",
+    "connectionsInfo": "{{count}} active connections · {{rps}} req/s",
+    "loading": "Loading…",
+    "reload": "Reload",
+    "restart": "Restart",
+    "restartConfirm": {
+      "title": "Restart Nginx?",
+      "description": "This may briefly interrupt all sites."
+    }
+  },
+  "backup": {
+    "title": "Nginx configuration backup",
+    "description": "Full archive of sites-available and nginx.conf (local, and Google Drive if enabled).",
+    "running": "Backup in progress…",
+    "runNow": "Back up now",
+    "includeDrive": "Include Google Drive",
+    "successWithSize": "OK · {{size}}",
+    "successDriveSuffix": " · sent to Drive",
+    "failed": "Failed: {{error}}"
+  },
+  "vhosts": {
+    "sectionTitle": "Vhosts",
+    "newSite": "New site",
+    "loading": "Loading…",
+    "empty": "No vhost.",
+    "noServerName": "(no server_name)",
+    "ports": "Ports {{ports}}",
+    "proxySuffix": " · proxy → {{target}}",
+    "rootNotFound": "not found",
+    "maintenanceBadge": "maintenance",
+    "enabled": "enabled",
+    "disabled": "disabled",
+    "disable": "Disable",
+    "enable": "Enable",
+    "disableConfirm": {
+      "title": "Disable {{name}}?",
+      "description": "The site will no longer be served until re-enabled."
+    }
+  },
+  "detail": {
+    "certificate": "Certificate",
+    "certExpires": "expires in {{days}}d",
+    "certPresent": "present",
+    "certAbsent": "absent",
+    "accessibility": "Accessibility",
+    "accessible": "reachable · HTTP {{statusCode}}",
+    "inaccessible": "unreachable",
+    "testing": "Testing…",
+    "retest": "Retest",
+    "testInProgress": "Testing…",
+    "traffic": "Traffic (last 7 days)",
+    "uniqueVisitors_one": "{{count}} unique visitor · {{requests}} requests",
+    "uniqueVisitors_other": "{{count}} unique visitors · {{requests}} requests",
+    "noLogData": "No log data available.",
+    "recentErrors": "Recent errors (24h)",
+    "noRecentErrors": "No recent errors.",
+    "errorCount_one": "{{count}} error",
+    "errorCount_other": "{{count}} errors",
+    "rawConfigTitle": "Raw configuration (simple editor — CodeMirror deferred)",
+    "saving": "Saving…",
+    "save": "Save",
+    "guidedEditor": "Guided editor",
+    "history": "History",
+    "restore": "Restore",
+    "restoreConfirm": {
+      "title": "Restore this version?",
+      "description": "The current configuration will be replaced."
+    },
+    "tabAccess": "Access",
+    "tabErrors": "Errors"
+  }
+}

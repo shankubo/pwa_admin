@@ -13,6 +13,7 @@ import type {
   TopPageEntry,
   VisitorStats,
 } from "@pwa-admin/shared";
+import { useTranslation } from "react-i18next";
 import { apiFetch, apiJson } from "@/lib/api";
 import { useWsChannel } from "@/lib/ws";
 import { Card, CardTitle } from "@/components/ui/Card";
@@ -45,6 +46,7 @@ function vhostCardClass(v: VhostSummary): string {
 }
 
 export function Nginx() {
+  const { t } = useTranslation("nginx");
   const [status, setStatus] = useState<WebServerStatus | null>(null);
   const [vhosts, setVhosts] = useState<VhostSummary[] | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -95,7 +97,7 @@ export function Nginx() {
       {error && <Card className="text-sm text-destructive">{error}</Card>}
 
       <Card>
-        <CardTitle>État Nginx</CardTitle>
+        <CardTitle>{t("status.title")}</CardTitle>
         {status ? (
           <div className="flex flex-col gap-1 text-sm">
             <div className="flex items-center gap-2">
@@ -104,7 +106,7 @@ export function Nginx() {
               ) : (
                 <XCircle className="h-4 w-4 text-destructive" />
               )}
-              <span>{status.active ? "Actif" : "Inactif"}</span>
+              <span>{status.active ? t("status.active") : t("status.inactive")}</span>
               {status.version && <span className="text-muted-foreground">· {status.version}</span>}
             </div>
             <div className="flex items-center gap-2">
@@ -113,32 +115,38 @@ export function Nginx() {
               ) : (
                 <XCircle className="h-4 w-4 text-destructive" />
               )}
-              <span>Test config : {status.configTestOk ? "OK" : "Échec"}</span>
+              <span>
+                {t("status.configTest", {
+                  result: status.configTestOk ? t("status.configTestOk") : t("status.configTestFailed"),
+                })}
+              </span>
             </div>
             {status.stubStatus && (
               <p className="text-xs text-muted-foreground">
-                {status.stubStatus.activeConnections} connexions actives ·{" "}
-                {status.stubStatus.requestsPerSecond.toFixed(1)} req/s
+                {t("status.connectionsInfo", {
+                  count: status.stubStatus.activeConnections,
+                  rps: status.stubStatus.requestsPerSecond.toFixed(1),
+                })}
               </p>
             )}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Chargement…</p>
+          <p className="text-sm text-muted-foreground">{t("status.loading")}</p>
         )}
 
         <div className="mt-3 flex gap-2">
           <Button size="sm" variant="outline" disabled={busy} onClick={reload}>
-            <RotateCw className="h-3.5 w-3.5" /> Recharger
+            <RotateCw className="h-3.5 w-3.5" /> {t("status.reload")}
           </Button>
           <ConfirmDialog
             trigger={
               <Button size="sm" variant="destructive">
-                Redémarrer
+                {t("status.restart")}
               </Button>
             }
-            title="Redémarrer Nginx ?"
-            description="Cela peut interrompre brièvement tous les sites."
-            confirmLabel="Redémarrer"
+            title={t("status.restartConfirm.title")}
+            description={t("status.restartConfirm.description")}
+            confirmLabel={t("status.restart")}
             onConfirm={restart}
           />
         </div>
@@ -148,20 +156,20 @@ export function Nginx() {
 
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-muted-foreground">Vhosts</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground">{t("vhosts.sectionTitle")}</h2>
           <GuidedConfigEditorDialog
             mode="create"
             trigger={
               <Button size="sm" variant="outline">
-                <Plus className="h-3.5 w-3.5" /> Nouveau site
+                <Plus className="h-3.5 w-3.5" /> {t("vhosts.newSite")}
               </Button>
             }
             onCreated={load}
           />
         </div>
         <div className="flex flex-col gap-3">
-          {!vhosts && <Card className="text-sm text-muted-foreground">Chargement…</Card>}
-          {vhosts?.length === 0 && <Card className="text-sm text-muted-foreground">Aucun vhost.</Card>}
+          {!vhosts && <Card className="text-sm text-muted-foreground">{t("vhosts.loading")}</Card>}
+          {vhosts?.length === 0 && <Card className="text-sm text-muted-foreground">{t("vhosts.empty")}</Card>}
           {vhosts?.map((v) => (
             <Card key={v.name} className={vhostCardClass(v)}>
               <div
@@ -179,19 +187,19 @@ export function Nginx() {
                         </span>
                       ))
                     ) : (
-                      "(sans server_name)"
+                      t("vhosts.noServerName")
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Ports {v.listenPorts.join(", ")}
-                    {v.proxyPassTarget ? ` · proxy → ${v.proxyPassTarget}` : ""}
+                    {t("vhosts.ports", { ports: v.listenPorts.join(", ") })}
+                    {v.proxyPassTarget ? t("vhosts.proxySuffix", { target: v.proxyPassTarget }) : ""}
                   </p>
                   {v.root && (
                     <p className="truncate text-xs text-muted-foreground">
                       {v.root}
                       {v.documentRootExists === false && (
                         <span className="ml-1 inline-flex items-center gap-0.5 text-destructive">
-                          <FolderX className="h-3 w-3" /> introuvable
+                          <FolderX className="h-3 w-3" /> {t("vhosts.rootNotFound")}
                         </span>
                       )}
                     </p>
@@ -200,7 +208,7 @@ export function Nginx() {
                 <div className="flex shrink-0 items-center gap-2">
                   {v.enabled && v.maintenanceMode && (
                     <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">
-                      maintenance
+                      {t("vhosts.maintenanceBadge")}
                     </span>
                   )}
                   <span
@@ -209,7 +217,7 @@ export function Nginx() {
                       (v.enabled ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground")
                     }
                   >
-                    {v.enabled ? "activé" : "désactivé"}
+                    {v.enabled ? t("vhosts.enabled") : t("vhosts.disabled")}
                   </span>
                   {expanded === v.name ? (
                     <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -224,17 +232,17 @@ export function Nginx() {
                   <ConfirmDialog
                     trigger={
                       <Button size="sm" variant="destructive">
-                        Désactiver
+                        {t("vhosts.disable")}
                       </Button>
                     }
-                    title={`Désactiver ${v.name} ?`}
-                    description="Le site ne sera plus servi tant qu'il n'est pas réactivé."
-                    confirmLabel="Désactiver"
+                    title={t("vhosts.disableConfirm.title", { name: v.name })}
+                    description={t("vhosts.disableConfirm.description")}
+                    confirmLabel={t("vhosts.disable")}
                     onConfirm={() => toggleVhost(v.name, v.enabled)}
                   />
                 ) : (
                   <Button size="sm" variant="outline" onClick={() => toggleVhost(v.name, v.enabled)}>
-                    Activer
+                    {t("vhosts.enable")}
                   </Button>
                 )}
               </div>
@@ -272,6 +280,7 @@ function certBadgeClass(daysRemaining: number | null) {
 }
 
 function NginxConfigBackupCard() {
+  const { t } = useTranslation("nginx");
   const [running, setRunning] = useState(false);
   const [lastRun, setLastRun] = useState<ConfigBackupRun | null>(null);
   const [useDrive, setUseDrive] = useState(true);
@@ -302,25 +311,24 @@ function NginxConfigBackupCard() {
   return (
     <Card>
       <CardTitle className="flex items-center gap-1">
-        <DatabaseBackup className="h-4 w-4" /> Sauvegarde de la configuration Nginx
+        <DatabaseBackup className="h-4 w-4" /> {t("backup.title")}
       </CardTitle>
-      <p className="text-xs text-muted-foreground">
-        Archive complète de sites-available et nginx.conf (local, et Google Drive si activé).
-      </p>
+      <p className="text-xs text-muted-foreground">{t("backup.description")}</p>
       <div className="mt-3 flex items-center gap-3">
         <Button size="sm" disabled={running} onClick={runBackup}>
-          {running ? "Sauvegarde en cours…" : "Sauvegarder maintenant"}
+          {running ? t("backup.running") : t("backup.runNow")}
         </Button>
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <input type="checkbox" checked={useDrive} onChange={(e) => setUseDrive(e.target.checked)} />
-          Inclure Google Drive
+          {t("backup.includeDrive")}
         </label>
       </div>
       {lastRun && (
         <p className={`mt-2 text-xs ${lastRun.status === "success" ? "text-primary" : "text-destructive"}`}>
           {lastRun.status === "success"
-            ? `OK · ${lastRun.sizeBytes ? formatBytes(lastRun.sizeBytes) : ""}${lastRun.driveFileId ? " · envoyé sur Drive" : ""}`
-            : `Échec : ${lastRun.error}`}
+            ? t("backup.successWithSize", { size: lastRun.sizeBytes ? formatBytes(lastRun.sizeBytes) : "" }) +
+              (lastRun.driveFileId ? t("backup.successDriveSuffix") : "")
+            : t("backup.failed", { error: lastRun.error })}
         </p>
       )}
     </Card>
@@ -328,6 +336,7 @@ function NginxConfigBackupCard() {
 }
 
 function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => void }) {
+  const { t } = useTranslation("nginx");
   const [detail, setDetail] = useState<VhostDetail | null>(null);
   const [cert, setCert] = useState<CertStatus | null>(null);
   const [history, setHistory] = useState<ConfigSnapshot[] | null>(null);
@@ -427,13 +436,13 @@ function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => 
     <div className="mt-3 flex flex-col gap-4 border-t border-border pt-3">
       {cert && (
         <div>
-          <p className="mb-1 text-xs font-medium text-muted-foreground">Certificat</p>
+          <p className="mb-1 text-xs font-medium text-muted-foreground">{t("detail.certificate")}</p>
           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${certBadgeClass(cert.daysRemaining)}`}>
             {cert.found
               ? cert.daysRemaining != null
-                ? `expire dans ${cert.daysRemaining}j`
-                : "présent"
-              : "absent"}
+                ? t("detail.certExpires", { days: cert.daysRemaining })
+                : t("detail.certPresent")
+              : t("detail.certAbsent")}
           </span>
           {cert.subject && <p className="mt-1 text-xs text-muted-foreground">{cert.subject}</p>}
         </div>
@@ -441,7 +450,7 @@ function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => 
 
       <div>
         <p className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
-          <Globe className="h-3.5 w-3.5" /> Accessibilité
+          <Globe className="h-3.5 w-3.5" /> {t("detail.accessibility")}
         </p>
         {accessibility ? (
           <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -451,7 +460,9 @@ function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => 
                 (accessibility.reachable ? "bg-primary/15 text-primary" : "bg-destructive/15 text-destructive")
               }
             >
-              {accessibility.reachable ? `accessible · HTTP ${accessibility.statusCode}` : "inaccessible"}
+              {accessibility.reachable
+                ? t("detail.accessible", { statusCode: accessibility.statusCode })
+                : t("detail.inaccessible")}
             </span>
             {accessibility.latencyMs != null && (
               <span className="text-muted-foreground">{accessibility.latencyMs} ms</span>
@@ -467,26 +478,25 @@ function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => 
               </a>
             )}
             <Button size="sm" variant="outline" disabled={checkingAccess} onClick={checkAccess}>
-              {checkingAccess ? "Test…" : "Retester"}
+              {checkingAccess ? t("detail.testing") : t("detail.retest")}
             </Button>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">Test en cours…</p>
+          <p className="text-xs text-muted-foreground">{t("detail.testInProgress")}</p>
         )}
         {accessibility?.error && <p className="mt-1 text-xs text-destructive">{accessibility.error}</p>}
       </div>
 
       <div>
         <p className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
-          <Users className="h-3.5 w-3.5" /> Trafic (7 derniers jours)
+          <Users className="h-3.5 w-3.5" /> {t("detail.traffic")}
         </p>
         {visitors ? (
           <p className="text-xs text-muted-foreground">
-            {visitors.uniqueIps} visiteur{visitors.uniqueIps > 1 ? "s" : ""} unique
-            {visitors.uniqueIps > 1 ? "s" : ""} · {visitors.totalRequests} requêtes
+            {t("detail.uniqueVisitors", { count: visitors.uniqueIps, requests: visitors.totalRequests })}
           </p>
         ) : (
-          <p className="text-xs text-muted-foreground">Pas de données de log disponibles.</p>
+          <p className="text-xs text-muted-foreground">{t("detail.noLogData")}</p>
         )}
         {topPages && topPages.length > 0 && (
           <div className="mt-1 flex flex-col gap-0.5">
@@ -502,14 +512,14 @@ function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => 
 
       <div>
         <p className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
-          <AlertTriangle className="h-3.5 w-3.5" /> Erreurs récentes (24h)
+          <AlertTriangle className="h-3.5 w-3.5" /> {t("detail.recentErrors")}
         </p>
         {errorSummary ? (
           errorSummary.recentCount === 0 ? (
-            <p className="text-xs text-muted-foreground">Aucune erreur récente.</p>
+            <p className="text-xs text-muted-foreground">{t("detail.noRecentErrors")}</p>
           ) : (
             <div className="flex flex-col gap-1">
-              <p className="text-xs text-muted-foreground">{errorSummary.recentCount} erreur(s)</p>
+              <p className="text-xs text-muted-foreground">{t("detail.errorCount", { count: errorSummary.recentCount })}</p>
               <div className="max-h-32 overflow-y-auto rounded-md border border-border bg-black/90 p-2 font-mono text-[10px] text-destructive">
                 {errorSummary.entries.map((e, i) => (
                   <div key={i} className="truncate">
@@ -520,14 +530,12 @@ function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => 
             </div>
           )
         ) : (
-          <p className="text-xs text-muted-foreground">Chargement…</p>
+          <p className="text-xs text-muted-foreground">{t("status.loading")}</p>
         )}
       </div>
 
       <div>
-        <p className="mb-1 text-xs font-medium text-muted-foreground">
-          Configuration brute (éditeur simple — CodeMirror différé)
-        </p>
+        <p className="mb-1 text-xs font-medium text-muted-foreground">{t("detail.rawConfigTitle")}</p>
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
@@ -537,7 +545,7 @@ function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => 
         {saveError && <p className="mt-1 text-xs text-destructive">{saveError}</p>}
         <div className="mt-2 flex gap-2">
           <Button size="sm" disabled={saving} onClick={save}>
-            {saving ? "Enregistrement…" : "Enregistrer"}
+            {saving ? t("detail.saving") : t("detail.save")}
           </Button>
           <GuidedConfigEditorDialog
             mode="edit"
@@ -545,7 +553,7 @@ function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => 
             content={content}
             trigger={
               <Button size="sm" variant="outline">
-                <Wand2 className="h-3.5 w-3.5" /> Éditeur guidé
+                <Wand2 className="h-3.5 w-3.5" /> {t("detail.guidedEditor")}
               </Button>
             }
             onApply={(newContent) => setContent(newContent)}
@@ -556,7 +564,7 @@ function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => 
       {history && history.length > 0 && (
         <div>
           <p className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
-            <History className="h-3.5 w-3.5" /> Historique
+            <History className="h-3.5 w-3.5" /> {t("detail.history")}
           </p>
           <div className="flex flex-col gap-1">
             {history.map((h) => (
@@ -565,12 +573,12 @@ function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => 
                 <ConfirmDialog
                   trigger={
                     <Button size="sm" variant="outline">
-                      Restaurer
+                      {t("detail.restore")}
                     </Button>
                   }
-                  title="Restaurer cette version ?"
-                  description="La configuration actuelle sera remplacée."
-                  confirmLabel="Restaurer"
+                  title={t("detail.restoreConfirm.title")}
+                  description={t("detail.restoreConfirm.description")}
+                  confirmLabel={t("detail.restore")}
                   onConfirm={() => restoreSnapshot(h.id)}
                 />
               </div>
@@ -581,16 +589,16 @@ function VhostDetailPanel({ name, onChanged }: { name: string; onChanged: () => 
 
       <div>
         <div className="mb-1 flex gap-1">
-          {(["access", "error"] as const).map((t) => (
+          {(["access", "error"] as const).map((tabKey) => (
             <button
-              key={t}
-              onClick={() => setLogType(t)}
+              key={tabKey}
+              onClick={() => setLogType(tabKey)}
               className={
                 "rounded-md px-2 py-1 text-xs font-medium " +
-                (logType === t ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")
+                (logType === tabKey ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")
               }
             >
-              {t === "access" ? "Accès" : "Erreurs"}
+              {tabKey === "access" ? t("detail.tabAccess") : t("detail.tabErrors")}
             </button>
           ))}
         </div>

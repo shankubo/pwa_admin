@@ -1,0 +1,79 @@
+{
+  "status": {
+    "title": "État Nginx",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "configTest": "Test config : {{result}}",
+    "configTestOk": "OK",
+    "configTestFailed": "Échec",
+    "connectionsInfo": "{{count}} connexions actives · {{rps}} req/s",
+    "loading": "Chargement…",
+    "reload": "Recharger",
+    "restart": "Redémarrer",
+    "restartConfirm": {
+      "title": "Redémarrer Nginx ?",
+      "description": "Cela peut interrompre brièvement tous les sites."
+    }
+  },
+  "backup": {
+    "title": "Sauvegarde de la configuration Nginx",
+    "description": "Archive complète de sites-available et nginx.conf (local, et Google Drive si activé).",
+    "running": "Sauvegarde en cours…",
+    "runNow": "Sauvegarder maintenant",
+    "includeDrive": "Inclure Google Drive",
+    "successWithSize": "OK · {{size}}",
+    "successDriveSuffix": " · envoyé sur Drive",
+    "failed": "Échec : {{error}}"
+  },
+  "vhosts": {
+    "sectionTitle": "Vhosts",
+    "newSite": "Nouveau site",
+    "loading": "Chargement…",
+    "empty": "Aucun vhost.",
+    "noServerName": "(sans server_name)",
+    "ports": "Ports {{ports}}",
+    "proxySuffix": " · proxy → {{target}}",
+    "rootNotFound": "introuvable",
+    "maintenanceBadge": "maintenance",
+    "enabled": "activé",
+    "disabled": "désactivé",
+    "disable": "Désactiver",
+    "enable": "Activer",
+    "disableConfirm": {
+      "title": "Désactiver {{name}} ?",
+      "description": "Le site ne sera plus servi tant qu'il n'est pas réactivé."
+    }
+  },
+  "detail": {
+    "certificate": "Certificat",
+    "certExpires": "expire dans {{days}}j",
+    "certPresent": "présent",
+    "certAbsent": "absent",
+    "accessibility": "Accessibilité",
+    "accessible": "accessible · HTTP {{statusCode}}",
+    "inaccessible": "inaccessible",
+    "testing": "Test…",
+    "retest": "Retester",
+    "testInProgress": "Test en cours…",
+    "traffic": "Trafic (7 derniers jours)",
+    "uniqueVisitors_one": "{{count}} visiteur unique · {{requests}} requêtes",
+    "uniqueVisitors_other": "{{count}} visiteurs uniques · {{requests}} requêtes",
+    "noLogData": "Pas de données de log disponibles.",
+    "recentErrors": "Erreurs récentes (24h)",
+    "noRecentErrors": "Aucune erreur récente.",
+    "errorCount_one": "{{count}} erreur",
+    "errorCount_other": "{{count}} erreurs",
+    "rawConfigTitle": "Configuration brute (éditeur simple — CodeMirror différé)",
+    "saving": "Enregistrement…",
+    "save": "Enregistrer",
+    "guidedEditor": "Éditeur guidé",
+    "history": "Historique",
+    "restore": "Restaurer",
+    "restoreConfirm": {
+      "title": "Restaurer cette version ?",
+      "description": "La configuration actuelle sera remplacée."
+    },
+    "tabAccess": "Accès",
+    "tabErrors": "Erreurs"
+  }
+}
