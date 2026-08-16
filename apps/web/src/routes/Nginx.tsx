@@ -692,6 +692,7 @@ function CertImportPanel({
   vhostName: string;
   onImported: (result: { certPath: string; keyPath: string }) => void;
 }) {
+  const { t } = useTranslation("nginx");
   const [mode, setMode] = useState<"closed" | "paste" | "upload">("closed");
   const [certPem, setCertPem] = useState("");
   const [keyPem, setKeyPem] = useState("");
@@ -752,10 +753,10 @@ function CertImportPanel({
     return (
       <div className="mt-2 flex gap-2">
         <Button size="sm" variant="outline" onClick={() => setMode("paste")}>
-          Coller un certificat
+          {t("guidedEditor.certImport.pasteButton")}
         </Button>
         <Button size="sm" variant="outline" onClick={() => setMode("upload")}>
-          <Upload className="h-3.5 w-3.5" /> Importer des fichiers
+          <Upload className="h-3.5 w-3.5" /> {t("guidedEditor.certImport.uploadButton")}
         </Button>
       </div>
     );
@@ -764,7 +765,9 @@ function CertImportPanel({
   return (
     <div className="mt-2 rounded-md border border-border p-3">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs font-medium">{mode === "paste" ? "Coller le certificat et la clé" : "Importer les fichiers"}</p>
+        <p className="text-xs font-medium">
+          {mode === "paste" ? t("guidedEditor.certImport.pasteTitle") : t("guidedEditor.certImport.uploadTitle")}
+        </p>
         <button type="button" onClick={() => setMode("closed")} className="text-muted-foreground hover:text-foreground">
           <X className="h-3.5 w-3.5" />
         </button>
@@ -773,7 +776,7 @@ function CertImportPanel({
       {mode === "paste" && (
         <div className="flex flex-col gap-2">
           <div>
-            <label className="mb-1 block text-xs text-muted-foreground">Certificat (PEM, ex: fullchain.pem)</label>
+            <label className="mb-1 block text-xs text-muted-foreground">{t("guidedEditor.certImport.certPemLabel")}</label>
             <textarea
               value={certPem}
               onChange={(e) => setCertPem(e.target.value)}
@@ -783,7 +786,7 @@ function CertImportPanel({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs text-muted-foreground">Clé privée (PEM, ex: privkey.pem)</label>
+            <label className="mb-1 block text-xs text-muted-foreground">{t("guidedEditor.certImport.keyPemLabel")}</label>
             <textarea
               value={keyPem}
               onChange={(e) => setKeyPem(e.target.value)}
@@ -793,7 +796,7 @@ function CertImportPanel({
             />
           </div>
           <Button size="sm" disabled={busy || !certPem.trim() || !keyPem.trim()} onClick={submitPaste}>
-            {busy ? "Enregistrement…" : "Enregistrer"}
+            {busy ? t("guidedEditor.certImport.saving") : t("guidedEditor.certImport.save")}
           </Button>
         </div>
       )}
@@ -801,7 +804,7 @@ function CertImportPanel({
       {mode === "upload" && (
         <div className="flex flex-col gap-2">
           <div>
-            <label className="mb-1 block text-xs text-muted-foreground">Fichier certificat (.pem/.crt)</label>
+            <label className="mb-1 block text-xs text-muted-foreground">{t("guidedEditor.certImport.certFileLabel")}</label>
             <input
               type="file"
               accept=".pem,.crt,.cer"
@@ -810,7 +813,7 @@ function CertImportPanel({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs text-muted-foreground">Fichier clé privée (.pem/.key)</label>
+            <label className="mb-1 block text-xs text-muted-foreground">{t("guidedEditor.certImport.keyFileLabel")}</label>
             <input
               type="file"
               accept=".pem,.key"
@@ -819,7 +822,7 @@ function CertImportPanel({
             />
           </div>
           <Button size="sm" disabled={busy || !certFile || !keyFile} onClick={submitUpload}>
-            {busy ? "Import en cours…" : "Importer"}
+            {busy ? t("guidedEditor.certImport.importing") : t("guidedEditor.certImport.import")}
           </Button>
         </div>
       )}
@@ -827,7 +830,7 @@ function CertImportPanel({
       {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
       {success && (
         <p className="mt-2 flex items-center gap-1 text-xs text-primary">
-          <CheckCircle2 className="h-3.5 w-3.5" /> Certificat enregistré et chemins renseignés ci-dessus.
+          <CheckCircle2 className="h-3.5 w-3.5" /> {t("guidedEditor.certImport.success")}
         </p>
       )}
     </div>
@@ -835,6 +838,7 @@ function CertImportPanel({
 }
 
 function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
+  const { t } = useTranslation("nginx");
   const [open, setOpen] = useState(false);
   const [model, setModel] = useState<GuidedFormModel>(DEFAULT_GUIDED_MODEL);
   const [serverName, setServerName] = useState("");
@@ -902,7 +906,7 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
         setOpen(false);
       } else {
         if (!newVhostName.trim() || !serverName.trim()) {
-          setError("Nom de fichier et server_name requis.");
+          setError(t("guidedEditor.requiredFields"));
           return;
         }
         const { content } = await apiJson<{ content: string }>("/nginx/vhosts/guided/build", {
@@ -931,9 +935,9 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[92vw] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-card p-4 shadow-xl outline-none">
           <div className="flex items-center justify-between">
             <Dialog.Title className="text-base font-semibold">
-              {props.mode === "create" ? "Nouveau site — configuration guidée" : "Éditeur guidé"}
+              {props.mode === "create" ? t("guidedEditor.createTitle") : t("guidedEditor.editTitle")}
             </Dialog.Title>
-            <Dialog.Close className="rounded-md p-1 hover:bg-muted" aria-label="Fermer">
+            <Dialog.Close className="rounded-md p-1 hover:bg-muted" aria-label={t("guidedEditor.close")}>
               <X className="h-4 w-4" />
             </Dialog.Close>
           </div>
@@ -942,7 +946,7 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
             {props.mode === "create" && (
               <div className="flex flex-col gap-2">
                 <div>
-                  <label className="mb-1 block text-xs font-medium">Nom du fichier (sites-available)</label>
+                  <label className="mb-1 block text-xs font-medium">{t("guidedEditor.fileNameLabel")}</label>
                   <input
                     type="text"
                     value={newVhostName}
@@ -952,7 +956,7 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium">server_name</label>
+                  <label className="mb-1 block text-xs font-medium">{t("guidedEditor.serverNameLabel")}</label>
                   <input
                     type="text"
                     value={serverName}
@@ -962,7 +966,7 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium">Port d'écoute</label>
+                  <label className="mb-1 block text-xs font-medium">{t("guidedEditor.listenPortLabel")}</label>
                   <input
                     type="number"
                     value={listenPort}
@@ -980,15 +984,13 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                   checked={model.sslEnabled}
                   onChange={(e) => setModel((m) => ({ ...m, sslEnabled: e.target.checked }))}
                 />
-                Activer SSL (HTTPS)
+                {t("guidedEditor.sslLabel")}
               </label>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Active HTTPS pour ce site en référençant un certificat et sa clé déjà présents sur le serveur.
-              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t("guidedEditor.sslDescription")}</p>
               {model.sslEnabled && (
                 <div className="mt-2 flex flex-col gap-2 pl-6">
                   <div>
-                    <label className="mb-1 block text-xs text-muted-foreground">Chemin du certificat</label>
+                    <label className="mb-1 block text-xs text-muted-foreground">{t("guidedEditor.certPathLabel")}</label>
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -1001,23 +1003,23 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                         className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
                       />
                       <Button size="sm" variant="outline" disabled={!model.certPath} onClick={checkCertPath}>
-                        Vérifier
+                        {t("guidedEditor.verify")}
                       </Button>
                     </div>
-                    {certCheck === "checking" && <p className="mt-1 text-xs text-muted-foreground">Vérification…</p>}
+                    {certCheck === "checking" && <p className="mt-1 text-xs text-muted-foreground">{t("guidedEditor.verifying")}</p>}
                     {certCheck === "found" && (
                       <p className="mt-1 flex items-center gap-1 text-xs text-primary">
-                        <CheckCircle2 className="h-3 w-3" /> Fichier trouvé.
+                        <CheckCircle2 className="h-3 w-3" /> {t("guidedEditor.certFound")}
                       </p>
                     )}
                     {certCheck === "missing" && (
                       <p className="mt-1 flex items-center gap-1 text-xs text-destructive">
-                        <XCircle className="h-3 w-3" /> Fichier introuvable à cet emplacement.
+                        <XCircle className="h-3 w-3" /> {t("guidedEditor.certMissing")}
                       </p>
                     )}
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-muted-foreground">Chemin de la clé privée</label>
+                    <label className="mb-1 block text-xs text-muted-foreground">{t("guidedEditor.certKeyPathLabel")}</label>
                     <input
                       type="text"
                       value={model.certKeyPath ?? ""}
@@ -1033,26 +1035,24 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                       {certImportedForName && certImportedForName !== newVhostName.trim() && (
                         <p className="mt-2 flex items-center gap-1 text-xs text-warning">
                           <AlertTriangle className="h-3.5 w-3.5" />
-                          Le certificat importé était lié au nom « {certImportedForName} » — réimportez-le pour « {newVhostName.trim()} » avant d'enregistrer.
+                          {t("guidedEditor.certNameMismatch", {
+                            oldName: certImportedForName,
+                            newName: newVhostName.trim(),
+                          })}
                         </p>
                       )}
                       <CertImportPanel vhostName={newVhostName.trim()} onImported={applyImportedCertPaths} />
                     </>
                   ) : (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Renseignez le nom du fichier ci-dessus pour pouvoir importer un certificat.
-                    </p>
+                    <p className="mt-2 text-xs text-muted-foreground">{t("guidedEditor.certNamePrompt")}</p>
                   )}
                 </div>
               )}
             </div>
 
             <div>
-              <label className="mb-1 block font-medium">Taille maximale des requêtes</label>
-              <p className="mb-1 text-xs text-muted-foreground">
-                Limite la taille des fichiers/formulaires envoyés par les visiteurs (ex : 20m pour 20 Mo). Laisser
-                vide pour garder la valeur par défaut de Nginx (1 Mo).
-              </p>
+              <label className="mb-1 block font-medium">{t("guidedEditor.maxBodySizeLabel")}</label>
+              <p className="mb-1 text-xs text-muted-foreground">{t("guidedEditor.maxBodySizeDescription")}</p>
               <input
                 type="text"
                 value={model.clientMaxBodySize ?? ""}
@@ -1063,47 +1063,47 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
             </div>
 
             <div>
-              <p className="mb-1 font-medium">En-têtes de sécurité</p>
+              <p className="mb-1 font-medium">{t("guidedEditor.securityHeadersTitle")}</p>
               <div className="flex flex-col gap-2">
                 <HeaderCheckbox
                   label="X-Frame-Options"
-                  description="Empêche le site d'être affiché dans un iframe sur un autre domaine (anti-clickjacking)."
+                  description={t("guidedEditor.headers.frameOptions")}
                   checked={model.headers.frameOptions}
                   onChange={(v) => setModel((m) => ({ ...m, headers: { ...m.headers, frameOptions: v } }))}
                 />
                 <HeaderCheckbox
                   label="X-Content-Type-Options"
-                  description="Empêche le navigateur de deviner le type d'un fichier différemment de ce que déclare le serveur."
+                  description={t("guidedEditor.headers.contentTypeOptions")}
                   checked={model.headers.contentTypeOptions}
                   onChange={(v) => setModel((m) => ({ ...m, headers: { ...m.headers, contentTypeOptions: v } }))}
                 />
                 <HeaderCheckbox
                   label="Referrer-Policy"
-                  description="Limite les informations envoyées aux autres sites quand un visiteur clique sur un lien sortant."
+                  description={t("guidedEditor.headers.referrerPolicy")}
                   checked={model.headers.referrerPolicy}
                   onChange={(v) => setModel((m) => ({ ...m, headers: { ...m.headers, referrerPolicy: v } }))}
                 />
                 <HeaderCheckbox
                   label="Strict-Transport-Security (HSTS)"
-                  description="Force les navigateurs à toujours utiliser HTTPS pour ce site. À activer seulement si SSL est bien configuré."
+                  description={t("guidedEditor.headers.hsts")}
                   checked={model.headers.hsts}
                   onChange={(v) => setModel((m) => ({ ...m, headers: { ...m.headers, hsts: v } }))}
                 />
                 <HeaderCheckbox
                   label="X-XSS-Protection"
-                  description="Ancienne protection navigateur contre les attaques XSS réfléchies (dépréciée mais encore acceptée)."
+                  description={t("guidedEditor.headers.xssProtection")}
                   checked={model.headers.xssProtection}
                   onChange={(v) => setModel((m) => ({ ...m, headers: { ...m.headers, xssProtection: v } }))}
                 />
                 <HeaderCheckbox
                   label="Permissions-Policy"
-                  description="Désactive l'accès à la caméra, au micro, à la géolocalisation, etc. pour ce site."
+                  description={t("guidedEditor.headers.permissionsPolicy")}
                   checked={model.headers.permissionsPolicy}
                   onChange={(v) => setModel((m) => ({ ...m, headers: { ...m.headers, permissionsPolicy: v } }))}
                 />
                 <HeaderCheckbox
                   label="Content-Security-Policy"
-                  description="Restreint les sources de scripts/styles autorisées (protection XSS avancée). Valeur générique de base — à adapter si le site charge des ressources externes (polices, CDN, etc.)."
+                  description={t("guidedEditor.headers.contentSecurityPolicy")}
                   checked={model.headers.contentSecurityPolicy}
                   onChange={(v) => setModel((m) => ({ ...m, headers: { ...m.headers, contentSecurityPolicy: v } }))}
                 />
@@ -1112,15 +1112,11 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
 
             {model.sslEnabled && (
               <div>
-                <p className="mb-1 font-medium">TLS avancé</p>
-                <p className="mb-1 text-xs text-muted-foreground">
-                  Réglages optionnels pour durcir/aligner la configuration TLS. Laisser vide pour garder les valeurs
-                  par défaut de Nginx. Les valeurs se collent généralement depuis un générateur externe (ex :
-                  Mozilla SSL Config Generator).
-                </p>
+                <p className="mb-1 font-medium">{t("guidedEditor.tlsAdvancedTitle")}</p>
+                <p className="mb-1 text-xs text-muted-foreground">{t("guidedEditor.tlsAdvancedDescription")}</p>
                 <div className="flex flex-col gap-2">
                   <div>
-                    <label className="mb-1 block text-xs text-muted-foreground">Protocoles (ssl_protocols)</label>
+                    <label className="mb-1 block text-xs text-muted-foreground">{t("guidedEditor.protocolsLabel")}</label>
                     <input
                       type="text"
                       value={model.tls.protocols ?? ""}
@@ -1130,7 +1126,7 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-muted-foreground">Suites de chiffrement (ssl_ciphers)</label>
+                    <label className="mb-1 block text-xs text-muted-foreground">{t("guidedEditor.ciphersLabel")}</label>
                     <input
                       type="text"
                       value={model.tls.ciphers ?? ""}
@@ -1141,7 +1137,7 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                   </div>
                   <div className="flex gap-2">
                     <div className="flex-1">
-                      <label className="mb-1 block text-xs text-muted-foreground">Cache de session</label>
+                      <label className="mb-1 block text-xs text-muted-foreground">{t("guidedEditor.sessionCacheLabel")}</label>
                       <input
                         type="text"
                         value={model.tls.sessionCache ?? ""}
@@ -1153,7 +1149,7 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                       />
                     </div>
                     <div className="flex-1">
-                      <label className="mb-1 block text-xs text-muted-foreground">Durée de session</label>
+                      <label className="mb-1 block text-xs text-muted-foreground">{t("guidedEditor.sessionTimeoutLabel")}</label>
                       <input
                         type="text"
                         value={model.tls.sessionTimeout ?? ""}
@@ -1176,11 +1172,9 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                   checked={model.gzip.enabled}
                   onChange={(e) => setModel((m) => ({ ...m, gzip: { ...m.gzip, enabled: e.target.checked } }))}
                 />
-                Compression Gzip
+                {t("guidedEditor.gzipLabel")}
               </label>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Compresse les réponses avant envoi pour accélérer le chargement (texte, CSS, JS, JSON...).
-              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{t("guidedEditor.gzipDescription")}</p>
               {model.gzip.enabled && (
                 <input
                   type="text"
@@ -1193,10 +1187,19 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
             </div>
 
             <div>
-              <p className="mb-1 font-medium">Blocs de contenu prédéfinis</p>
+              <p className="mb-1 font-medium">{t("guidedEditor.presetsTitle")}</p>
               <p className="mb-1 text-xs text-muted-foreground">
-                Modèles courants prêts à l'emploi — pas de saisie libre, pour éviter une erreur de syntaxe dans un
-                bloc <span className="font-mono">location</span>.
+                {t("guidedEditor.presetsDescription")
+                  .split(/(location)/)
+                  .map((part, i) =>
+                    part === "location" ? (
+                      <span key={i} className="font-mono">
+                        location
+                      </span>
+                    ) : (
+                      part
+                    )
+                  )}
               </p>
               <div className="flex flex-col gap-2">
                 <label className="flex items-start gap-2">
@@ -1209,10 +1212,8 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                     }
                   />
                   <span>
-                    <span className="block">Bloquer les fichiers cachés (.git, .htaccess...)</span>
-                    <span className="block text-xs text-muted-foreground">
-                      Interdit l'accès direct aux fichiers/dossiers sensibles commençant par un point.
-                    </span>
+                    <span className="block">{t("guidedEditor.presets.blockDotfilesLabel")}</span>
+                    <span className="block text-xs text-muted-foreground">{t("guidedEditor.presets.blockDotfilesDescription")}</span>
                   </span>
                 </label>
                 <label className="flex items-start gap-2">
@@ -1225,11 +1226,8 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                     }
                   />
                   <span>
-                    <span className="block">Cache long pour /assets/</span>
-                    <span className="block text-xs text-muted-foreground">
-                      Cache navigateur d'un an pour les fichiers statiques versionnés (JS/CSS avec hash dans le nom,
-                      généré par Vite/Webpack).
-                    </span>
+                    <span className="block">{t("guidedEditor.presets.cacheStaticLabel")}</span>
+                    <span className="block text-xs text-muted-foreground">{t("guidedEditor.presets.cacheStaticDescription")}</span>
                   </span>
                 </label>
                 <label className="flex items-start gap-2">
@@ -1242,22 +1240,16 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                     }
                   />
                   <span>
-                    <span className="block">Fallback SPA (React/Vue/Vite)</span>
-                    <span className="block text-xs text-muted-foreground">
-                      Toutes les routes inconnues renvoient index.html — nécessaire pour une application une-page
-                      avec routage côté client.
-                    </span>
+                    <span className="block">{t("guidedEditor.presets.spaFallbackLabel")}</span>
+                    <span className="block text-xs text-muted-foreground">{t("guidedEditor.presets.spaFallbackDescription")}</span>
                   </span>
                 </label>
               </div>
             </div>
 
             <div>
-              <p className="mb-1 font-medium">Mode de service</p>
-              <p className="mb-1 text-xs text-muted-foreground">
-                « Fichiers statiques » sert directement un dossier du serveur ; « Proxy » relaie les requêtes vers
-                une autre adresse (ex : une application Node.js/Docker sur un port local).
-              </p>
+              <p className="mb-1 font-medium">{t("guidedEditor.serviceModeTitle")}</p>
+              <p className="mb-1 text-xs text-muted-foreground">{t("guidedEditor.serviceModeDescription")}</p>
               <div className="flex gap-4">
                 <label className="flex items-center gap-1.5 text-xs">
                   <input
@@ -1265,7 +1257,7 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                     checked={model.mode === "root"}
                     onChange={() => setModel((m) => ({ ...m, mode: "root" }))}
                   />
-                  Fichiers statiques
+                  {t("guidedEditor.modeRoot")}
                 </label>
                 <label className="flex items-center gap-1.5 text-xs">
                   <input
@@ -1273,7 +1265,7 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
                     checked={model.mode === "proxy_pass"}
                     onChange={() => setModel((m) => ({ ...m, mode: "proxy_pass" }))}
                   />
-                  Proxy
+                  {t("guidedEditor.modeProxy")}
                 </label>
               </div>
               {model.mode === "root" && (
@@ -1302,11 +1294,11 @@ function GuidedConfigEditorDialog(props: GuidedConfigEditorDialogProps) {
           <div className="mt-4 flex justify-end gap-2">
             <Dialog.Close asChild>
               <Button variant="outline" size="sm" disabled={saving}>
-                Annuler
+                {t("guidedEditor.cancel")}
               </Button>
             </Dialog.Close>
             <Button size="sm" disabled={saving} onClick={submit}>
-              {saving ? "..." : props.mode === "create" ? "Créer le site" : "Appliquer"}
+              {saving ? t("guidedEditor.submitting") : props.mode === "create" ? t("guidedEditor.createSite") : t("guidedEditor.apply")}
             </Button>
           </div>
         </Dialog.Content>
