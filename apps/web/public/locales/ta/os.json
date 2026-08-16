@@ -1,0 +1,42 @@
+{
+  "system": {
+    "title": "System",
+    "loading": "ஏற்றுகிறது…",
+    "uptime": "இயங்கிய நேரம்: {{uptime}}",
+    "kernel": "கர்னல் {{kernel}} · {{arch}} · {{hostname}}"
+  },
+  "rebootRequired": {
+    "title": "மறுதொடக்கம் தேவை"
+  },
+  "upgrades": {
+    "title": "புதுப்பிப்புகள்",
+    "loading": "ஏற்றுகிறது…",
+    "count": "{{count}} தொகுப்பு(கள்) புதுப்பிக்க வேண்டும்",
+    "check": "புதுப்பிப்புகளைச் சரிபார்க்கவும்",
+    "upgrade": "புதுப்பி",
+    "confirmTitle": "புதுப்பிப்பைத் தொடங்கவா?",
+    "modeStandard": "upgrade (நிலையான)",
+    "modeFull": "full-upgrade (தொகுப்புகளை அகற்றக்கூடும்)",
+    "fullAck": "இது தொகுப்புகளை அகற்றக்கூடும் என்பதை புரிந்துகொள்கிறேன்",
+    "confirmLaunch": "தொடங்கு"
+  },
+  "job": {
+    "titlePrefix": "நடப்பில் உள்ள பணி: {{jobId}}",
+    "finished": "முடிந்தது: {{status}} (குறியீடு {{exitCode}})"
+  },
+  "held": {
+    "title": "முடக்கப்பட்ட தொகுப்புகள்",
+    "empty": "முடக்கப்பட்ட தொகுப்புகள் இல்லை.",
+    "release": "விடுவி"
+  },
+  "jobHistory": {
+    "title": "பணி வரலாறு",
+    "empty": "பணிகள் இல்லை."
+  },
+  "installedPackages": {
+    "title": "நிறுவப்பட்ட தொகுப்புகள் ({{count}})",
+    "filterPlaceholder": "பெயரால் வடிகட்டு…",
+    "more": "…மேலும் {{count}}, வடிகட்டியை மேம்படுத்தவும்",
+    "empty": "முடிவுகள் இல்லை."
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "system": {
+    "title": "System",
+    "loading": "Loading…",
+    "uptime": "Uptime: {{uptime}}",
+    "kernel": "Kernel {{kernel}} · {{arch}} · {{hostname}}"
+  },
+  "rebootRequired": {
+    "title": "Reboot required"
+  },
+  "upgrades": {
+    "title": "Updates",
+    "loading": "Loading…",
+    "count": "{{count}} package(s) to update",
+    "check": "Check for updates",
+    "upgrade": "Upgrade",
+    "confirmTitle": "Start the upgrade?",
+    "modeStandard": "upgrade (standard)",
+    "modeFull": "full-upgrade (may remove packages)",
+    "fullAck": "I understand this may remove packages",
+    "confirmLaunch": "Start"
+  },
+  "job": {
+    "titlePrefix": "Job in progress: {{jobId}}",
+    "finished": "Finished: {{status}} (code {{exitCode}})"
+  },
+  "held": {
+    "title": "Held packages",
+    "empty": "No held packages.",
+    "release": "Release"
+  },
+  "jobHistory": {
+    "title": "Job history",
+    "empty": "No jobs."
+  },
+  "installedPackages": {
+    "title": "Installed packages ({{count}})",
+    "filterPlaceholder": "Filter by name…",
+    "more": "…{{count}} more, refine the filter",
+    "empty": "No results."
+  }
+}

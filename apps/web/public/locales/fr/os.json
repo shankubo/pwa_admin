@@ -1,0 +1,42 @@
+{
+  "system": {
+    "title": "Système",
+    "loading": "Chargement…",
+    "uptime": "Uptime : {{uptime}}",
+    "kernel": "Noyau {{kernel}} · {{arch}} · {{hostname}}"
+  },
+  "rebootRequired": {
+    "title": "Redémarrage requis"
+  },
+  "upgrades": {
+    "title": "Mises à jour",
+    "loading": "Chargement…",
+    "count": "{{count}} paquet(s) à mettre à jour",
+    "check": "Vérifier les mises à jour",
+    "upgrade": "Mettre à jour",
+    "confirmTitle": "Lancer la mise à jour ?",
+    "modeStandard": "upgrade (standard)",
+    "modeFull": "full-upgrade (peut supprimer des paquets)",
+    "fullAck": "Je comprends que cela peut supprimer des paquets",
+    "confirmLaunch": "Lancer"
+  },
+  "job": {
+    "titlePrefix": "Job en cours : {{jobId}}",
+    "finished": "Terminé : {{status}} (code {{exitCode}})"
+  },
+  "held": {
+    "title": "Paquets figés (hold)",
+    "empty": "Aucun paquet figé.",
+    "release": "Libérer"
+  },
+  "jobHistory": {
+    "title": "Historique des jobs",
+    "empty": "Aucun job."
+  },
+  "installedPackages": {
+    "title": "Paquets installés ({{count}})",
+    "filterPlaceholder": "Filtrer par nom…",
+    "more": "…{{count}} de plus, affinez le filtre",
+    "empty": "Aucun résultat."
+  }
+}

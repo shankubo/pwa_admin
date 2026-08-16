@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { OsInfo, InstalledPackage, UpgradablePackage, OsJob } from "@pwa-admin/shared";
+import { useTranslation } from "react-i18next";
 import { apiJson } from "@/lib/api";
 import { useWsChannel } from "@/lib/ws";
 import { Card, CardTitle } from "@/components/ui/Card";
@@ -16,6 +17,7 @@ function formatUptime(seconds: number): string {
 }
 
 export function OsSystem() {
+  const { t } = useTranslation("os");
   const [info, setInfo] = useState<OsInfo | null>(null);
   const [upgradable, setUpgradable] = useState<UpgradablePackage[] | null>(null);
   const [held, setHeld] = useState<string[] | null>(null);
@@ -83,17 +85,17 @@ export function OsSystem() {
       {error && <Card className="text-sm text-destructive">{error}</Card>}
 
       <Card>
-        <CardTitle>Système</CardTitle>
+        <CardTitle>{t("system.title")}</CardTitle>
         {info ? (
           <div className="text-sm">
             <p>{info.distro} {info.release}</p>
             <p className="text-xs text-muted-foreground">
-              Noyau {info.kernel} · {info.arch} · {info.hostname}
+              {t("system.kernel", { kernel: info.kernel, arch: info.arch, hostname: info.hostname })}
             </p>
-            <p className="text-xs text-muted-foreground">Uptime : {formatUptime(info.uptimeSeconds)}</p>
+            <p className="text-xs text-muted-foreground">{t("system.uptime", { uptime: formatUptime(info.uptimeSeconds) })}</p>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Chargement…</p>
+          <p className="text-sm text-muted-foreground">{t("system.loading")}</p>
         )}
       </Card>
 
@@ -101,7 +103,7 @@ export function OsSystem() {
         <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
-            <p className="font-medium">Redémarrage requis</p>
+            <p className="font-medium">{t("rebootRequired.title")}</p>
             {info.rebootRequiredPackages.length > 0 && (
               <p className="text-xs">{info.rebootRequiredPackages.join(", ")}</p>
             )}
@@ -110,8 +112,8 @@ export function OsSystem() {
       )}
 
       <Card>
-        <CardTitle>Mises à jour</CardTitle>
-        <p className="text-sm">{upgradable ? `${upgradable.length} paquet(s) à mettre à jour` : "Chargement…"}</p>
+        <CardTitle>{t("upgrades.title")}</CardTitle>
+        <p className="text-sm">{upgradable ? t("upgrades.count", { count: upgradable.length }) : t("upgrades.loading")}</p>
         {upgradable && upgradable.length > 0 && (
           <div className="mt-2 flex max-h-56 flex-col gap-1 overflow-y-auto">
             {upgradable.map((p) => (
@@ -127,15 +129,15 @@ export function OsSystem() {
 
         <div className="mt-3 flex flex-wrap gap-2">
           <Button size="sm" variant="outline" disabled={checking} onClick={checkUpdates}>
-            <RefreshCw className="h-3.5 w-3.5" /> Vérifier les mises à jour
+            <RefreshCw className="h-3.5 w-3.5" /> {t("upgrades.check")}
           </Button>
           <ConfirmDialog
             trigger={
               <Button size="sm" variant="destructive" disabled={!upgradable || upgradable.length === 0}>
-                <PackageCheck className="h-3.5 w-3.5" /> Mettre à jour
+                <PackageCheck className="h-3.5 w-3.5" /> {t("upgrades.upgrade")}
               </Button>
             }
-            title="Lancer la mise à jour ?"
+            title={t("upgrades.confirmTitle")}
             description={
               <div className="flex flex-col gap-2">
                 <label className="flex items-center gap-2 text-sm text-foreground">
@@ -144,7 +146,7 @@ export function OsSystem() {
                     checked={upgradeMode === "upgrade"}
                     onChange={() => setUpgradeMode("upgrade")}
                   />
-                  upgrade (standard)
+                  {t("upgrades.modeStandard")}
                 </label>
                 <label className="flex items-center gap-2 text-sm text-foreground">
                   <input
@@ -152,7 +154,7 @@ export function OsSystem() {
                     checked={upgradeMode === "full-upgrade"}
                     onChange={() => setUpgradeMode("full-upgrade")}
                   />
-                  full-upgrade (peut supprimer des paquets)
+                  {t("upgrades.modeFull")}
                 </label>
                 {upgradeMode === "full-upgrade" && (
                   <label className="flex items-center gap-2 text-sm text-foreground">
@@ -161,12 +163,12 @@ export function OsSystem() {
                       checked={fullUpgradeAck}
                       onChange={(e) => setFullUpgradeAck(e.target.checked)}
                     />
-                    Je comprends que cela peut supprimer des paquets
+                    {t("upgrades.fullAck")}
                   </label>
                 )}
               </div>
             }
-            confirmLabel="Lancer"
+            confirmLabel={t("upgrades.confirmLaunch")}
             onConfirm={() => {
               if (upgradeMode === "full-upgrade" && !fullUpgradeAck) return;
               return startUpgrade();
@@ -177,13 +179,13 @@ export function OsSystem() {
 
       {activeJobId && (
         <Card>
-          <CardTitle>Job en cours : {activeJobId}</CardTitle>
+          <CardTitle>{t("job.titlePrefix", { jobId: activeJobId })}</CardTitle>
           <OsUpgradeJobPanel jobId={activeJobId} onFinished={loadAll} />
         </Card>
       )}
 
       <Card>
-        <CardTitle>Paquets figés (hold)</CardTitle>
+        <CardTitle>{t("held.title")}</CardTitle>
         {held && held.length > 0 ? (
           <div className="flex flex-col gap-1">
             {held.map((name) => (
@@ -192,18 +194,18 @@ export function OsSystem() {
                   <Lock className="h-3.5 w-3.5" /> {name}
                 </span>
                 <Button size="sm" variant="outline" onClick={() => unhold(name)}>
-                  <Unlock className="h-3.5 w-3.5" /> Libérer
+                  <Unlock className="h-3.5 w-3.5" /> {t("held.release")}
                 </Button>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Aucun paquet figé.</p>
+          <p className="text-sm text-muted-foreground">{t("held.empty")}</p>
         )}
       </Card>
 
       <Card>
-        <CardTitle>Historique des jobs</CardTitle>
+        <CardTitle>{t("jobHistory.title")}</CardTitle>
         {jobs && jobs.length > 0 ? (
           <div className="flex flex-col gap-1">
             {jobs.map((j) => (
@@ -231,7 +233,7 @@ export function OsSystem() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Aucun job.</p>
+          <p className="text-sm text-muted-foreground">{t("jobHistory.empty")}</p>
         )}
       </Card>
 
@@ -241,6 +243,7 @@ export function OsSystem() {
 }
 
 function OsUpgradeJobPanel({ jobId, onFinished }: { jobId: string; onFinished: () => void }) {
+  const { t } = useTranslation("os");
   const [chunk, setChunk] = useState<string | null>(null);
   const [result, setResult] = useState<{ exitCode: number; status: string } | null>(null);
 
@@ -263,7 +266,7 @@ function OsUpgradeJobPanel({ jobId, onFinished }: { jobId: string; onFinished: (
       <LiveLogPanel chunk={chunk} />
       {result && (
         <p className={`text-xs font-medium ${result.status === "succeeded" ? "text-primary" : "text-destructive"}`}>
-          Terminé : {result.status} (code {result.exitCode})
+          {t("job.finished", { status: result.status, exitCode: result.exitCode })}
         </p>
       )}
     </div>
@@ -271,6 +274,7 @@ function OsUpgradeJobPanel({ jobId, onFinished }: { jobId: string; onFinished: (
 }
 
 function InstalledPackagesCard() {
+  const { t } = useTranslation("os");
   const [packages, setPackages] = useState<InstalledPackage[] | null>(null);
   const [filter, setFilter] = useState("");
 
@@ -289,10 +293,10 @@ function InstalledPackagesCard() {
 
   return (
     <Card>
-      <CardTitle>Paquets installés ({packages?.length ?? "…"})</CardTitle>
+      <CardTitle>{t("installedPackages.title", { count: packages?.length ?? "…" })}</CardTitle>
       <input
         type="text"
-        placeholder="Filtrer par nom…"
+        placeholder={t("installedPackages.filterPlaceholder")}
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         className="mb-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
@@ -305,9 +309,9 @@ function InstalledPackagesCard() {
           </div>
         ))}
         {filtered.length > 300 && (
-          <p className="pt-1 text-xs text-muted-foreground">…{filtered.length - 300} de plus, affinez le filtre</p>
+          <p className="pt-1 text-xs text-muted-foreground">{t("installedPackages.more", { count: filtered.length - 300 })}</p>
         )}
-        {packages && filtered.length === 0 && <p className="py-2 text-xs text-muted-foreground">Aucun résultat.</p>}
+        {packages && filtered.length === 0 && <p className="py-2 text-xs text-muted-foreground">{t("installedPackages.empty")}</p>}
       </div>
     </Card>
   );
