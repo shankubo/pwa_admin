@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { SecurityOverview } from "@pwa-admin/shared";
+import { useTranslation } from "react-i18next";
 import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import {
@@ -16,8 +17,9 @@ import {
 } from "lucide-react";
 
 function StatusBadge({ ok, okLabel, badLabel }: { ok: boolean | null; okLabel: string; badLabel: string }) {
+  const { t } = useTranslation("security");
   if (ok === null) {
-    return <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">inconnu</span>;
+    return <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{t("statusUnknown")}</span>;
   }
   return (
     <span
@@ -33,6 +35,7 @@ function StatusBadge({ ok, okLabel, badLabel }: { ok: boolean | null; okLabel: s
 }
 
 export function Security() {
+  const { t } = useTranslation("security");
   const [overview, setOverview] = useState<SecurityOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -54,38 +57,38 @@ export function Security() {
       <Card>
         <div className="flex items-center justify-between">
           <CardTitle className="mb-0 flex items-center gap-1">
-            <ShieldCheck className="h-4 w-4" /> Sécurité du serveur
+            <ShieldCheck className="h-4 w-4" /> {t("title")}
           </CardTitle>
           <button
             onClick={load}
             disabled={loading}
             className="rounded-md p-1.5 text-muted-foreground hover:bg-muted disabled:opacity-50"
-            title="Actualiser"
+            title={t("refresh")}
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          État en direct des mécanismes de protection du Raspberry Pi et de l'application.
-        </p>
+        <p className="text-xs text-muted-foreground">{t("description")}</p>
       </Card>
 
       {error && <Card className="text-sm text-destructive">{error}</Card>}
-      {!overview && !error && <Card className="text-sm text-muted-foreground">Chargement…</Card>}
+      {!overview && !error && <Card className="text-sm text-muted-foreground">{t("loading")}</Card>}
 
       {overview && (
         <>
           {/* UFW */}
           <Card>
             <div className="flex items-center justify-between">
-              <CardTitle className="mb-0">Pare-feu (UFW)</CardTitle>
-              <StatusBadge ok={overview.ufw.active} okLabel="actif" badLabel="inactif" />
+              <CardTitle className="mb-0">{t("ufw.title")}</CardTitle>
+              <StatusBadge ok={overview.ufw.active} okLabel={t("statusActive")} badLabel={t("statusInactive")} />
             </div>
             {overview.ufw.installed ? (
               <>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Par défaut : entrant <span className="font-mono">{overview.ufw.defaultIncoming ?? "?"}</span>, sortant{" "}
-                  <span className="font-mono">{overview.ufw.defaultOutgoing ?? "?"}</span>
+                  {t("ufw.defaults", {
+                    incoming: overview.ufw.defaultIncoming ?? "?",
+                    outgoing: overview.ufw.defaultOutgoing ?? "?",
+                  })}
                 </p>
                 <div className="mt-2 flex flex-col gap-1">
                   {overview.ufw.rules.map((r, i) => (
@@ -109,12 +112,12 @@ export function Security() {
                     </div>
                   ))}
                   {overview.ufw.rules.length === 0 && (
-                    <p className="text-xs text-muted-foreground">Aucune règle explicite.</p>
+                    <p className="text-xs text-muted-foreground">{t("ufw.noRules")}</p>
                   )}
                 </div>
               </>
             ) : (
-              <p className="mt-1 text-xs text-destructive">UFW non installé — le serveur n'a pas de pare-feu applicatif.</p>
+              <p className="mt-1 text-xs text-destructive">{t("ufw.notInstalled")}</p>
             )}
           </Card>
 
@@ -122,9 +125,13 @@ export function Security() {
           <Card>
             <div className="flex items-center justify-between">
               <CardTitle className="mb-0 flex items-center gap-1">
-                <ShieldBan className="h-4 w-4" /> fail2ban
+                <ShieldBan className="h-4 w-4" /> {t("fail2ban.title")}
               </CardTitle>
-              <StatusBadge ok={overview.fail2ban.installed && overview.fail2ban.active} okLabel="actif" badLabel="inactif" />
+              <StatusBadge
+                ok={overview.fail2ban.installed && overview.fail2ban.active}
+                okLabel={t("statusActive")}
+                badLabel={t("statusInactive")}
+              />
             </div>
             {overview.fail2ban.installed ? (
               <div className="mt-2 flex flex-col gap-1">
@@ -132,16 +139,16 @@ export function Security() {
                   <div key={j.name} className="flex items-center justify-between border-b border-border/50 py-1 text-xs last:border-0">
                     <span className="font-mono">{j.name}</span>
                     <span className="text-muted-foreground">
-                      {j.currentlyBanned} banni(s) actuellement · {j.totalBanned} au total
+                      {t("fail2ban.jailStats", { banned: j.currentlyBanned, total: j.totalBanned })}
                     </span>
                   </div>
                 ))}
                 {overview.fail2ban.jails.length === 0 && (
-                  <p className="text-xs text-muted-foreground">Aucune jail configurée.</p>
+                  <p className="text-xs text-muted-foreground">{t("fail2ban.noJails")}</p>
                 )}
               </div>
             ) : (
-              <p className="mt-1 text-xs text-destructive">fail2ban non installé — pas de protection anti brute-force.</p>
+              <p className="mt-1 text-xs text-destructive">{t("fail2ban.notInstalled")}</p>
             )}
           </Card>
 
@@ -149,26 +156,34 @@ export function Security() {
           <Card>
             <div className="flex items-center justify-between">
               <CardTitle className="mb-0 flex items-center gap-1">
-                <KeyRound className="h-4 w-4" /> SSH
+                <KeyRound className="h-4 w-4" /> {t("ssh.title")}
               </CardTitle>
-              <StatusBadge ok={overview.ssh.active} okLabel="actif" badLabel="inactif" />
+              <StatusBadge ok={overview.ssh.active} okLabel={t("statusActive")} badLabel={t("statusInactive")} />
             </div>
             <div className="mt-2 flex flex-col gap-1.5 text-xs">
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Port</span>
+                <span className="text-muted-foreground">{t("ssh.port")}</span>
                 <span className="font-mono">{overview.ssh.port ?? 22}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Connexion root</span>
-                <StatusBadge ok={overview.ssh.rootLoginPermitted === null ? null : !overview.ssh.rootLoginPermitted} okLabel="désactivée" badLabel="autorisée" />
+                <span className="text-muted-foreground">{t("ssh.rootLogin")}</span>
+                <StatusBadge
+                  ok={overview.ssh.rootLoginPermitted === null ? null : !overview.ssh.rootLoginPermitted}
+                  okLabel={t("ssh.rootLoginDisabled")}
+                  badLabel={t("ssh.rootLoginEnabled")}
+                />
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Authentification par mot de passe</span>
-                <StatusBadge ok={overview.ssh.passwordAuthEnabled === null ? null : !overview.ssh.passwordAuthEnabled} okLabel="désactivée (clé)" badLabel="activée" />
+                <span className="text-muted-foreground">{t("ssh.passwordAuth")}</span>
+                <StatusBadge
+                  ok={overview.ssh.passwordAuthEnabled === null ? null : !overview.ssh.passwordAuthEnabled}
+                  okLabel={t("ssh.passwordAuthDisabled")}
+                  badLabel={t("ssh.passwordAuthEnabled")}
+                />
               </div>
               {overview.ssh.maxAuthTries != null && (
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Tentatives max</span>
+                  <span className="text-muted-foreground">{t("ssh.maxAuthTries")}</span>
                   <span className="font-mono">{overview.ssh.maxAuthTries}</span>
                 </div>
               )}
@@ -179,48 +194,50 @@ export function Security() {
           <Card>
             <div className="flex items-center justify-between">
               <CardTitle className="mb-0 flex items-center gap-1">
-                <Radio className="h-4 w-4" /> Tailscale
+                <Radio className="h-4 w-4" /> {t("tailscale.title")}
               </CardTitle>
-              <StatusBadge ok={overview.tailscale.running} okLabel="connecté" badLabel="déconnecté" />
+              <StatusBadge ok={overview.tailscale.running} okLabel={t("tailscale.connected")} badLabel={t("tailscale.disconnected")} />
             </div>
             {overview.tailscale.installed ? (
               <div className="mt-2 flex flex-col gap-1 text-xs">
                 {overview.tailscale.hostname && (
-                  <p className="text-muted-foreground">Hôte : {overview.tailscale.hostname}</p>
+                  <p className="text-muted-foreground">{t("tailscale.host", { hostname: overview.tailscale.hostname })}</p>
                 )}
                 {overview.tailscale.tailnetName && (
-                  <p className="text-muted-foreground">Tailnet : {overview.tailscale.tailnetName}</p>
+                  <p className="text-muted-foreground">{t("tailscale.tailnet", { name: overview.tailscale.tailnetName })}</p>
                 )}
                 {overview.tailscale.tailscaleIps.map((ip) => (
                   <p key={ip} className="font-mono text-muted-foreground">{ip}</p>
                 ))}
               </div>
             ) : (
-              <p className="mt-1 text-xs text-destructive">
-                Tailscale non installé — vérifier que l'accès n'est pas exposé publiquement.
-              </p>
+              <p className="mt-1 text-xs text-destructive">{t("tailscale.notInstalled")}</p>
             )}
           </Card>
 
           {/* unattended-upgrades */}
           <Card>
             <div className="flex items-center justify-between">
-              <CardTitle className="mb-0">Mises à jour automatiques</CardTitle>
-              <StatusBadge ok={overview.unattendedUpgrades.installed && overview.unattendedUpgrades.timerActive} okLabel="actif" badLabel="inactif" />
+              <CardTitle className="mb-0">{t("unattendedUpgrades.title")}</CardTitle>
+              <StatusBadge
+                ok={overview.unattendedUpgrades.installed && overview.unattendedUpgrades.timerActive}
+                okLabel={t("statusActive")}
+                badLabel={t("statusInactive")}
+              />
             </div>
             <div className="mt-2 flex flex-col gap-1 text-xs">
               {overview.unattendedUpgrades.lastRunAt && (
                 <p className="text-muted-foreground">
-                  Dernière exécution : {new Date(overview.unattendedUpgrades.lastRunAt).toLocaleString()}
+                  {t("unattendedUpgrades.lastRun", { date: new Date(overview.unattendedUpgrades.lastRunAt).toLocaleString() })}
                 </p>
               )}
               {overview.unattendedUpgrades.lastRunPackages.length > 0 && (
                 <p className="text-muted-foreground">
-                  Paquets mis à jour : {overview.unattendedUpgrades.lastRunPackages.join(", ")}
+                  {t("unattendedUpgrades.lastRunPackages", { packages: overview.unattendedUpgrades.lastRunPackages.join(", ") })}
                 </p>
               )}
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Mises à jour de sécurité en attente</span>
+                <span className="text-muted-foreground">{t("unattendedUpgrades.pendingSecurity")}</span>
                 <span className={overview.unattendedUpgrades.pendingSecurityUpdates > 0 ? "font-medium text-warning" : "font-mono"}>
                   {overview.unattendedUpgrades.pendingSecurityUpdates}
                 </span>
@@ -232,23 +249,21 @@ export function Security() {
           <Card>
             <div className="flex items-center justify-between">
               <CardTitle className="mb-0 flex items-center gap-1">
-                <Lock className="h-4 w-4" /> TLS (app)
+                <Lock className="h-4 w-4" /> {t("tls.title")}
               </CardTitle>
-              <StatusBadge ok={overview.appTls.found} okLabel="présent" badLabel="absent" />
+              <StatusBadge ok={overview.appTls.found} okLabel={t("tls.present")} badLabel={t("tls.absent")} />
             </div>
             {overview.appTls.found ? (
               <div className="mt-2 flex flex-col gap-1 text-xs">
                 {overview.appTls.subject && <p className="text-muted-foreground">{overview.appTls.subject}</p>}
                 {overview.appTls.daysRemaining != null && (
                   <p className={overview.appTls.daysRemaining < 30 ? "font-medium text-warning" : "text-muted-foreground"}>
-                    Expire dans {overview.appTls.daysRemaining} jours
+                    {t("tls.expiresIn", { days: overview.appTls.daysRemaining })}
                   </p>
                 )}
               </div>
             ) : (
-              <p className="mt-1 text-xs text-destructive">
-                Pas de certificat TLS configuré — l'app tourne peut-être en HTTP non chiffré.
-              </p>
+              <p className="mt-1 text-xs text-destructive">{t("tls.notConfigured")}</p>
             )}
           </Card>
 
@@ -256,29 +271,28 @@ export function Security() {
           <Card>
             <div className="flex items-center justify-between">
               <CardTitle className="mb-0 flex items-center gap-1">
-                <ShieldAlert className="h-4 w-4" /> Authentification de l'app (JWT + 2FA)
+                <ShieldAlert className="h-4 w-4" /> {t("appAuth.title")}
               </CardTitle>
             </div>
             <div className="mt-2 flex flex-col gap-1.5 text-xs">
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Comptes avec 2FA activée</span>
+                <span className="text-muted-foreground">{t("appAuth.twoFactorAccounts")}</span>
                 <span className="font-mono">
                   {overview.appAuth.usersWithTwoFactor} / {overview.appAuth.totalUsers}
                 </span>
               </div>
               {overview.appAuth.usersWithTwoFactor < overview.appAuth.totalUsers && (
                 <p className="flex items-center gap-1 text-warning">
-                  <AlertTriangle className="h-3.5 w-3.5" /> Au moins un compte n'a pas activé la 2FA — recommandé
-                  pour tous les administrateurs (voir Settings).
+                  <AlertTriangle className="h-3.5 w-3.5" /> {t("appAuth.twoFactorWarning")}
                 </p>
               )}
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Durée de vie du token d'accès</span>
+                <span className="text-muted-foreground">{t("appAuth.jwtTtl")}</span>
                 <span className="font-mono">{overview.appAuth.jwtAccessTtl ?? "?"}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Rate limiting sur la connexion</span>
-                <StatusBadge ok={overview.appAuth.rateLimitEnabled} okLabel="activé" badLabel="désactivé" />
+                <span className="text-muted-foreground">{t("appAuth.rateLimit")}</span>
+                <StatusBadge ok={overview.appAuth.rateLimitEnabled} okLabel={t("appAuth.rateLimitEnabled")} badLabel={t("appAuth.rateLimitDisabled")} />
               </div>
             </div>
           </Card>

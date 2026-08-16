@@ -1,0 +1,62 @@
+{
+  "title": "சேவையக பாதுகாப்பு",
+  "description": "Raspberry Pi மற்றும் பயன்பாட்டின் பாதுகாப்பு வழிமுறைகளின் நேரடி நிலை.",
+  "refresh": "புதுப்பி",
+  "loading": "ஏற்றுகிறது…",
+  "statusUnknown": "தெரியவில்லை",
+  "statusActive": "செயலில்",
+  "statusInactive": "செயலற்றது",
+  "ufw": {
+    "title": "தீவைரவு (UFW)",
+    "defaults": "இயல்புநிலை: உள்வரும் {{incoming}}, வெளிச்செல்லும் {{outgoing}}",
+    "noRules": "வெளிப்படையான விதிகள் இல்லை.",
+    "notInstalled": "UFW நிறுவப்படவில்லை — சேவையகத்திற்கு பயன்பாட்டு தீவைரவு இல்லை."
+  },
+  "fail2ban": {
+    "title": "fail2ban",
+    "jailStats": "தற்போது {{banned}} தடைசெய்யப்பட்டது · மொத்தம் {{total}}",
+    "noJails": "எந்த jail ஐயும் கட்டமைக்கப்படவில்லை.",
+    "notInstalled": "fail2ban நிறுவப்படவில்லை — brute-force தடுப்பு இல்லை."
+  },
+  "ssh": {
+    "title": "SSH",
+    "port": "போர்ட்",
+    "rootLogin": "Root உள்நுழைவு",
+    "rootLoginDisabled": "முடக்கப்பட்டது",
+    "rootLoginEnabled": "அனுமதிக்கப்பட்டது",
+    "passwordAuth": "கடவுச்சொல் அங்கீகாரம்",
+    "passwordAuthDisabled": "முடக்கப்பட்டது (சாவி)",
+    "passwordAuthEnabled": "இயக்கப்பட்டது",
+    "maxAuthTries": "அதிகபட்ச முயற்சிகள்"
+  },
+  "tailscale": {
+    "title": "Tailscale",
+    "connected": "இணைக்கப்பட்டது",
+    "disconnected": "துண்டிக்கப்பட்டது",
+    "host": "ஹோஸ்ட்: {{hostname}}",
+    "tailnet": "Tailnet: {{name}}",
+    "notInstalled": "Tailscale நிறுவப்படவில்லை — அணுகல் பொதுவில் திறக்கப்படவில்லை என்பதை சரிபார்க்கவும்."
+  },
+  "unattendedUpgrades": {
+    "title": "தானியங்கி புதுப்பிப்புகள்",
+    "lastRun": "கடைசி இயக்கம்: {{date}}",
+    "lastRunPackages": "புதுப்பிக்கப்பட்ட தொகுப்புகள்: {{packages}}",
+    "pendingSecurity": "நிலுவையிலுள்ள பாதுகாப்பு புதுப்பிப்புகள்"
+  },
+  "tls": {
+    "title": "TLS (பயன்பாடு)",
+    "present": "உள்ளது",
+    "absent": "இல்லை",
+    "expiresIn": "{{days}} நாட்களில் காலாவதியாகும்",
+    "notConfigured": "TLS சான்றிதழ் கட்டமைக்கப்படவில்லை — பயன்பாடு குறியாக்கம் செய்யப்படாத HTTP இல் இயங்கக்கூடும்."
+  },
+  "appAuth": {
+    "title": "பயன்பாட்டு அங்கீகாரம் (JWT + 2FA)",
+    "twoFactorAccounts": "2FA இயக்கப்பட்ட கணக்குகள்",
+    "twoFactorWarning": "குறைந்தது ஒரு கணக்கு 2FA ஐ இயக்கவில்லை — அனைத்து நிர்வாகிகளுக்கும் பரிந்துரைக்கப்படுகிறது (அமைப்புகளைப் பார்க்கவும்).",
+    "jwtTtl": "அணுகல் டோக்கன் காலம்",
+    "rateLimit": "உள்நுழைவு வீத வரம்பு",
+    "rateLimitEnabled": "இயக்கப்பட்டது",
+    "rateLimitDisabled": "முடக்கப்பட்டது"
+  }
+}

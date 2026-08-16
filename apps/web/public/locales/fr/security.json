@@ -1,0 +1,62 @@
+{
+  "title": "Sécurité du serveur",
+  "description": "État en direct des mécanismes de protection du Raspberry Pi et de l'application.",
+  "refresh": "Actualiser",
+  "loading": "Chargement…",
+  "statusUnknown": "inconnu",
+  "statusActive": "actif",
+  "statusInactive": "inactif",
+  "ufw": {
+    "title": "Pare-feu (UFW)",
+    "defaults": "Par défaut : entrant {{incoming}}, sortant {{outgoing}}",
+    "noRules": "Aucune règle explicite.",
+    "notInstalled": "UFW non installé — le serveur n'a pas de pare-feu applicatif."
+  },
+  "fail2ban": {
+    "title": "fail2ban",
+    "jailStats": "{{banned}} banni(s) actuellement · {{total}} au total",
+    "noJails": "Aucune jail configurée.",
+    "notInstalled": "fail2ban non installé — pas de protection anti brute-force."
+  },
+  "ssh": {
+    "title": "SSH",
+    "port": "Port",
+    "rootLogin": "Connexion root",
+    "rootLoginDisabled": "désactivée",
+    "rootLoginEnabled": "autorisée",
+    "passwordAuth": "Authentification par mot de passe",
+    "passwordAuthDisabled": "désactivée (clé)",
+    "passwordAuthEnabled": "activée",
+    "maxAuthTries": "Tentatives max"
+  },
+  "tailscale": {
+    "title": "Tailscale",
+    "connected": "connecté",
+    "disconnected": "déconnecté",
+    "host": "Hôte : {{hostname}}",
+    "tailnet": "Tailnet : {{name}}",
+    "notInstalled": "Tailscale non installé — vérifier que l'accès n'est pas exposé publiquement."
+  },
+  "unattendedUpgrades": {
+    "title": "Mises à jour automatiques",
+    "lastRun": "Dernière exécution : {{date}}",
+    "lastRunPackages": "Paquets mis à jour : {{packages}}",
+    "pendingSecurity": "Mises à jour de sécurité en attente"
+  },
+  "tls": {
+    "title": "TLS (app)",
+    "present": "présent",
+    "absent": "absent",
+    "expiresIn": "Expire dans {{days}} jours",
+    "notConfigured": "Pas de certificat TLS configuré — l'app tourne peut-être en HTTP non chiffré."
+  },
+  "appAuth": {
+    "title": "Authentification de l'app (JWT + 2FA)",
+    "twoFactorAccounts": "Comptes avec 2FA activée",
+    "twoFactorWarning": "Au moins un compte n'a pas activé la 2FA — recommandé pour tous les administrateurs (voir Settings).",
+    "jwtTtl": "Durée de vie du token d'accès",
+    "rateLimit": "Rate limiting sur la connexion",
+    "rateLimitEnabled": "activé",
+    "rateLimitDisabled": "désactivé"
+  }
+}

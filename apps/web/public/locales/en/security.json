@@ -1,0 +1,62 @@
+{
+  "title": "Server security",
+  "description": "Live status of the Raspberry Pi's and the app's protection mechanisms.",
+  "refresh": "Refresh",
+  "loading": "Loading…",
+  "statusUnknown": "unknown",
+  "statusActive": "active",
+  "statusInactive": "inactive",
+  "ufw": {
+    "title": "Firewall (UFW)",
+    "defaults": "Default: incoming {{incoming}}, outgoing {{outgoing}}",
+    "noRules": "No explicit rules.",
+    "notInstalled": "UFW not installed — the server has no application firewall."
+  },
+  "fail2ban": {
+    "title": "fail2ban",
+    "jailStats": "{{banned}} currently banned · {{total}} total",
+    "noJails": "No jail configured.",
+    "notInstalled": "fail2ban not installed — no brute-force protection."
+  },
+  "ssh": {
+    "title": "SSH",
+    "port": "Port",
+    "rootLogin": "Root login",
+    "rootLoginDisabled": "disabled",
+    "rootLoginEnabled": "allowed",
+    "passwordAuth": "Password authentication",
+    "passwordAuthDisabled": "disabled (key)",
+    "passwordAuthEnabled": "enabled",
+    "maxAuthTries": "Max attempts"
+  },
+  "tailscale": {
+    "title": "Tailscale",
+    "connected": "connected",
+    "disconnected": "disconnected",
+    "host": "Host: {{hostname}}",
+    "tailnet": "Tailnet: {{name}}",
+    "notInstalled": "Tailscale not installed — verify access isn't publicly exposed."
+  },
+  "unattendedUpgrades": {
+    "title": "Automatic updates",
+    "lastRun": "Last run: {{date}}",
+    "lastRunPackages": "Packages updated: {{packages}}",
+    "pendingSecurity": "Pending security updates"
+  },
+  "tls": {
+    "title": "TLS (app)",
+    "present": "present",
+    "absent": "absent",
+    "expiresIn": "Expires in {{days}} days",
+    "notConfigured": "No TLS certificate configured — the app might be running over unencrypted HTTP."
+  },
+  "appAuth": {
+    "title": "App authentication (JWT + 2FA)",
+    "twoFactorAccounts": "Accounts with 2FA enabled",
+    "twoFactorWarning": "At least one account hasn't enabled 2FA — recommended for every administrator (see Settings).",
+    "jwtTtl": "Access token lifetime",
+    "rateLimit": "Login rate limiting",
+    "rateLimitEnabled": "enabled",
+    "rateLimitDisabled": "disabled"
+  }
+}
