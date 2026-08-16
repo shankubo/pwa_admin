@@ -7,6 +7,7 @@ import type {
   VhostSummary,
   HardwareOverview,
 } from "@pwa-admin/shared";
+import { useTranslation } from "react-i18next";
 import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -40,14 +41,11 @@ export function NetworkSecurity() {
 }
 
 function OpenPortsSection() {
+  const { t } = useTranslation("network");
   const [ports, setPorts] = useState<ListeningPort[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  // Purement local — /network/ports ne rapporte pas les règles UFW
-  // existantes, donc rien ne réapparaît "débloqué" tout seul après un
-  // rechargement ; ce badge indique juste "bloqué depuis cette page,
-  // cette session". Le pare-feu reste la source de vérité.
   const [blockedKeys, setBlockedKeys] = useState<Set<string>>(new Set());
   const [sshPort, setSshPort] = useState<number | null>(null);
 
@@ -66,10 +64,6 @@ function OpenPortsSection() {
 
   const portKey = (p: ListeningPort) => `${p.protocol}/${p.port}`;
 
-  // window.location.port is this exact browser tab's own connection to
-  // pwa-admin — the most direct possible signal for "which port is THIS
-  // app listening on", no extra API round-trip needed. Falls back to 443
-  // for the (rare) case of a bare-HTTPS URL with an implicit port.
   const ownPort = Number(window.location.port) || 443;
 
   function isProtectedRow(p: ListeningPort): boolean {
@@ -135,12 +129,12 @@ function OpenPortsSection() {
   return (
     <Card>
       <CardTitle className="flex items-center gap-1">
-        <NetworkIcon className="h-4 w-4" /> Ports ouverts
+        <NetworkIcon className="h-4 w-4" /> {t("ports.title")}
       </CardTitle>
       {error && <p className="text-sm text-destructive">{error}</p>}
       {rowError && <p className="text-sm text-destructive">{rowError}</p>}
-      {!ports && !error && <p className="text-sm text-muted-foreground">Chargement…</p>}
-      {ports && ports.length === 0 && <p className="text-sm text-muted-foreground">Aucun port ouvert détecté.</p>}
+      {!ports && !error && <p className="text-sm text-muted-foreground">{t("ports.loading")}</p>}
+      {ports && ports.length === 0 && <p className="text-sm text-muted-foreground">{t("ports.empty")}</p>}
       {ports && ports.length > 0 && (
         <div className="flex flex-col gap-1">
           {ports.map((p, i) => {
@@ -165,38 +159,36 @@ function OpenPortsSection() {
                     )}
                     {isBlocked && (
                       <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-medium text-destructive">
-                        bloqué
+                        {t("ports.blocked")}
                       </span>
                     )}
                     {protectedRow && (
                       <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary">
-                        protégé
+                        {t("ports.protected")}
                       </span>
                     )}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   {protectedRow ? (
-                    <span className="text-[10px] text-muted-foreground">
-                      Port protégé — ni blocage ni arrêt possibles depuis cet écran.
-                    </span>
+                    <span className="text-[10px] text-muted-foreground">{t("ports.protectedNote")}</span>
                   ) : (
                     <>
                       {isBlocked ? (
                         <Button size="sm" variant="outline" disabled={busyKey === key} onClick={() => unblockPort(p)}>
-                          {busyKey === key ? <Loader2 className="h-3 w-3 animate-spin" /> : "Débloquer"}
+                          {busyKey === key ? <Loader2 className="h-3 w-3 animate-spin" /> : t("ports.unblock")}
                         </Button>
                       ) : (
                         <ConfirmDialog
                           trigger={
                             <Button size="sm" variant="outline" disabled={busyKey === key}>
                               {busyKey === key ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban className="h-3 w-3" />}
-                              Bloquer
+                              {t("ports.block")}
                             </Button>
                           }
-                          title={`Bloquer le port ${p.port}/${p.protocol} ?`}
-                          description="Ferme l'accès à ce port depuis l'extérieur via le pare-feu (ufw deny). Le processus continue de tourner — seule sa joignabilité réseau change. Réversible."
-                          confirmLabel="Bloquer"
+                          title={t("ports.blockConfirmTitle", { port: p.port, protocol: p.protocol })}
+                          description={t("ports.blockConfirmDescription")}
+                          confirmLabel={t("ports.block")}
                           onConfirm={() => blockPort(p)}
                         />
                       )}
@@ -209,20 +201,18 @@ function OpenPortsSection() {
                               ) : (
                                 <Square className="h-3 w-3" />
                               )}
-                              Arrêter
+                              {t("ports.stop")}
                             </Button>
                           }
-                          title={`Arrêter le processus « ${p.processName ?? "?"} » (PID ${p.pid}) ?`}
-                          description="Envoie un signal d'arrêt (SIGTERM) au processus qui écoute sur ce port. Contrairement à « Bloquer », le processus lui-même s'arrête — tout ce qu'il servait devient indisponible, pas seulement injoignable depuis l'extérieur. Action irréversible (il faudra le relancer manuellement)."
+                          title={t("ports.stopConfirmTitle", { process: p.processName ?? "?", pid: p.pid })}
+                          description={t("ports.stopConfirmDescription")}
                           requireTypedConfirmation="STOP"
-                          confirmLabel="Arrêter"
+                          confirmLabel={t("ports.stop")}
                           onConfirm={() => killPort(p)}
                         />
                       )}
                       {p.pid != null && p.ownedByContainer && (
-                        <span className="text-[10px] text-muted-foreground">
-                          Conteneur — utilisez Docker pour l'arrêter.
-                        </span>
+                        <span className="text-[10px] text-muted-foreground">{t("ports.containerNote")}</span>
                       )}
                     </>
                   )}
@@ -237,6 +227,7 @@ function OpenPortsSection() {
 }
 
 function AnalyticsSection() {
+  const { t } = useTranslation("network");
   const [sites, setSites] = useState<VhostSummary[] | null>(null);
   const [selected, setSelected] = useState<string>("");
   const [windowDays, setWindowDays] = useState(7);
@@ -264,7 +255,7 @@ function AnalyticsSection() {
 
   return (
     <Card>
-      <CardTitle>Trafic par site</CardTitle>
+      <CardTitle>{t("analytics.title")}</CardTitle>
       {sites && sites.length > 0 ? (
         <>
           <select
@@ -289,7 +280,7 @@ function AnalyticsSection() {
                   (windowDays === w ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")
                 }
               >
-                {w}j
+                {t("analytics.days", { count: w })}
               </button>
             ))}
           </div>
@@ -297,11 +288,11 @@ function AnalyticsSection() {
           {visitors && (
             <div className="mb-3 grid grid-cols-2 gap-3 text-sm">
               <div>
-                <p className="text-xs text-muted-foreground">Visiteurs uniques</p>
+                <p className="text-xs text-muted-foreground">{t("analytics.uniqueVisitors")}</p>
                 <p className="font-medium">{visitors.uniqueIps}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Requêtes totales</p>
+                <p className="text-xs text-muted-foreground">{t("analytics.totalRequests")}</p>
                 <p className="font-medium">{visitors.totalRequests}</p>
               </div>
             </div>
@@ -309,7 +300,7 @@ function AnalyticsSection() {
 
           {topPages && topPages.length > 0 && (
             <div>
-              <p className="mb-1 text-xs font-medium text-muted-foreground">Pages les plus visitées</p>
+              <p className="mb-1 text-xs font-medium text-muted-foreground">{t("analytics.topPages")}</p>
               <div className="flex flex-col gap-1">
                 {topPages.map((p, i) => (
                   <div key={i} className="flex items-center justify-between text-xs">
@@ -322,13 +313,14 @@ function AnalyticsSection() {
           )}
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">Aucun site.</p>
+        <p className="text-sm text-muted-foreground">{t("analytics.empty")}</p>
       )}
     </Card>
   );
 }
 
 function BlockedIpsSection() {
+  const { t } = useTranslation("network");
   const [blocked, setBlocked] = useState<BlockedIpEntry[] | null>(null);
   const [newIp, setNewIp] = useState("");
   const [newJail, setNewJail] = useState("");
@@ -356,7 +348,7 @@ function BlockedIpsSection() {
     e.preventDefault();
     setFormError(null);
     if (!isValidIp(newIp.trim())) {
-      setFormError("Adresse IP invalide");
+      setFormError(t("blockedIps.invalidIp"));
       return;
     }
     setSubmitting(true);
@@ -378,7 +370,7 @@ function BlockedIpsSection() {
   return (
     <Card>
       <CardTitle className="flex items-center gap-1">
-        <ShieldBan className="h-4 w-4" /> IPs bloquées
+        <ShieldBan className="h-4 w-4" /> {t("blockedIps.title")}
       </CardTitle>
 
       {blocked && blocked.length > 0 ? (
@@ -391,11 +383,11 @@ function BlockedIpsSection() {
                 <ConfirmDialog
                   trigger={
                     <Button size="sm" variant="outline">
-                      Débloquer
+                      {t("blockedIps.unblock")}
                     </Button>
                   }
-                  title={`Débloquer ${b.ip} ?`}
-                  confirmLabel="Débloquer"
+                  title={t("blockedIps.unblockConfirmTitle", { ip: b.ip })}
+                  confirmLabel={t("blockedIps.unblock")}
                   onConfirm={() => unban(b.ip)}
                 />
               </div>
@@ -403,28 +395,28 @@ function BlockedIpsSection() {
           ))}
         </div>
       ) : (
-        <p className="mb-3 text-sm text-muted-foreground">Aucune IP bloquée.</p>
+        <p className="mb-3 text-sm text-muted-foreground">{t("blockedIps.empty")}</p>
       )}
 
       <form onSubmit={ban} className="flex flex-col gap-2">
-        <p className="text-xs font-medium text-muted-foreground">Bloquer une IP</p>
+        <p className="text-xs font-medium text-muted-foreground">{t("blockedIps.formTitle")}</p>
         <input
           type="text"
-          placeholder="192.168.1.10"
+          placeholder={t("blockedIps.ipPlaceholder")}
           value={newIp}
           onChange={(e) => setNewIp(e.target.value)}
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
         />
         <input
           type="text"
-          placeholder="jail (optionnel)"
+          placeholder={t("blockedIps.jailPlaceholder")}
           value={newJail}
           onChange={(e) => setNewJail(e.target.value)}
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
         />
         {formError && <p className="text-xs text-destructive">{formError}</p>}
         <Button type="submit" size="sm" variant="destructive" disabled={submitting}>
-          Bloquer
+          {t("blockedIps.block")}
         </Button>
       </form>
     </Card>

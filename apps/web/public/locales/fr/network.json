@@ -1,0 +1,37 @@
+{
+  "ports": {
+    "title": "Ports ouverts",
+    "loading": "Chargement…",
+    "empty": "Aucun port ouvert détecté.",
+    "blocked": "bloqué",
+    "protected": "protégé",
+    "protectedNote": "Port protégé — ni blocage ni arrêt possibles depuis cet écran.",
+    "unblock": "Débloquer",
+    "block": "Bloquer",
+    "blockConfirmTitle": "Bloquer le port {{port}}/{{protocol}} ?",
+    "blockConfirmDescription": "Ferme l'accès à ce port depuis l'extérieur via le pare-feu (ufw deny). Le processus continue de tourner — seule sa joignabilité réseau change. Réversible.",
+    "stop": "Arrêter",
+    "stopConfirmTitle": "Arrêter le processus « {{process}} » (PID {{pid}}) ?",
+    "stopConfirmDescription": "Envoie un signal d'arrêt (SIGTERM) au processus qui écoute sur ce port. Contrairement à « Bloquer », le processus lui-même s'arrête — tout ce qu'il servait devient indisponible, pas seulement injoignable depuis l'extérieur. Action irréversible (il faudra le relancer manuellement).",
+    "containerNote": "Conteneur — utilisez Docker pour l'arrêter."
+  },
+  "analytics": {
+    "title": "Trafic par site",
+    "empty": "Aucun site.",
+    "uniqueVisitors": "Visiteurs uniques",
+    "totalRequests": "Requêtes totales",
+    "topPages": "Pages les plus visitées",
+    "days": "{{count}}j"
+  },
+  "blockedIps": {
+    "title": "IPs bloquées",
+    "empty": "Aucune IP bloquée.",
+    "unblock": "Débloquer",
+    "unblockConfirmTitle": "Débloquer {{ip}} ?",
+    "formTitle": "Bloquer une IP",
+    "ipPlaceholder": "192.168.1.10",
+    "jailPlaceholder": "jail (optionnel)",
+    "invalidIp": "Adresse IP invalide",
+    "block": "Bloquer"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "ports": {
+    "title": "Open ports",
+    "loading": "Loading…",
+    "empty": "No open port detected.",
+    "blocked": "blocked",
+    "protected": "protected",
+    "protectedNote": "Protected port — neither blocking nor stopping is possible from this screen.",
+    "unblock": "Unblock",
+    "block": "Block",
+    "blockConfirmTitle": "Block port {{port}}/{{protocol}}?",
+    "blockConfirmDescription": "Closes access to this port from the outside via the firewall (ufw deny). The process keeps running — only its network reachability changes. Reversible.",
+    "stop": "Stop",
+    "stopConfirmTitle": "Stop process \"{{process}}\" (PID {{pid}})?",
+    "stopConfirmDescription": "Sends a stop signal (SIGTERM) to the process listening on this port. Unlike \"Block\", the process itself stops — whatever it was serving becomes unavailable, not just unreachable from the outside. Irreversible action (it will need to be restarted manually).",
+    "containerNote": "Container — use Docker to stop it."
+  },
+  "analytics": {
+    "title": "Traffic by site",
+    "empty": "No site.",
+    "uniqueVisitors": "Unique visitors",
+    "totalRequests": "Total requests",
+    "topPages": "Most visited pages",
+    "days": "{{count}}d"
+  },
+  "blockedIps": {
+    "title": "Blocked IPs",
+    "empty": "No blocked IP.",
+    "unblock": "Unblock",
+    "unblockConfirmTitle": "Unblock {{ip}}?",
+    "formTitle": "Block an IP",
+    "ipPlaceholder": "192.168.1.10",
+    "jailPlaceholder": "jail (optional)",
+    "invalidIp": "Invalid IP address",
+    "block": "Block"
+  }
+}
