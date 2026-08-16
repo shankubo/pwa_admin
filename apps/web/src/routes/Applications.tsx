@@ -12,6 +12,7 @@ import type {
   ContainerSummary,
   UsbStatus,
 } from "@pwa-admin/shared";
+import { useTranslation } from "react-i18next";
 import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -34,20 +35,20 @@ import {
 } from "lucide-react";
 
 interface CronPreset {
-  label: string;
+  labelKey: string;
   value: string;
-  hint: string;
+  hintKey: string;
 }
 
 const CRON_PRESETS: CronPreset[] = [
-  { label: "Toutes les heures", value: "0 * * * *", hint: "à chaque heure pile" },
-  { label: "Toutes les 6 heures", value: "0 */6 * * *", hint: "00h, 06h, 12h, 18h" },
-  { label: "Quotidien à 2h", value: "0 2 * * *", hint: "chaque jour à 2h00 du matin" },
-  { label: "Quotidien à 3h", value: "0 3 * * *", hint: "chaque jour à 3h00 du matin" },
-  { label: "Toutes les 12h", value: "0 */12 * * *", hint: "00h et 12h" },
-  { label: "Hebdomadaire (dimanche 3h)", value: "0 3 * * 0", hint: "chaque dimanche à 3h00" },
-  { label: "Hebdomadaire (lundi 3h)", value: "0 3 * * 1", hint: "chaque lundi à 3h00" },
-  { label: "Mensuel (1er du mois, 3h)", value: "0 3 1 * *", hint: "le 1er de chaque mois à 3h00" },
+  { labelKey: "cronPresets.hourly.label", value: "0 * * * *", hintKey: "cronPresets.hourly.hint" },
+  { labelKey: "cronPresets.every6h.label", value: "0 */6 * * *", hintKey: "cronPresets.every6h.hint" },
+  { labelKey: "cronPresets.daily2am.label", value: "0 2 * * *", hintKey: "cronPresets.daily2am.hint" },
+  { labelKey: "cronPresets.daily3am.label", value: "0 3 * * *", hintKey: "cronPresets.daily3am.hint" },
+  { labelKey: "cronPresets.every12h.label", value: "0 */12 * * *", hintKey: "cronPresets.every12h.hint" },
+  { labelKey: "cronPresets.weeklySun3am.label", value: "0 3 * * 0", hintKey: "cronPresets.weeklySun3am.hint" },
+  { labelKey: "cronPresets.weeklyMon3am.label", value: "0 3 * * 1", hintKey: "cronPresets.weeklyMon3am.hint" },
+  { labelKey: "cronPresets.monthly3am.label", value: "0 3 1 * *", hintKey: "cronPresets.monthly3am.hint" },
 ];
 
 /** Cron frequency picker: dropdown of common presets + a "Personnalisé" mode
@@ -62,6 +63,7 @@ function CronPicker({
   onChange: (v: string) => void;
   label: string;
 }) {
+  const { t } = useTranslation("applications");
   const matchedPreset = CRON_PRESETS.find((p) => p.value === value);
   const [mode, setMode] = useState<"none" | "preset" | "custom">(
     value ? (matchedPreset ? "preset" : "custom") : "none"
@@ -82,9 +84,9 @@ function CronPicker({
         onChange={(e) => handleModeChange(e.target.value as "none" | "preset" | "custom")}
         className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
       >
-        <option value="none">Désactivé</option>
-        <option value="preset">Fréquence prédéfinie</option>
-        <option value="custom">Expression cron personnalisée</option>
+        <option value="none">{t("cronPicker.disabled")}</option>
+        <option value="preset">{t("cronPicker.presetMode")}</option>
+        <option value="custom">{t("cronPicker.customMode")}</option>
       </select>
 
       {mode === "preset" && (
@@ -95,7 +97,7 @@ function CronPicker({
         >
           {CRON_PRESETS.map((p) => (
             <option key={p.value} value={p.value}>
-              {p.label}
+              {t(p.labelKey)}
             </option>
           ))}
         </select>
@@ -105,26 +107,26 @@ function CronPicker({
         <>
           <input
             type="text"
-            placeholder="ex: 0 3 * * * (minute heure jour mois jour-semaine)"
+            placeholder={t("cronPicker.customPlaceholder")}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-primary"
           />
           <p className="text-xs text-muted-foreground">
-            Format : minute (0-59) heure (0-23) jour-du-mois (1-31) mois (1-12) jour-semaine (0-6, 0=dimanche). Ex :{" "}
-            <code className="rounded bg-muted px-1">0 3 * * *</code> = tous les jours à 3h00.
+            {t("cronPicker.formatHelp")} <code className="rounded bg-muted px-1">0 3 * * *</code>
           </p>
         </>
       )}
 
       {mode === "preset" && matchedPreset && (
-        <p className="text-xs text-muted-foreground">{matchedPreset.hint}</p>
+        <p className="text-xs text-muted-foreground">{t(matchedPreset.hintKey)}</p>
       )}
     </div>
   );
 }
 
 function HelpPanel() {
+  const { t } = useTranslation("applications");
   const [open, setOpen] = useState(false);
 
   return (
@@ -136,7 +138,7 @@ function HelpPanel() {
       >
         <span className="flex items-center gap-1.5 text-sm font-medium">
           <Info className="h-4 w-4 shrink-0 text-primary" />
-          Comment fonctionne ce système de sauvegarde ?
+          {t("help.question")}
         </span>
         {open ? (
           <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -148,64 +150,38 @@ function HelpPanel() {
       {open && (
         <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3 text-sm">
           <div>
-            <p className="font-medium">Qu'est-ce qu'une « Application » ?</p>
-            <p className="mt-1 text-muted-foreground">
-              Un regroupement logique de tout ce qui appartient à un même site/service que vous gérez sur le Pi :
-              son ou ses conteneurs Docker, les dossiers qui contiennent ses vraies données (photos, uploads,
-              fichiers de config — ce qu'on appelle des « bind mounts »), et éventuellement sa base de données.
-              Sans ce regroupement, il faudrait sauvegarder chaque dossier et chaque base séparément et se souvenir
-              lesquels vont ensemble.
-            </p>
+            <p className="font-medium">{t("help.whatIsApp.title")}</p>
+            <p className="mt-1 text-muted-foreground">{t("help.whatIsApp.text")}</p>
           </div>
 
           <div>
-            <p className="font-medium">Backup complet vs backup partiel</p>
+            <p className="font-medium">{t("help.fullVsPartial.title")}</p>
             <ul className="mt-1 list-disc space-y-1 pl-4 text-muted-foreground">
               <li>
-                <span className="font-medium text-foreground">Complet</span> : capture l'état entier des dossiers à
-                cet instant, comme un point de sauvegarde autonome.
+                <span className="font-medium text-foreground">{t("help.fullVsPartial.fullLabel")}</span>
+                {t("help.fullVsPartial.fullText")}
               </li>
               <li>
-                <span className="font-medium text-foreground">Partiel</span> : ne copie physiquement que les
-                fichiers nouveaux ou modifiés depuis le dernier backup (complet ou partiel). Les fichiers
-                inchangés ne sont pas dupliqués — ils sont liés au backup précédent, donc chaque backup partiel
-                reste consultable comme un instantané complet, sans consommer d'espace disque supplémentaire pour
-                ce qui n'a pas changé.
+                <span className="font-medium text-foreground">{t("help.fullVsPartial.partialLabel")}</span>
+                {t("help.fullVsPartial.partialText")}
               </li>
             </ul>
-            <p className="mt-1 text-muted-foreground">
-              La base de données, elle, est toujours sauvegardée intégralement à chaque backup (complet ou
-              partiel) — les dumps de base de données sont rapides, il n'y a pas besoin de version « partielle ».
-            </p>
+            <p className="mt-1 text-muted-foreground">{t("help.fullVsPartial.dbNote")}</p>
           </div>
 
           <div>
-            <p className="font-medium">Planification automatique</p>
-            <p className="mt-1 text-muted-foreground">
-              Une bonne pratique courante : backup partiel tous les jours (rapide, capture les changements
-              récents) et backup complet une fois par semaine (point de repère solide et indépendant). Les deux
-              plannings sont indépendants et optionnels — vous pouvez aussi tout déclencher manuellement avec les
-              boutons « Backup complet » / « Backup partiel » sur chaque application.
-            </p>
+            <p className="font-medium">{t("help.scheduling.title")}</p>
+            <p className="mt-1 text-muted-foreground">{t("help.scheduling.text")}</p>
           </div>
 
           <div>
-            <p className="font-medium">Restauration</p>
-            <p className="mt-1 text-muted-foreground">
-              Dépliez une application pour voir son historique de backups, puis choisissez un point dans le temps
-              à restaurer. La restauration écrase les fichiers actuels par ceux du backup choisi — une confirmation
-              explicite (taper « RESTORE ») est demandée avant toute action, et un backup de sécurité de l'état
-              actuel est automatiquement pris juste avant, au cas où.
-            </p>
+            <p className="font-medium">{t("help.restore.title")}</p>
+            <p className="mt-1 text-muted-foreground">{t("help.restore.text")}</p>
           </div>
 
           <div>
-            <p className="font-medium">Stockage local et Google Drive</p>
-            <p className="mt-1 text-muted-foreground">
-              Les backups sont toujours écrits localement sur le Pi. Vous pouvez en plus cocher « gdrive » pour
-              qu'une copie soit envoyée automatiquement sur Google Drive (nécessite d'être connecté depuis l'écran
-              Backups) — utile pour survivre à une panne du Pi lui-même, pas seulement à une erreur applicative.
-            </p>
+            <p className="font-medium">{t("help.storage.title")}</p>
+            <p className="mt-1 text-muted-foreground">{t("help.storage.text")}</p>
           </div>
         </div>
       )}
@@ -214,6 +190,7 @@ function HelpPanel() {
 }
 
 export function Applications() {
+  const { t } = useTranslation("applications");
   const [searchParams, setSearchParams] = useSearchParams();
   const prefillContainer = searchParams.get("container");
   const [apps, setApps] = useState<Application[] | null>(null);
@@ -269,9 +246,9 @@ export function Applications() {
 
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-muted-foreground">Applications</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground">{t("sectionTitle")}</h2>
           <Button size="sm" variant="outline" onClick={() => setShowNewApp((v) => !v)}>
-            {showNewApp ? "Annuler" : "Nouvelle application"}
+            {showNewApp ? t("cancel") : t("newApp")}
           </Button>
         </div>
 
@@ -287,9 +264,9 @@ export function Applications() {
         )}
 
         <div className="flex flex-col gap-3">
-          {!apps && <Card className="text-sm text-muted-foreground">Chargement…</Card>}
+          {!apps && <Card className="text-sm text-muted-foreground">{t("loading")}</Card>}
           {apps?.length === 0 && (
-            <Card className="text-sm text-muted-foreground">Aucune application configurée.</Card>
+            <Card className="text-sm text-muted-foreground">{t("empty")}</Card>
           )}
           {apps?.map((app) => (
             <AppCard
@@ -329,6 +306,7 @@ function AppCard({
   onBackup: (kind: AppBackupRunKind) => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation("applications");
   return (
     <Card className={appCardClass(lastRunStatus)}>
       <div className="flex items-start justify-between gap-2">
@@ -344,10 +322,8 @@ function AppCard({
             ))}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            {app.paths.length} chemin{app.paths.length > 1 ? "s" : ""}
-            {app.volumeNames.length > 0 && (
-              <> · {app.volumeNames.length} volume{app.volumeNames.length > 1 ? "s" : ""}</>
-            )}
+            {t("paths", { count: app.paths.length })}
+            {app.volumeNames.length > 0 && <> · {t("volumes", { count: app.volumeNames.length })}</>}
             {app.dbRef && (
               <>
                 {" · "}
@@ -358,7 +334,7 @@ function AppCard({
             )}
           </p>
           <p className="text-xs text-muted-foreground">
-            cibles : {app.targets.join(", ")}
+            {t("targetsLabel", { targets: app.targets.join(", ") })}
             {app.scheduleFullCron ? ` · full: ${app.scheduleFullCron}` : ""}
             {app.schedulePartialCron ? ` · partial: ${app.schedulePartialCron}` : ""}
           </p>
@@ -366,10 +342,10 @@ function AppCard({
         <div className="flex shrink-0 flex-col gap-2">
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={() => onBackup("full")}>
-              Backup complet
+              {t("fullBackup")}
             </Button>
             <Button size="sm" variant="outline" onClick={() => onBackup("partial")}>
-              Backup partiel
+              {t("partialBackup")}
             </Button>
             <ConfirmDialog
               trigger={
@@ -377,8 +353,8 @@ function AppCard({
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               }
-              title={`Supprimer l'application ${app.name} ?`}
-              confirmLabel="Supprimer"
+              title={t("deleteConfirm.title", { name: app.name })}
+              confirmLabel={t("deleteConfirm.confirmLabel")}
               onConfirm={onDelete}
             />
           </div>
@@ -393,7 +369,7 @@ function AppCard({
             to="/restore"
             className="mt-3 flex items-center justify-center gap-1 border-t border-border pt-3 text-xs text-primary underline"
           >
-            Voir dans Restore <ArrowRight className="h-3 w-3" />
+            {t("viewInRestore")} <ArrowRight className="h-3 w-3" />
           </Link>
         </>
       )}
@@ -408,6 +384,7 @@ function AppCard({
  * of destructive restore actions).
  */
 function AppImageHistory({ containerNames }: { containerNames: string[] }) {
+  const { t } = useTranslation("applications");
   const [historyByContainer, setHistoryByContainer] = useState<Record<string, BackupHistoryEntry[]>>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -428,7 +405,7 @@ function AppImageHistory({ containerNames }: { containerNames: string[] }) {
 
   return (
     <div className="mt-3 border-t border-border pt-3">
-      <p className="mb-2 text-xs font-semibold text-muted-foreground">Images de conteneur sauvegardées</p>
+      <p className="mb-2 text-xs font-semibold text-muted-foreground">{t("imageHistoryTitle")}</p>
       {error && <p className="text-xs text-destructive">{error}</p>}
       {containerNames.map((name) => {
         const rows = historyByContainer[name] ?? [];
@@ -464,20 +441,21 @@ function AppImageHistory({ containerNames }: { containerNames: string[] }) {
  * the DB dump's own dbDriveFileId, which uploads synchronously since dumps are
  * small — this tracks the potentially multi-GB, asynchronous file upload). */
 function DriveUploadIndicator({ run }: { run: AppBackupRun }) {
+  const { t } = useTranslation("applications");
   switch (run.driveUploadStatus) {
     case "none":
       return null;
     case "pending":
       return (
         <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-          <Cloud className="h-3.5 w-3.5" /> En attente d'envoi vers Google Drive…
+          <Cloud className="h-3.5 w-3.5" /> {t("driveUpload.pending")}
         </p>
       );
     case "compressing":
       return (
         <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Préparation de l'archive avant envoi… (peut prendre plusieurs minutes pour de gros dossiers)
+          {t("driveUpload.compressing")}
         </p>
       );
     case "uploading":
@@ -485,7 +463,7 @@ function DriveUploadIndicator({ run }: { run: AppBackupRun }) {
         <div className="mt-1 flex flex-col gap-1">
           <p className="flex items-center gap-1 text-xs text-warning">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Envoi vers Google Drive… {run.driveUploadProgressPct ?? 0}%
+            {t("driveUpload.uploading", { pct: run.driveUploadProgressPct ?? 0 })}
           </p>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
             <div
@@ -498,15 +476,16 @@ function DriveUploadIndicator({ run }: { run: AppBackupRun }) {
     case "success":
       return (
         <p className="mt-1 flex items-center gap-1 text-xs text-primary">
-          <CheckCircle2 className="h-3.5 w-3.5" /> Envoyé sur Google Drive ({run.driveFileIds?.length ?? 0}{" "}
-          fichier{(run.driveFileIds?.length ?? 0) > 1 ? "s" : ""})
+          <CheckCircle2 className="h-3.5 w-3.5" /> {t("driveUpload.success", { count: run.driveFileIds?.length ?? 0 })}
         </p>
       );
     case "failed":
       return (
         <p className="mt-1 flex items-center gap-1 text-xs text-destructive">
-          <XCircle className="h-3.5 w-3.5" /> Échec de l'envoi vers Google Drive
-          {run.driveUploadError ? ` : ${run.driveUploadError}` : ""}
+          <XCircle className="h-3.5 w-3.5" />{" "}
+          {t("driveUpload.failed", {
+            suffix: run.driveUploadError ? t("driveUpload.failedSuffix", { error: run.driveUploadError }) : "",
+          })}
         </p>
       );
     default:
@@ -518,6 +497,7 @@ function DriveUploadIndicator({ run }: { run: AppBackupRun }) {
  * here, so this page stays purely about creating/managing backups and can't
  * accidentally overwrite live data with a misclick. */
 function AppRunHistory({ appId }: { appId: number }) {
+  const { t } = useTranslation("applications");
   const [runs, setRuns] = useState<AppBackupRun[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -544,10 +524,10 @@ function AppRunHistory({ appId }: { appId: number }) {
 
   return (
     <div className="mt-3 border-t border-border pt-3">
-      <p className="mb-2 text-xs font-semibold text-muted-foreground">Historique des runs</p>
+      <p className="mb-2 text-xs font-semibold text-muted-foreground">{t("runHistory.title")}</p>
       {error && <p className="text-xs text-destructive">{error}</p>}
-      {!runs && !error && <p className="text-xs text-muted-foreground">Chargement…</p>}
-      {runs?.length === 0 && <p className="text-xs text-muted-foreground">Aucun run pour cette application.</p>}
+      {!runs && !error && <p className="text-xs text-muted-foreground">{t("runHistory.loading")}</p>}
+      {runs?.length === 0 && <p className="text-xs text-muted-foreground">{t("runHistory.empty")}</p>}
       <div className="flex flex-col gap-2">
         {runs?.map((run) => (
           <div key={run.runId} className="rounded-md border border-border p-2 text-sm">
@@ -558,7 +538,7 @@ function AppRunHistory({ appId }: { appId: number }) {
                   (run.kind === "full" ? "bg-primary/15 text-primary" : "bg-warning/15 text-warning")
                 }
               >
-                {run.kind === "full" ? "Backup complet" : "Backup partiel"}
+                {run.kind === "full" ? t("fullBackup") : t("partialBackup")}
               </span>
               <span
                 className={
@@ -576,11 +556,13 @@ function AppRunHistory({ appId }: { appId: number }) {
             <p className="mt-1 text-xs text-muted-foreground">
               {new Date(run.startedAt).toLocaleString()}
               {run.finishedAt && run.startedAt
-                ? ` · ${((new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000).toFixed(1)}s`
+                ? t("runHistory.durationSuffix", {
+                    duration: ((new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000).toFixed(1),
+                  })
                 : ""}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {run.filesChanged != null ? `${run.filesChanged} fichiers modifiés` : ""}
+              {run.filesChanged != null ? t("runHistory.filesChanged", { count: run.filesChanged }) : ""}
               {run.sizeBytes != null ? ` · ${formatBytes(run.sizeBytes)}` : ""}
             </p>
             <DriveUploadIndicator run={run} />

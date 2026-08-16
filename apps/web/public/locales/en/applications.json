@@ -1,0 +1,81 @@
+{
+  "cronPresets": {
+    "hourly": { "label": "Every hour", "hint": "on the hour" },
+    "every6h": { "label": "Every 6 hours", "hint": "00:00, 06:00, 12:00, 18:00" },
+    "daily2am": { "label": "Daily at 2am", "hint": "every day at 2:00am" },
+    "daily3am": { "label": "Daily at 3am", "hint": "every day at 3:00am" },
+    "every12h": { "label": "Every 12h", "hint": "00:00 and 12:00" },
+    "weeklySun3am": { "label": "Weekly (Sunday 3am)", "hint": "every Sunday at 3:00am" },
+    "weeklyMon3am": { "label": "Weekly (Monday 3am)", "hint": "every Monday at 3:00am" },
+    "monthly3am": { "label": "Monthly (1st of month, 3am)", "hint": "the 1st of every month at 3:00am" }
+  },
+  "cronPicker": {
+    "disabled": "Disabled",
+    "presetMode": "Preset frequency",
+    "customMode": "Custom cron expression",
+    "customPlaceholder": "e.g. 0 3 * * * (minute hour day month weekday)",
+    "formatHelp": "Format: minute (0-59) hour (0-23) day-of-month (1-31) month (1-12) day-of-week (0-6, 0=Sunday). E.g.:"
+  },
+  "help": {
+    "question": "How does this backup system work?",
+    "whatIsApp": {
+      "title": "What is an \"Application\"?",
+      "text": "A logical grouping of everything belonging to the same site/service you manage on the Pi: its Docker container(s), the folders holding its real data (photos, uploads, config files — known as \"bind mounts\"), and optionally its database. Without this grouping, you'd have to back up each folder and database separately and remember which ones belong together."
+    },
+    "fullVsPartial": {
+      "title": "Full backup vs partial backup",
+      "fullLabel": "Full",
+      "fullText": ": captures the entire state of the folders at that moment, as a standalone backup point.",
+      "partialLabel": "Partial",
+      "partialText": ": only physically copies files that are new or modified since the last backup (full or partial). Unchanged files aren't duplicated — they're linked to the previous backup, so every partial backup remains browsable as a complete snapshot, without using extra disk space for what hasn't changed.",
+      "dbNote": "The database, on the other hand, is always backed up in full on every backup (full or partial) — database dumps are fast, so there's no need for a \"partial\" version."
+    },
+    "scheduling": {
+      "title": "Automatic scheduling",
+      "text": "A common good practice: partial backup every day (fast, captures recent changes) and full backup once a week (a solid, independent reference point). Both schedules are independent and optional — you can also trigger everything manually with the \"Full backup\" / \"Partial backup\" buttons on each application."
+    },
+    "restore": {
+      "title": "Restore",
+      "text": "Expand an application to see its backup history, then pick a point in time to restore. Restoring overwrites the current files with those from the chosen backup — explicit confirmation (typing \"RESTORE\") is required before any action, and a safety backup of the current state is automatically taken just before, just in case."
+    },
+    "storage": {
+      "title": "Local storage and Google Drive",
+      "text": "Backups are always written locally on the Pi. You can additionally check \"gdrive\" to have a copy automatically sent to Google Drive (requires being connected from the Backups screen) — useful to survive a failure of the Pi itself, not just an application error."
+    }
+  },
+  "sectionTitle": "Applications",
+  "cancel": "Cancel",
+  "newApp": "New application",
+  "loading": "Loading…",
+  "empty": "No application configured.",
+  "paths_one": "{{count}} path",
+  "paths_other": "{{count}} paths",
+  "volumes_one": "{{count}} volume",
+  "volumes_other": "{{count}} volumes",
+  "targetsLabel": "targets: {{targets}}",
+  "fullBackup": "Full backup",
+  "partialBackup": "Partial backup",
+  "deleteConfirm": {
+    "title": "Delete application {{name}}?",
+    "confirmLabel": "Delete"
+  },
+  "viewInRestore": "View in Restore",
+  "imageHistoryTitle": "Saved container images",
+  "driveUpload": {
+    "pending": "Waiting to send to Google Drive…",
+    "compressing": "Preparing archive before sending… (can take several minutes for large folders)",
+    "uploading": "Sending to Google Drive… {{pct}}%",
+    "success_one": "Sent to Google Drive ({{count}} file)",
+    "success_other": "Sent to Google Drive ({{count}} files)",
+    "failed": "Failed to send to Google Drive{{suffix}}",
+    "failedSuffix": ": {{error}}"
+  },
+  "runHistory": {
+    "title": "Run history",
+    "loading": "Loading…",
+    "empty": "No run for this application.",
+    "durationSuffix": " · {{duration}}s",
+    "filesChanged_one": "{{count}} file changed",
+    "filesChanged_other": "{{count}} files changed"
+  }
+}

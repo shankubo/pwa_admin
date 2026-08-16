@@ -1,0 +1,81 @@
+{
+  "cronPresets": {
+    "hourly": { "label": "Toutes les heures", "hint": "à chaque heure pile" },
+    "every6h": { "label": "Toutes les 6 heures", "hint": "00h, 06h, 12h, 18h" },
+    "daily2am": { "label": "Quotidien à 2h", "hint": "chaque jour à 2h00 du matin" },
+    "daily3am": { "label": "Quotidien à 3h", "hint": "chaque jour à 3h00 du matin" },
+    "every12h": { "label": "Toutes les 12h", "hint": "00h et 12h" },
+    "weeklySun3am": { "label": "Hebdomadaire (dimanche 3h)", "hint": "chaque dimanche à 3h00" },
+    "weeklyMon3am": { "label": "Hebdomadaire (lundi 3h)", "hint": "chaque lundi à 3h00" },
+    "monthly3am": { "label": "Mensuel (1er du mois, 3h)", "hint": "le 1er de chaque mois à 3h00" }
+  },
+  "cronPicker": {
+    "disabled": "Désactivé",
+    "presetMode": "Fréquence prédéfinie",
+    "customMode": "Expression cron personnalisée",
+    "customPlaceholder": "ex: 0 3 * * * (minute heure jour mois jour-semaine)",
+    "formatHelp": "Format : minute (0-59) heure (0-23) jour-du-mois (1-31) mois (1-12) jour-semaine (0-6, 0=dimanche). Ex :"
+  },
+  "help": {
+    "question": "Comment fonctionne ce système de sauvegarde ?",
+    "whatIsApp": {
+      "title": "Qu'est-ce qu'une « Application » ?",
+      "text": "Un regroupement logique de tout ce qui appartient à un même site/service que vous gérez sur le Pi : son ou ses conteneurs Docker, les dossiers qui contiennent ses vraies données (photos, uploads, fichiers de config — ce qu'on appelle des « bind mounts »), et éventuellement sa base de données. Sans ce regroupement, il faudrait sauvegarder chaque dossier et chaque base séparément et se souvenir lesquels vont ensemble."
+    },
+    "fullVsPartial": {
+      "title": "Backup complet vs backup partiel",
+      "fullLabel": "Complet",
+      "fullText": " : capture l'état entier des dossiers à cet instant, comme un point de sauvegarde autonome.",
+      "partialLabel": "Partiel",
+      "partialText": " : ne copie physiquement que les fichiers nouveaux ou modifiés depuis le dernier backup (complet ou partiel). Les fichiers inchangés ne sont pas dupliqués — ils sont liés au backup précédent, donc chaque backup partiel reste consultable comme un instantané complet, sans consommer d'espace disque supplémentaire pour ce qui n'a pas changé.",
+      "dbNote": "La base de données, elle, est toujours sauvegardée intégralement à chaque backup (complet ou partiel) — les dumps de base de données sont rapides, il n'y a pas besoin de version « partielle »."
+    },
+    "scheduling": {
+      "title": "Planification automatique",
+      "text": "Une bonne pratique courante : backup partiel tous les jours (rapide, capture les changements récents) et backup complet une fois par semaine (point de repère solide et indépendant). Les deux plannings sont indépendants et optionnels — vous pouvez aussi tout déclencher manuellement avec les boutons « Backup complet » / « Backup partiel » sur chaque application."
+    },
+    "restore": {
+      "title": "Restauration",
+      "text": "Dépliez une application pour voir son historique de backups, puis choisissez un point dans le temps à restaurer. La restauration écrase les fichiers actuels par ceux du backup choisi — une confirmation explicite (taper « RESTORE ») est demandée avant toute action, et un backup de sécurité de l'état actuel est automatiquement pris juste avant, au cas où."
+    },
+    "storage": {
+      "title": "Stockage local et Google Drive",
+      "text": "Les backups sont toujours écrits localement sur le Pi. Vous pouvez en plus cocher « gdrive » pour qu'une copie soit envoyée automatiquement sur Google Drive (nécessite d'être connecté depuis l'écran Backups) — utile pour survivre à une panne du Pi lui-même, pas seulement à une erreur applicative."
+    }
+  },
+  "sectionTitle": "Applications",
+  "cancel": "Annuler",
+  "newApp": "Nouvelle application",
+  "loading": "Chargement…",
+  "empty": "Aucune application configurée.",
+  "paths_one": "{{count}} chemin",
+  "paths_other": "{{count}} chemins",
+  "volumes_one": "{{count}} volume",
+  "volumes_other": "{{count}} volumes",
+  "targetsLabel": "cibles : {{targets}}",
+  "fullBackup": "Backup complet",
+  "partialBackup": "Backup partiel",
+  "deleteConfirm": {
+    "title": "Supprimer l'application {{name}} ?",
+    "confirmLabel": "Supprimer"
+  },
+  "viewInRestore": "Voir dans Restore",
+  "imageHistoryTitle": "Images de conteneur sauvegardées",
+  "driveUpload": {
+    "pending": "En attente d'envoi vers Google Drive…",
+    "compressing": "Préparation de l'archive avant envoi… (peut prendre plusieurs minutes pour de gros dossiers)",
+    "uploading": "Envoi vers Google Drive… {{pct}}%",
+    "success_one": "Envoyé sur Google Drive ({{count}} fichier)",
+    "success_other": "Envoyé sur Google Drive ({{count}} fichiers)",
+    "failed": "Échec de l'envoi vers Google Drive{{suffix}}",
+    "failedSuffix": " : {{error}}"
+  },
+  "runHistory": {
+    "title": "Historique des runs",
+    "loading": "Chargement…",
+    "empty": "Aucun run pour cette application.",
+    "durationSuffix": " · {{duration}}s",
+    "filesChanged_one": "{{count}} fichier modifié",
+    "filesChanged_other": "{{count}} fichiers modifiés"
+  }
+}
