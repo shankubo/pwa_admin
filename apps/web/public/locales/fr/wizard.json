@@ -1,0 +1,32 @@
+{
+  "title": "Assistant",
+  "step1": "Étape 1 — Que souhaitez-vous faire ?",
+  "back": "Retour",
+  "actions": {
+    "backup": {
+      "label": "Sauvegarde",
+      "description": "Créer une sauvegarde d'un site ou d'une donnée du serveur."
+    },
+    "restore": {
+      "label": "Restauration",
+      "description": "Restaurer une sauvegarde existante."
+    },
+    "migration": {
+      "label": "Migration",
+      "description": "Créer ou restaurer un instantané complet du serveur, pour le déplacer ou le reconstruire."
+    },
+    "other": {
+      "label": "Autres",
+      "description": "Accéder à d'autres opérations d'administration."
+    }
+  },
+  "otherList": {
+    "links": {
+      "sites": "Sites & domaines",
+      "osUpdates": "Mises à jour système",
+      "services": "Services (Docker/PM2/Tailscale)",
+      "security": "Sécurité serveur"
+    },
+    "open": "Ouvrir"
+  }
+}

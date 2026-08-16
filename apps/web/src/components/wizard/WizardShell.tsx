@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface WizardShellProps {
   title: string;
@@ -12,6 +13,7 @@ interface WizardShellProps {
  * layout Restore.tsx hand-rolls inline, factored out so Backup/Restore/
  * Migration don't each redefine it. */
 export function WizardShell({ title, stepLabel, onBack, children }: WizardShellProps) {
+  const { t } = useTranslation("wizard");
   return (
     <div className="flex flex-col gap-4">
       {onBack && (
@@ -20,7 +22,7 @@ export function WizardShell({ title, stepLabel, onBack, children }: WizardShellP
           onClick={onBack}
           className="flex items-center gap-1 self-start text-sm text-muted-foreground"
         >
-          <ArrowLeft className="h-4 w-4" /> Retour
+          <ArrowLeft className="h-4 w-4" /> {t("back")}
         </button>
       )}
       <div>

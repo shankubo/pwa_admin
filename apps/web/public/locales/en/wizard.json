@@ -1,0 +1,32 @@
+{
+  "title": "Wizard",
+  "step1": "Step 1 — What would you like to do?",
+  "back": "Back",
+  "actions": {
+    "backup": {
+      "label": "Backup",
+      "description": "Create a backup of a site or server data."
+    },
+    "restore": {
+      "label": "Restore",
+      "description": "Restore an existing backup."
+    },
+    "migration": {
+      "label": "Migration",
+      "description": "Create or restore a full server snapshot, to move or rebuild it."
+    },
+    "other": {
+      "label": "Other",
+      "description": "Access other administration operations."
+    }
+  },
+  "otherList": {
+    "links": {
+      "sites": "Sites & domains",
+      "osUpdates": "System updates",
+      "services": "Services (Docker/PM2/Tailscale)",
+      "security": "Server security"
+    },
+    "open": "Open"
+  }
+}
