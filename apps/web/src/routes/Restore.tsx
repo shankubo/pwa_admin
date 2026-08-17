@@ -15,6 +15,7 @@ import type {
   MigrationManifestFileList,
   WsServerFrame,
 } from "@pwa-admin/shared";
+import { useTranslation } from "react-i18next";
 import { apiJson, apiFetch } from "@/lib/api";
 import { useWsChannel } from "@/lib/ws";
 import { Card, CardTitle } from "@/components/ui/Card";
@@ -49,6 +50,7 @@ type SelectedItem =
 type Source = "local" | "usb" | "gdrive" | "upload" | "migration";
 
 export function Restore() {
+  const { t } = useTranslation("restore");
   const location = useLocation();
   const preselectedManifestId = (location.state as { manifestId?: string } | null)?.manifestId ?? null;
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -165,7 +167,7 @@ export function Restore() {
           onClick={() => setStep((s) => ((s - 1) as 1 | 2 | 3))}
           className="flex items-center gap-1 self-start text-sm text-muted-foreground"
         >
-          <ArrowLeft className="h-4 w-4" /> Retour
+          <ArrowLeft className="h-4 w-4" /> {t("back")}
         </button>
       )}
 
@@ -315,49 +317,50 @@ function StepSource({
   onSelect: (source: Source) => void;
   onUploaded: (result: BackupUploadResult, sourceType: BackupUploadSourceKind, sourceRef: string) => void;
 }) {
+  const { t } = useTranslation("restore");
   const [showUpload, setShowUpload] = useState(false);
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm text-muted-foreground">Étape 1 — Choisissez la source de la sauvegarde à restaurer.</p>
+      <p className="text-sm text-muted-foreground">{t("stepSource.intro")}</p>
       <div className="grid grid-cols-2 gap-3">
         <SourceTile
           icon={HardDrive}
-          label="Local"
-          description="Restaurer à partir d'une sauvegarde déjà présente sur ce serveur."
+          label={t("stepSource.local.label")}
+          description={t("stepSource.local.description")}
           enabled={localAvailable}
-          disabledReason="Aucune sauvegarde locale"
+          disabledReason={t("stepSource.local.disabledReason")}
           onClick={() => onSelect("local")}
         />
         <SourceTile
           icon={Usb}
-          label="USB"
-          description="Restaurer depuis un disque externe branché (la sauvegarde doit se trouver dans BACKUP/<nom du serveur>/... sur ce disque)."
+          label={t("stepSource.usb.label")}
+          description={t("stepSource.usb.description")}
           enabled={usbAvailable}
-          disabledReason="Aucun disque USB connecté"
+          disabledReason={t("stepSource.usb.disabledReason")}
           onClick={() => onSelect("usb")}
         />
         <SourceTile
           icon={Cloud}
-          label="Google Drive"
-          description="Si Google Drive est connecté, la sauvegarde est d'abord téléchargée automatiquement sur ce serveur, puis restaurée."
+          label={t("stepSource.gdrive.label")}
+          description={t("stepSource.gdrive.description")}
           enabled={gdriveAuthorized}
-          disabledReason="Google Drive non connecté"
+          disabledReason={t("stepSource.gdrive.disabledReason")}
           onClick={() => onSelect("gdrive")}
         />
         <SourceTile
           icon={Upload}
-          label="Téléverser"
-          description="Envoyer un fichier de sauvegarde depuis votre appareil (PC/téléphone) vers ce serveur, puis le restaurer directement."
+          label={t("stepSource.upload.label")}
+          description={t("stepSource.upload.description")}
           enabled
           onClick={() => setShowUpload(true)}
         />
         <SourceTile
           icon={Shuffle}
-          label="Migration serveur"
-          description="Restaurer un instantané complet capturé depuis un disque externe (USB) : sites, données et paquets système sont réinstallés à l'identique — pour remplacer ou reconstruire un serveur."
+          label={t("stepSource.migration.label")}
+          description={t("stepSource.migration.description")}
           enabled={migrationAvailable}
-          disabledReason="Aucun instantané de migration sur le disque USB"
+          disabledReason={t("stepSource.migration.disabledReason")}
           onClick={() => onSelect("migration")}
         />
       </div>
@@ -407,6 +410,7 @@ function UploadForm({
   onCancel: () => void;
   onUploaded: (result: BackupUploadResult, sourceType: BackupUploadSourceKind, sourceRef: string) => void;
 }) {
+  const { t } = useTranslation("restore");
   const [file, setFile] = useState<File | null>(null);
   const [sourceType, setSourceType] = useState<BackupUploadSourceKind>("volume");
   const [sourceRef, setSourceRef] = useState("");
@@ -416,7 +420,7 @@ function UploadForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!file || !sourceRef.trim()) {
-      setError("Fichier et référence source requis");
+      setError(t("uploadForm.validationError"));
       return;
     }
     setUploading(true);
@@ -429,7 +433,7 @@ function UploadForm({
       const res = await apiFetch("/backups/uploads", { method: "POST", body: form });
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: "unknown_error" }));
-        throw new Error(body.error ?? `Échec de l'upload (${res.status})`);
+        throw new Error(body.error ?? t("uploadForm.uploadFailedError", { status: res.status }));
       }
       const result = (await res.json()) as BackupUploadResult;
       onUploaded(result, sourceType, sourceRef.trim());
@@ -443,7 +447,7 @@ function UploadForm({
   return (
     <Card>
       <CardTitle className="flex items-center gap-1">
-        <Upload className="h-4 w-4" /> Téléverser une sauvegarde
+        <Upload className="h-4 w-4" /> {t("uploadForm.title")}
       </CardTitle>
       <form onSubmit={submit} className="mt-2 flex flex-col gap-2">
         <input
@@ -456,18 +460,18 @@ function UploadForm({
           onChange={(e) => setSourceType(e.target.value as BackupUploadSourceKind)}
           className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none"
         >
-          <option value="volume">volume Docker</option>
-          <option value="path">dossier (bind mount)</option>
-          <option value="db">base de données</option>
+          <option value="volume">{t("uploadForm.sourceTypeVolume")}</option>
+          <option value="path">{t("uploadForm.sourceTypePath")}</option>
+          <option value="db">{t("uploadForm.sourceTypeDb")}</option>
         </select>
         <input
           type="text"
           placeholder={
             sourceType === "volume"
-              ? "Nom du volume cible"
+              ? t("uploadForm.targetVolumePlaceholder")
               : sourceType === "path"
-                ? "Chemin cible"
-                : "Référence (location:ref, ex: docker:ima-postgres)"
+                ? t("uploadForm.targetPathPlaceholder")
+                : t("uploadForm.targetDbPlaceholder")
           }
           value={sourceRef}
           onChange={(e) => setSourceRef(e.target.value)}
@@ -476,10 +480,10 @@ function UploadForm({
         {error && <p className="text-xs text-destructive">{error}</p>}
         <div className="flex gap-2">
           <Button type="submit" size="sm" disabled={uploading}>
-            {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Téléverser"}
+            {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("uploadForm.upload")}
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
-            Annuler
+            {t("uploadForm.cancel")}
           </Button>
         </div>
       </form>
@@ -498,6 +502,7 @@ function StepLocal({
   appRuns: AppBackupRun[];
   onSelect: (item: SelectedItem) => void;
 }) {
+  const { t } = useTranslation("restore");
   const appById = useMemo(() => new Map(apps.map((a) => [a.id, a])), [apps]);
   const successfulHistory = history.filter((h) => h.status === "success");
   const dbBackups = successfulHistory.filter((h) => h.sourceType === "db");
@@ -511,16 +516,16 @@ function StepLocal({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground">Étape 2 — Choisissez l'élément à restaurer.</p>
+      <p className="text-sm text-muted-foreground">{t("stepLocal.intro")}</p>
 
-      <GenericGroup title="Bases de données" icon={Database} items={dbBackups} onSelect={onSelect} />
-      <GenericGroup title="Volumes Docker" icon={Boxes} items={volumeBackups} onSelect={onSelect} />
-      <GenericGroup title="Dossiers (chemins)" icon={HardDrive} items={pathBackups} onSelect={onSelect} />
+      <GenericGroup title={t("stepLocal.groupDbs")} icon={Database} items={dbBackups} onSelect={onSelect} />
+      <GenericGroup title={t("stepLocal.groupVolumes")} icon={Boxes} items={volumeBackups} onSelect={onSelect} />
+      <GenericGroup title={t("stepLocal.groupPaths")} icon={HardDrive} items={pathBackups} onSelect={onSelect} />
 
       {fullAppRuns.length > 0 && (
         <div>
           <p className="mb-2 flex items-center gap-1 text-xs font-semibold text-muted-foreground">
-            <Boxes className="h-3.5 w-3.5" /> Applications — backup complet
+            <Boxes className="h-3.5 w-3.5" /> {t("stepLocal.groupFullApps")}
           </p>
           <div className="flex flex-col gap-2">
             {fullAppRuns.map((r) => {
@@ -548,7 +553,7 @@ function StepLocal({
       {partialAppRuns.length > 0 && (
         <div>
           <p className="mb-2 flex items-center gap-1 text-xs font-semibold text-muted-foreground">
-            <Boxes className="h-3.5 w-3.5" /> Applications — backup partiel
+            <Boxes className="h-3.5 w-3.5" /> {t("stepLocal.groupPartialApps")}
           </p>
           <div className="flex flex-col gap-2">
             {partialAppRuns.map((r) => {
@@ -576,7 +581,7 @@ function StepLocal({
       {apps.length > 0 && (
         <div>
           <p className="mb-2 flex items-center gap-1 text-xs font-semibold text-muted-foreground">
-            <Container className="h-3.5 w-3.5" /> Images de conteneur sauvegardées
+            <Container className="h-3.5 w-3.5" /> {t("stepLocal.groupImages")}
           </p>
           {apps.map((app) => (
             <AppImagePicker key={app.id} app={app} onSelect={onSelect} />
@@ -584,7 +589,7 @@ function StepLocal({
         </div>
       )}
 
-      {!hasAnything && <p className="text-sm text-muted-foreground">Aucune sauvegarde locale disponible.</p>}
+      {!hasAnything && <p className="text-sm text-muted-foreground">{t("stepLocal.empty")}</p>}
     </div>
   );
 }

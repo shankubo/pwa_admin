@@ -1,0 +1,53 @@
+{
+  "back": "Back",
+  "stepSource": {
+    "intro": "Step 1 — Choose the backup source to restore from.",
+    "local": {
+      "label": "Local",
+      "description": "Restore from a backup already present on this server.",
+      "disabledReason": "No local backup"
+    },
+    "usb": {
+      "label": "USB",
+      "description": "Restore from a plugged-in external drive (the backup must be located in BACKUP/<server name>/... on this drive).",
+      "disabledReason": "No USB drive connected"
+    },
+    "gdrive": {
+      "label": "Google Drive",
+      "description": "If Google Drive is connected, the backup is first automatically downloaded to this server, then restored.",
+      "disabledReason": "Google Drive not connected"
+    },
+    "upload": {
+      "label": "Upload",
+      "description": "Send a backup file from your device (PC/phone) to this server, then restore it directly."
+    },
+    "migration": {
+      "label": "Server migration",
+      "description": "Restore a full snapshot captured from an external drive (USB): sites, data, and system packages are reinstalled identically — to replace or rebuild a server.",
+      "disabledReason": "No migration snapshot on the USB drive"
+    }
+  },
+  "uploadForm": {
+    "title": "Upload a backup",
+    "validationError": "File and source reference are required",
+    "uploadFailedError": "Upload failed ({{status}})",
+    "sourceTypeVolume": "Docker volume",
+    "sourceTypePath": "folder (bind mount)",
+    "sourceTypeDb": "database",
+    "targetVolumePlaceholder": "Target volume name",
+    "targetPathPlaceholder": "Target path",
+    "targetDbPlaceholder": "Reference (location:ref, e.g. docker:ima-postgres)",
+    "upload": "Upload",
+    "cancel": "Cancel"
+  },
+  "stepLocal": {
+    "intro": "Step 2 — Choose the item to restore.",
+    "groupDbs": "Databases",
+    "groupVolumes": "Docker volumes",
+    "groupPaths": "Folders (paths)",
+    "groupFullApps": "Applications — full backup",
+    "groupPartialApps": "Applications — partial backup",
+    "groupImages": "Saved container images",
+    "empty": "No local backup available."
+  }
+}

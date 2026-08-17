@@ -1,0 +1,53 @@
+{
+  "back": "Retour",
+  "stepSource": {
+    "intro": "Étape 1 — Choisissez la source de la sauvegarde à restaurer.",
+    "local": {
+      "label": "Local",
+      "description": "Restaurer à partir d'une sauvegarde déjà présente sur ce serveur.",
+      "disabledReason": "Aucune sauvegarde locale"
+    },
+    "usb": {
+      "label": "USB",
+      "description": "Restaurer depuis un disque externe branché (la sauvegarde doit se trouver dans BACKUP/<nom du serveur>/... sur ce disque).",
+      "disabledReason": "Aucun disque USB connecté"
+    },
+    "gdrive": {
+      "label": "Google Drive",
+      "description": "Si Google Drive est connecté, la sauvegarde est d'abord téléchargée automatiquement sur ce serveur, puis restaurée.",
+      "disabledReason": "Google Drive non connecté"
+    },
+    "upload": {
+      "label": "Téléverser",
+      "description": "Envoyer un fichier de sauvegarde depuis votre appareil (PC/téléphone) vers ce serveur, puis le restaurer directement."
+    },
+    "migration": {
+      "label": "Migration serveur",
+      "description": "Restaurer un instantané complet capturé depuis un disque externe (USB) : sites, données et paquets système sont réinstallés à l'identique — pour remplacer ou reconstruire un serveur.",
+      "disabledReason": "Aucun instantané de migration sur le disque USB"
+    }
+  },
+  "uploadForm": {
+    "title": "Téléverser une sauvegarde",
+    "validationError": "Fichier et référence source requis",
+    "uploadFailedError": "Échec de l'upload ({{status}})",
+    "sourceTypeVolume": "volume Docker",
+    "sourceTypePath": "dossier (bind mount)",
+    "sourceTypeDb": "base de données",
+    "targetVolumePlaceholder": "Nom du volume cible",
+    "targetPathPlaceholder": "Chemin cible",
+    "targetDbPlaceholder": "Référence (location:ref, ex: docker:ima-postgres)",
+    "upload": "Téléverser",
+    "cancel": "Annuler"
+  },
+  "stepLocal": {
+    "intro": "Étape 2 — Choisissez l'élément à restaurer.",
+    "groupDbs": "Bases de données",
+    "groupVolumes": "Volumes Docker",
+    "groupPaths": "Dossiers (chemins)",
+    "groupFullApps": "Applications — backup complet",
+    "groupPartialApps": "Applications — backup partiel",
+    "groupImages": "Images de conteneur sauvegardées",
+    "empty": "Aucune sauvegarde locale disponible."
+  }
+}
