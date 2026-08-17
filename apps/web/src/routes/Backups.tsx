@@ -727,6 +727,7 @@ function GDriveCompareCard({
   onCompare: () => void;
   onDeletedFile: () => void;
 }) {
+  const { t } = useTranslation("backups");
   const [authorized, setAuthorized] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -738,11 +739,11 @@ function GDriveCompareCard({
   return (
     <Card>
       <CardTitle className="flex items-center gap-1">
-        <Cloud className="h-4 w-4" /> Google Drive
+        <Cloud className="h-4 w-4" /> {t("gdrive.title")}
       </CardTitle>
       {authorized === false && (
         <p className="text-sm text-muted-foreground">
-          Non connecté — configurez la connexion dans <Link to="/settings" className="text-primary underline-offset-2 hover:underline">Settings</Link>.
+          {t("gdrive.notConnected")} <Link to="/settings" className="text-primary underline-offset-2 hover:underline">{t("gdrive.settingsLink")}</Link>.
         </p>
       )}
       {authorized && <GDriveCompareSummary comparison={comparison} comparing={comparing} onCompare={onCompare} onDeletedFile={onDeletedFile} />}
@@ -761,13 +762,14 @@ function GDriveCompareSummary({
   onCompare: () => void;
   onDeletedFile: () => void;
 }) {
+  const { t } = useTranslation("backups");
   return (
     <div className="border-t border-border pt-3 first:border-t-0 first:pt-0">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-muted-foreground">Comparaison local ↔ Google Drive</p>
+        <p className="text-xs font-medium text-muted-foreground">{t("gdrive.compareTitle")}</p>
         <Button size="sm" variant="outline" onClick={onCompare} disabled={comparing}>
           {comparing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
-          {comparing ? "Vérification…" : "Vérifier Google Drive"}
+          {comparing ? t("gdrive.verifying") : t("gdrive.verifyButton")}
         </Button>
       </div>
 
@@ -775,17 +777,17 @@ function GDriveCompareSummary({
         <div className="mt-3 flex flex-col gap-2">
           <div className="grid grid-cols-3 gap-2 text-xs">
             <div className="rounded-md border border-border p-2">
-              <p className="text-muted-foreground">Vérifiées sur Drive</p>
+              <p className="text-muted-foreground">{t("gdrive.verifiedOnDrive")}</p>
               <p className="text-sm font-medium text-primary">{comparison.totalVerified}</p>
             </div>
             <div className="rounded-md border border-border p-2">
-              <p className="text-muted-foreground">Manquantes sur Drive</p>
+              <p className="text-muted-foreground">{t("gdrive.missingOnDrive")}</p>
               <p className={`text-sm font-medium ${comparison.totalMissing > 0 ? "text-destructive" : ""}`}>
                 {comparison.totalMissing}
               </p>
             </div>
             <div className="rounded-md border border-border p-2">
-              <p className="text-muted-foreground">Fichiers Drive orphelins</p>
+              <p className="text-muted-foreground">{t("gdrive.orphanFiles")}</p>
               <p className={`text-sm font-medium ${comparison.totalOrphans > 0 ? "text-warning" : ""}`}>
                 {comparison.totalOrphans}
               </p>
@@ -793,15 +795,13 @@ function GDriveCompareSummary({
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Vérifié le {new Date(comparison.checkedAt).toLocaleString()} — le statut de chaque sauvegarde est
-            affiché directement dans l'historique ci-dessous.
+            {t("gdrive.checkedAt", { date: new Date(comparison.checkedAt).toLocaleString() })}
           </p>
 
           {comparison.orphanGroups.length > 0 && (
             <div className="mt-1 flex flex-col gap-2">
               <p className="flex items-center gap-1 text-xs font-medium text-warning">
-                <AlertTriangle className="h-3.5 w-3.5" /> Présents sur Drive uniquement (pas de sauvegarde locale
-                correspondante)
+                <AlertTriangle className="h-3.5 w-3.5" /> {t("gdrive.orphansOnly")}
               </p>
               {comparison.orphanGroups.map((group) => (
                 <OrphanGroupCard key={`${group.category}/${group.sourceRef}`} group={group} onDeleted={onDeletedFile} />
@@ -821,6 +821,7 @@ function OrphanGroupCard({
   group: GDriveComparisonResult["orphanGroups"][number];
   onDeleted: () => void;
 }) {
+  const { t } = useTranslation("backups");
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function deleteFile(fileId: string) {
@@ -837,7 +838,7 @@ function OrphanGroupCard({
     <div className="rounded-md border border-border p-2">
       <p className="text-xs font-medium">
         {group.category}/{group.sourceRef}
-        <span className="ml-1 text-muted-foreground">({group.files.length} fichier(s))</span>
+        <span className="ml-1 text-muted-foreground">{t("gdrive.fileCount", { count: group.files.length })}</span>
       </p>
       <div className="mt-1 flex flex-col gap-1">
         {group.files.map((f) => (
@@ -854,9 +855,9 @@ function OrphanGroupCard({
                   <Trash2 className="h-3 w-3" />
                 </Button>
               }
-              title="Supprimer ce fichier sur Google Drive ?"
-              description="Le fichier sera définitivement supprimé de Google Drive (aucune copie locale n'existe)."
-              confirmLabel="Supprimer"
+              title={t("gdrive.deleteFileConfirm.title")}
+              description={t("gdrive.deleteFileConfirm.description")}
+              confirmLabel={t("gdrive.deleteFileConfirm.confirmLabel")}
               onConfirm={() => deleteFile(f.fileId)}
             />
           </div>
@@ -867,6 +868,7 @@ function OrphanGroupCard({
 }
 
 function UsbConnection() {
+  const { t } = useTranslation("backups");
   const [status, setStatus] = useState<UsbStatus | null>(null);
   const [archives, setArchives] = useState<UsbBackupArchive[] | null>(null);
   const [showArchives, setShowArchives] = useState(false);
@@ -921,24 +923,24 @@ function UsbConnection() {
     <Card>
       <div className="flex items-center justify-between">
         <CardTitle className="flex items-center gap-1">
-          <Usb className="h-4 w-4" /> Disque USB / SSD
+          <Usb className="h-4 w-4" /> {t("usb.title")}
         </CardTitle>
         <Button size="sm" variant="outline" onClick={loadStatus}>
-          Rafraîchir
+          {t("usb.refresh")}
         </Button>
       </div>
 
       {ejected && (
         <p className="flex items-center gap-1 text-sm text-primary">
-          <CheckCircle2 className="h-4 w-4" /> Disque démonté, débranchement possible en toute sécurité.
+          <CheckCircle2 className="h-4 w-4" /> {t("usb.ejectedSafe")}
         </p>
       )}
 
       {!status ? (
-        <p className="text-sm text-muted-foreground">Chargement…</p>
+        <p className="text-sm text-muted-foreground">{t("usb.loading")}</p>
       ) : !status.available ? (
         <p className="flex items-center gap-1 text-sm text-warning">
-          <XCircle className="h-4 w-4" /> Aucun disque USB détecté (branchez-le, il sera monté automatiquement).
+          <XCircle className="h-4 w-4" /> {t("usb.noneDetected")}
         </p>
       ) : (
         <div className="flex flex-col gap-2">
@@ -949,30 +951,30 @@ function UsbConnection() {
                   <CheckCircle2 className="h-4 w-4" /> {d.label} ({d.device})
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {d.filesystem ?? "?"} · {d.freeBytes != null ? formatBytes(d.freeBytes) : "?"} libre
-                  {d.totalBytes != null ? ` / ${formatBytes(d.totalBytes)}` : ""}
+                  {d.filesystem ?? "?"} · {t("usb.freeSpace", { free: d.freeBytes != null ? formatBytes(d.freeBytes) : "?" })}
+                  {d.totalBytes != null ? t("usb.freeSpaceTotal", { total: formatBytes(d.totalBytes) }) : ""}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">{d.backupRoot}</p>
                 <ConfirmDialog
                   trigger={
                     <Button size="sm" variant="outline" className="mt-2" disabled={ejecting === d.mountpoint}>
-                      {ejecting === d.mountpoint ? "Éjection…" : "Éjecter"}
+                      {ejecting === d.mountpoint ? t("usb.ejecting") : t("usb.eject")}
                     </Button>
                   }
-                  title="Éjecter ce disque ?"
-                  description="Le disque sera démonté proprement. Attendez la confirmation avant de le débrancher physiquement, sinon une sauvegarde en cours pourrait être corrompue."
-                  confirmLabel="Éjecter"
+                  title={t("usb.ejectConfirm.title")}
+                  description={t("usb.ejectConfirm.description")}
+                  confirmLabel={t("usb.ejectConfirm.confirmLabel")}
                   onConfirm={() => ejectDrive(d.mountpoint)}
                 />
               </div>
             ) : (
               <div key={d.mountpoint} className="rounded-md border border-warning/40 bg-warning/10 p-2 text-sm">
                 <p className="flex items-center gap-1 text-warning">
-                  <AlertTriangle className="h-4 w-4" /> {d.label} ({d.device}) — non configuré comme disque de sauvegarde
+                  <AlertTriangle className="h-4 w-4" /> {d.label} ({d.device}) {t("usb.notConfigured")}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {d.filesystem ?? "?"} · {d.freeBytes != null ? formatBytes(d.freeBytes) : "?"} libre
-                  {d.totalBytes != null ? ` / ${formatBytes(d.totalBytes)}` : ""}
+                  {d.filesystem ?? "?"} · {t("usb.freeSpace", { free: d.freeBytes != null ? formatBytes(d.freeBytes) : "?" })}
+                  {d.totalBytes != null ? t("usb.freeSpaceTotal", { total: formatBytes(d.totalBytes) }) : ""}
                 </p>
                 <Button
                   size="sm"
@@ -981,7 +983,7 @@ function UsbConnection() {
                   disabled={enabling === d.mountpoint}
                   onClick={() => enableDrive(d.mountpoint)}
                 >
-                  {enabling === d.mountpoint ? "Activation…" : "Activer comme disque de sauvegarde"}
+                  {enabling === d.mountpoint ? t("usb.activating") : t("usb.activate")}
                 </Button>
               </div>
             )
@@ -989,15 +991,15 @@ function UsbConnection() {
 
           {status.drives.some((d) => d.isBackupConfigured) && (
             <Button size="sm" variant="outline" onClick={loadArchives}>
-              {showArchives ? "Masquer les archives" : "Parcourir les archives sur le disque"}
+              {showArchives ? t("usb.hideArchives") : t("usb.browseArchives")}
             </Button>
           )}
 
           {showArchives && (
             <div className="flex flex-col gap-1">
-              {loadingArchives && <p className="text-xs text-muted-foreground">Chargement…</p>}
+              {loadingArchives && <p className="text-xs text-muted-foreground">{t("usb.loading")}</p>}
               {!loadingArchives && archives?.length === 0 && (
-                <p className="text-xs text-muted-foreground">Aucune archive trouvée sur le disque.</p>
+                <p className="text-xs text-muted-foreground">{t("usb.noArchivesFound")}</p>
               )}
               {archives?.map((a) => (
                 <div key={a.fullPath} className="flex items-center justify-between text-xs">
@@ -1024,6 +1026,7 @@ function UsbConnection() {
  * snapshot is deliberately not here — that's Restore.tsx's job, same
  * separation as every other backup category in this app. */
 function MigrationSnapshotCard() {
+  const { t } = useTranslation("backups");
   const [usbConfigured, setUsbConfigured] = useState(false);
   // Décoché par défaut — un conteneur "-duplicate" est un clone de bascule
   // manuelle permanent (voir Sites > Dupliquer), identique à son original
@@ -1046,21 +1049,15 @@ function MigrationSnapshotCard() {
   return (
     <Card>
       <CardTitle className="flex items-center gap-1">
-        <HardDriveUpload className="h-4 w-4" /> Migration serveur (disque externe)
+        <HardDriveUpload className="h-4 w-4" /> {t("migration.title")}
       </CardTitle>
-      <p className="text-xs text-muted-foreground">
-        Capture un instantané complet du serveur (images/volumes Docker, bases de données, config
-        Nginx, applications, paquets système, configuration pwa-admin) sur le disque USB de
-        sauvegarde — à utiliser en cas de changement de matériel. La restauration se fait depuis
-        l'écran Restore, sur le nouveau serveur.
-      </p>
+      <p className="text-xs text-muted-foreground">{t("migration.explanation")}</p>
 
       {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
 
       {!usbConfigured ? (
         <p className="mt-2 flex items-center gap-1 text-sm text-warning">
-          <AlertTriangle className="h-4 w-4" /> Aucun disque USB configuré comme sauvegarde (voir
-          ci-dessus).
+          <AlertTriangle className="h-4 w-4" /> {t("migration.noUsbConfigured")}
         </p>
       ) : (
         <>
@@ -1071,16 +1068,15 @@ function MigrationSnapshotCard() {
               onChange={(e) => setIncludeDuplicates(e.target.checked)}
               disabled={starting || !!activeManifestId}
             />
-            Inclure les conteneurs "-duplicate" (clones de bascule manuelle — généralement inutiles pour une
-            migration vers un nouveau serveur)
+            {t("migration.includeDuplicates")}
           </label>
           <Button size="sm" variant="outline" className="mt-2" onClick={startSnapshot} disabled={starting || !!activeManifestId}>
             {starting || activeManifestId ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Capture en cours…
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> {t("migration.capturing")}
               </>
             ) : (
-              "Prendre un instantané de migration"
+              t("migration.startSnapshot")
             )}
           </Button>
         </>
@@ -1091,7 +1087,7 @@ function MigrationSnapshotCard() {
           {snapshots.map((s) => (
             <div key={s.manifestId} className="flex items-center justify-between text-xs">
               <span className="truncate text-muted-foreground">
-                {s.scope.type === "site" ? `Site: ${s.scope.siteName}` : "Serveur complet"} ·{" "}
+                {s.scope.type === "site" ? t("migration.siteLabel", { name: s.scope.siteName }) : t("migration.fullServer")} ·{" "}
                 {new Date(s.startedAt).toLocaleString()}
               </span>
               <span

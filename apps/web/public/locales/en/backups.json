@@ -75,5 +75,57 @@
     "sizeMismatch": "different size on Drive",
     "missing": "missing from Drive",
     "notUploaded": "never sent to Drive"
+  },
+  "gdrive": {
+    "title": "Google Drive",
+    "notConnected": "Not connected — set up the connection in",
+    "settingsLink": "Settings",
+    "compareTitle": "Local ↔ Google Drive comparison",
+    "verifying": "Verifying…",
+    "verifyButton": "Verify Google Drive",
+    "verifiedOnDrive": "Verified on Drive",
+    "missingOnDrive": "Missing from Drive",
+    "orphanFiles": "Orphan Drive files",
+    "checkedAt": "Checked on {{date}} — each backup's status is shown directly in the history below.",
+    "orphansOnly": "Present on Drive only (no matching local backup)",
+    "fileCount_one": "({{count}} file)",
+    "fileCount_other": "({{count}} files)",
+    "deleteFileConfirm": {
+      "title": "Delete this file on Google Drive?",
+      "description": "The file will be permanently deleted from Google Drive (no local copy exists).",
+      "confirmLabel": "Delete"
+    }
+  },
+  "usb": {
+    "title": "USB / SSD Drive",
+    "refresh": "Refresh",
+    "ejectedSafe": "Drive unmounted, safe to unplug.",
+    "loading": "Loading…",
+    "noneDetected": "No USB drive detected (plug it in, it will be mounted automatically).",
+    "freeSpace": "{{free}} free",
+    "freeSpaceTotal": " / {{total}}",
+    "ejecting": "Ejecting…",
+    "eject": "Eject",
+    "ejectConfirm": {
+      "title": "Eject this drive?",
+      "description": "The drive will be cleanly unmounted. Wait for confirmation before physically unplugging it, otherwise a backup in progress could be corrupted.",
+      "confirmLabel": "Eject"
+    },
+    "notConfigured": "— not configured as a backup drive",
+    "activating": "Activating…",
+    "activate": "Set as backup drive",
+    "hideArchives": "Hide archives",
+    "browseArchives": "Browse archives on the drive",
+    "noArchivesFound": "No archive found on the drive."
+  },
+  "migration": {
+    "title": "Server migration (external drive)",
+    "explanation": "Captures a full server snapshot (Docker images/volumes, databases, Nginx config, applications, system packages, pwa-admin configuration) to the backup USB drive — use in case of a hardware change. Restore is done from the Restore screen, on the new server.",
+    "noUsbConfigured": "No USB drive configured as backup (see above).",
+    "includeDuplicates": "Include \"-duplicate\" containers (manual failover clones — usually unnecessary for migrating to a new server)",
+    "capturing": "Capturing…",
+    "startSnapshot": "Take a migration snapshot",
+    "siteLabel": "Site: {{name}}",
+    "fullServer": "Full server"
   }
 }

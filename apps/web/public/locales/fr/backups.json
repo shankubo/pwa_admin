@@ -75,5 +75,57 @@
     "sizeMismatch": "taille différente sur Drive",
     "missing": "absent de Drive",
     "notUploaded": "jamais envoyé sur Drive"
+  },
+  "gdrive": {
+    "title": "Google Drive",
+    "notConnected": "Non connecté — configurez la connexion dans",
+    "settingsLink": "Settings",
+    "compareTitle": "Comparaison local ↔ Google Drive",
+    "verifying": "Vérification…",
+    "verifyButton": "Vérifier Google Drive",
+    "verifiedOnDrive": "Vérifiées sur Drive",
+    "missingOnDrive": "Manquantes sur Drive",
+    "orphanFiles": "Fichiers Drive orphelins",
+    "checkedAt": "Vérifié le {{date}} — le statut de chaque sauvegarde est affiché directement dans l'historique ci-dessous.",
+    "orphansOnly": "Présents sur Drive uniquement (pas de sauvegarde locale correspondante)",
+    "fileCount_one": "({{count}} fichier)",
+    "fileCount_other": "({{count}} fichiers)",
+    "deleteFileConfirm": {
+      "title": "Supprimer ce fichier sur Google Drive ?",
+      "description": "Le fichier sera définitivement supprimé de Google Drive (aucune copie locale n'existe).",
+      "confirmLabel": "Supprimer"
+    }
+  },
+  "usb": {
+    "title": "Disque USB / SSD",
+    "refresh": "Rafraîchir",
+    "ejectedSafe": "Disque démonté, débranchement possible en toute sécurité.",
+    "loading": "Chargement…",
+    "noneDetected": "Aucun disque USB détecté (branchez-le, il sera monté automatiquement).",
+    "freeSpace": "{{free}} libre",
+    "freeSpaceTotal": " / {{total}}",
+    "ejecting": "Éjection…",
+    "eject": "Éjecter",
+    "ejectConfirm": {
+      "title": "Éjecter ce disque ?",
+      "description": "Le disque sera démonté proprement. Attendez la confirmation avant de le débrancher physiquement, sinon une sauvegarde en cours pourrait être corrompue.",
+      "confirmLabel": "Éjecter"
+    },
+    "notConfigured": "— non configuré comme disque de sauvegarde",
+    "activating": "Activation…",
+    "activate": "Activer comme disque de sauvegarde",
+    "hideArchives": "Masquer les archives",
+    "browseArchives": "Parcourir les archives sur le disque",
+    "noArchivesFound": "Aucune archive trouvée sur le disque."
+  },
+  "migration": {
+    "title": "Migration serveur (disque externe)",
+    "explanation": "Capture un instantané complet du serveur (images/volumes Docker, bases de données, config Nginx, applications, paquets système, configuration pwa-admin) sur le disque USB de sauvegarde — à utiliser en cas de changement de matériel. La restauration se fait depuis l'écran Restore, sur le nouveau serveur.",
+    "noUsbConfigured": "Aucun disque USB configuré comme sauvegarde (voir ci-dessus).",
+    "includeDuplicates": "Inclure les conteneurs \"-duplicate\" (clones de bascule manuelle — généralement inutiles pour une migration vers un nouveau serveur)",
+    "capturing": "Capture en cours…",
+    "startSnapshot": "Prendre un instantané de migration",
+    "siteLabel": "Site: {{name}}",
+    "fullServer": "Serveur complet"
   }
 }
