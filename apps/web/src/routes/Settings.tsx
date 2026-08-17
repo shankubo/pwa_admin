@@ -478,6 +478,7 @@ interface GDriveEnvConfig {
  * explicitement plutôt que de laisser croire que c'est appliqué à chaud.
  */
 function GDriveConfigCard() {
+  const { t } = useTranslation("settings");
   const [expanded, setExpanded] = useState(false);
   const [config, setConfig] = useState<GDriveEnvConfig | null>(null);
   const [enabled, setEnabled] = useState(false);
@@ -523,7 +524,7 @@ function GDriveConfigCard() {
       setClientSecret("");
       setMessage({
         type: "ok",
-        text: "Enregistré dans .env — redémarrez le service (sudo systemctl restart pwa-admin) pour appliquer.",
+        text: t("gdriveConfig.savedMessage"),
       });
       loadConfig();
     } catch (err) {
@@ -537,7 +538,7 @@ function GDriveConfigCard() {
     <Card>
       <button type="button" onClick={toggle} className="flex w-full items-center justify-between">
         <CardTitle className="mb-0 flex items-center gap-1">
-          <Cloud className="h-4 w-4" /> Configuration Google Drive
+          <Cloud className="h-4 w-4" /> {t("gdriveConfig.title")}
         </CardTitle>
         {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
       </button>
@@ -545,16 +546,16 @@ function GDriveConfigCard() {
       {expanded && (
         <>
           {!config ? (
-            <p className="mt-2 text-sm text-muted-foreground">Chargement…</p>
+            <p className="mt-2 text-sm text-muted-foreground">{t("gdriveConfig.loading")}</p>
           ) : (
             <form onSubmit={save} className="mt-3 flex flex-col gap-3">
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-                Activer l'intégration Google Drive
+                {t("gdriveConfig.enableIntegration")}
               </label>
 
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">Client ID OAuth</label>
+                <label className="mb-1 block text-xs text-muted-foreground">{t("gdriveConfig.clientIdLabel")}</label>
                 <input
                   type="text"
                   value={clientId}
@@ -566,13 +567,13 @@ function GDriveConfigCard() {
 
               <div>
                 <label className="mb-1 block text-xs text-muted-foreground">
-                  Client Secret OAuth {config.clientSecretSet && <span className="text-primary">(déjà défini)</span>}
+                  {t("gdriveConfig.clientSecretLabel")} {config.clientSecretSet && <span className="text-primary">{t("gdriveConfig.clientSecretAlreadySet")}</span>}
                 </label>
                 <input
                   type="password"
                   value={clientSecret}
                   onChange={(e) => setClientSecret(e.target.value)}
-                  placeholder={config.clientSecretSet ? "Laisser vide pour conserver l'actuel" : "Non défini"}
+                  placeholder={config.clientSecretSet ? t("gdriveConfig.clientSecretPlaceholderSet") : t("gdriveConfig.clientSecretPlaceholderUnset")}
                   autoComplete="off"
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary"
                 />
@@ -580,7 +581,7 @@ function GDriveConfigCard() {
 
               <div>
                 <label className="mb-1 block text-xs text-muted-foreground">
-                  ID du dossier racine Drive (créé manuellement dans votre Drive)
+                  {t("gdriveConfig.rootFolderLabel")}
                 </label>
                 <input
                   type="text"
@@ -598,7 +599,7 @@ function GDriveConfigCard() {
               )}
 
               <Button type="submit" size="sm" disabled={saving}>
-                {saving ? "Enregistrement…" : "Enregistrer"}
+                {saving ? t("gdriveConfig.saving") : t("gdriveConfig.save")}
               </Button>
             </form>
           )}
@@ -623,6 +624,7 @@ interface GDriveStatus {
  * (GET/POST /backups/gdrive/*) — seul l'emplacement de l'UI change.
  */
 function GDriveConnectionCard() {
+  const { t } = useTranslation("settings");
   const [status, setStatus] = useState<GDriveStatus | null>(null);
   const [authUrl, setAuthUrl] = useState<string | null>(null);
   const [code, setCode] = useState("");
@@ -660,7 +662,7 @@ function GDriveConnectionCard() {
       });
       setCode("");
       setAuthUrl(null);
-      setMessage({ type: "ok", text: "Connecté à Google Drive avec succès." });
+      setMessage({ type: "ok", text: t("gdriveConnection.authorizedSuccess") });
       loadStatus();
     } catch (err) {
       setMessage({ type: "error", text: (err as Error).message });
@@ -674,7 +676,7 @@ function GDriveConnectionCard() {
     setMessage(null);
     try {
       await apiJson("/backups/gdrive/test-upload", { method: "POST" });
-      setMessage({ type: "ok", text: "Fichier de test envoyé avec succès sur Google Drive." });
+      setMessage({ type: "ok", text: t("gdriveConnection.testUploadSuccess") });
     } catch (err) {
       setMessage({ type: "error", text: (err as Error).message });
     } finally {
@@ -687,7 +689,7 @@ function GDriveConnectionCard() {
     setMessage(null);
     try {
       await apiJson("/backups/gdrive/revoke", { method: "POST" });
-      setMessage({ type: "ok", text: "Déconnecté de Google Drive." });
+      setMessage({ type: "ok", text: t("gdriveConnection.disconnectedSuccess") });
       loadStatus();
     } catch (err) {
       setMessage({ type: "error", text: (err as Error).message });
@@ -703,31 +705,31 @@ function GDriveConnectionCard() {
       </CardTitle>
 
       {!status ? (
-        <p className="text-sm text-muted-foreground">Chargement…</p>
+        <p className="text-sm text-muted-foreground">{t("gdriveConnection.loading")}</p>
       ) : !status.enabled ? (
-        <p className="text-sm text-muted-foreground">Désactivé (GDRIVE_ENABLED=false côté serveur).</p>
+        <p className="text-sm text-muted-foreground">{t("gdriveConnection.disabledByServer")}</p>
       ) : !status.configured ? (
         <p className="text-sm text-muted-foreground">
-          Identifiants OAuth manquants (GDRIVE_OAUTH_CLIENT_ID / GDRIVE_OAUTH_CLIENT_SECRET).
+          {t("gdriveConnection.missingCredentials")}
         </p>
       ) : status.authorized ? (
         <div className="flex flex-col gap-2">
           <p className="flex items-center gap-1 text-sm text-primary">
-            <CheckCircle2 className="h-4 w-4" /> Connecté
+            <CheckCircle2 className="h-4 w-4" /> {t("gdriveConnection.connected")}
           </p>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={testUpload} disabled={busy}>
-              Tester la connexion
+              {t("gdriveConnection.testConnection")}
             </Button>
             <ConfirmDialog
               trigger={
                 <Button size="sm" variant="destructive" disabled={busy}>
-                  Déconnecter
+                  {t("gdriveConnection.disconnect")}
                 </Button>
               }
-              title="Déconnecter Google Drive ?"
-              description="Les jobs ciblant « gdrive » échoueront jusqu'à une nouvelle autorisation."
-              confirmLabel="Déconnecter"
+              title={t("gdriveConnection.disconnectTitle")}
+              description={t("gdriveConnection.disconnectDescription")}
+              confirmLabel={t("gdriveConnection.disconnect")}
               onConfirm={disconnect}
             />
           </div>
@@ -735,26 +737,25 @@ function GDriveConnectionCard() {
       ) : (
         <div className="flex flex-col gap-2">
           <p className="flex items-center gap-1 text-sm text-warning">
-            <XCircle className="h-4 w-4" /> Non connecté
+            <XCircle className="h-4 w-4" /> {t("gdriveConnection.notConnected")}
           </p>
           <Button size="sm" variant="outline" onClick={startAuth}>
-            Autoriser l'accès à Google Drive
+            {t("gdriveConnection.authorize")}
           </Button>
           {authUrl && (
             <form onSubmit={submitCode} className="flex flex-col gap-2">
               <p className="text-xs text-muted-foreground">
-                Une fenêtre Google s'est ouverte. Connectez-vous, autorisez l'accès, puis collez le code affiché
-                ci-dessous.
+                {t("gdriveConnection.authWindowInstructions")}
               </p>
               <input
                 type="text"
-                placeholder="Code d'autorisation"
+                placeholder={t("gdriveConnection.authCodePlaceholder")}
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
               />
               <Button type="submit" size="sm" disabled={busy || !code.trim()}>
-                {busy ? "Validation…" : "Valider le code"}
+                {busy ? t("gdriveConnection.validating") : t("gdriveConnection.validateCode")}
               </Button>
             </form>
           )}
@@ -771,6 +772,7 @@ function GDriveConnectionCard() {
 }
 
 function AuditLogCard() {
+  const { t } = useTranslation("settings");
   const [expanded, setExpanded] = useState(false);
   const [rows, setRows] = useState<AuditLogRow[]>([]);
   const [offset, setOffset] = useState(0);
@@ -804,7 +806,7 @@ function AuditLogCard() {
   return (
     <Card>
       <button type="button" onClick={toggle} className="flex w-full items-center justify-between">
-        <CardTitle className="mb-0">Journal d'audit</CardTitle>
+        <CardTitle className="mb-0">{t("auditLog.title")}</CardTitle>
         {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
       </button>
       {expanded && (
@@ -821,11 +823,11 @@ function AuditLogCard() {
                 </p>
               </div>
             ))}
-            {rows.length === 0 && !loading && <p className="text-sm text-muted-foreground">Aucune entrée.</p>}
+            {rows.length === 0 && !loading && <p className="text-sm text-muted-foreground">{t("auditLog.noEntries")}</p>}
           </div>
           {hasMore && (
             <Button size="sm" variant="outline" className="mt-2 w-full" disabled={loading} onClick={loadMore}>
-              {loading ? "Chargement…" : "Charger plus"}
+              {loading ? t("auditLog.loading") : t("auditLog.loadMore")}
             </Button>
           )}
         </>

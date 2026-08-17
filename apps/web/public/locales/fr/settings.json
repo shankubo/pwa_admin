@@ -57,5 +57,45 @@
     "revokeDescription": "L'appareil « {{label}} » ne pourra plus se connecter avec ce jeton.",
     "revoke": "Révoquer",
     "noActiveTokens": "Aucun jeton actif."
+  },
+  "gdriveConfig": {
+    "title": "Configuration Google Drive",
+    "loading": "Chargement…",
+    "enableIntegration": "Activer l'intégration Google Drive",
+    "clientIdLabel": "Client ID OAuth",
+    "clientSecretLabel": "Client Secret OAuth",
+    "clientSecretAlreadySet": "(déjà défini)",
+    "clientSecretPlaceholderSet": "Laisser vide pour conserver l'actuel",
+    "clientSecretPlaceholderUnset": "Non défini",
+    "rootFolderLabel": "ID du dossier racine Drive (créé manuellement dans votre Drive)",
+    "savedMessage": "Enregistré dans .env — redémarrez le service (sudo systemctl restart pwa-admin) pour appliquer.",
+    "saving": "Enregistrement…",
+    "save": "Enregistrer"
+  },
+  "gdriveConnection": {
+    "title": "Google Drive",
+    "loading": "Chargement…",
+    "disabledByServer": "Désactivé (GDRIVE_ENABLED=false côté serveur).",
+    "missingCredentials": "Identifiants OAuth manquants (GDRIVE_OAUTH_CLIENT_ID / GDRIVE_OAUTH_CLIENT_SECRET).",
+    "connected": "Connecté",
+    "testConnection": "Tester la connexion",
+    "disconnectTitle": "Déconnecter Google Drive ?",
+    "disconnectDescription": "Les jobs ciblant « gdrive » échoueront jusqu'à une nouvelle autorisation.",
+    "disconnect": "Déconnecter",
+    "notConnected": "Non connecté",
+    "authorize": "Autoriser l'accès à Google Drive",
+    "authorizedSuccess": "Connecté à Google Drive avec succès.",
+    "testUploadSuccess": "Fichier de test envoyé avec succès sur Google Drive.",
+    "disconnectedSuccess": "Déconnecté de Google Drive.",
+    "authWindowInstructions": "Une fenêtre Google s'est ouverte. Connectez-vous, autorisez l'accès, puis collez le code affiché ci-dessous.",
+    "authCodePlaceholder": "Code d'autorisation",
+    "validating": "Validation…",
+    "validateCode": "Valider le code"
+  },
+  "auditLog": {
+    "title": "Journal d'audit",
+    "noEntries": "Aucune entrée.",
+    "loading": "Chargement…",
+    "loadMore": "Charger plus"
   }
 }

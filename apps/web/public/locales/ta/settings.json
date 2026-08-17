@@ -57,5 +57,45 @@
     "revokeDescription": "\"{{label}}\" சாதனம் இந்த டோக்கனுடன் இனி உள்நுழைய முடியாது.",
     "revoke": "ரத்துசெய்",
     "noActiveTokens": "செயலில் உள்ள டோக்கன்கள் இல்லை."
+  },
+  "gdriveConfig": {
+    "title": "Google Drive கட்டமைப்பு",
+    "loading": "ஏற்றுகிறது…",
+    "enableIntegration": "Google Drive ஒருங்கிணைப்பை இயக்கு",
+    "clientIdLabel": "OAuth Client ID",
+    "clientSecretLabel": "OAuth Client Secret",
+    "clientSecretAlreadySet": "(ஏற்கனவே அமைக்கப்பட்டது)",
+    "clientSecretPlaceholderSet": "தற்போதையதை வைத்திருக்க காலியாக விடவும்",
+    "clientSecretPlaceholderUnset": "அமைக்கப்படவில்லை",
+    "rootFolderLabel": "Drive மூல கோப்புறை ID (உங்கள் Drive இல் கைமுறையாக உருவாக்கப்பட்டது)",
+    "savedMessage": ".env இல் சேமிக்கப்பட்டது — பயன்படுத்த சேவையை மறுதொடக்கம் செய்யவும் (sudo systemctl restart pwa-admin).",
+    "saving": "சேமிக்கிறது…",
+    "save": "சேமி"
+  },
+  "gdriveConnection": {
+    "title": "Google Drive",
+    "loading": "ஏற்றுகிறது…",
+    "disabledByServer": "முடக்கப்பட்டது (சேவையக பக்கத்தில் GDRIVE_ENABLED=false).",
+    "missingCredentials": "OAuth நற்சான்றிதழ்கள் இல்லை (GDRIVE_OAUTH_CLIENT_ID / GDRIVE_OAUTH_CLIENT_SECRET).",
+    "connected": "இணைக்கப்பட்டது",
+    "testConnection": "இணைப்பைச் சோதி",
+    "disconnectTitle": "Google Drive ஐ துண்டிக்கவா?",
+    "disconnectDescription": "\"gdrive\" ஐ இலக்காகக் கொண்ட பணிகள் மீண்டும் அங்கீகரிக்கப்படும் வரை தோல்வியடையும்.",
+    "disconnect": "துண்டி",
+    "notConnected": "இணைக்கப்படவில்லை",
+    "authorize": "Google Drive அணுகலை அங்கீகரி",
+    "authorizedSuccess": "Google Drive உடன் வெற்றிகரமாக இணைக்கப்பட்டது.",
+    "testUploadSuccess": "சோதனைக் கோப்பு Google Drive க்கு வெற்றிகரமாக பதிவேற்றப்பட்டது.",
+    "disconnectedSuccess": "Google Drive இலிருந்து துண்டிக்கப்பட்டது.",
+    "authWindowInstructions": "ஒரு Google சாளரம் திறக்கப்பட்டது. உள்நுழைந்து, அணுகலை அங்கீகரித்து, கீழே காட்டப்படும் குறியீட்டை ஒட்டவும்.",
+    "authCodePlaceholder": "அங்கீகார குறியீடு",
+    "validating": "சரிபார்க்கிறது…",
+    "validateCode": "குறியீட்டை சரிபார்"
+  },
+  "auditLog": {
+    "title": "தணிக்கை பதிவு",
+    "noEntries": "பதிவுகள் இல்லை.",
+    "loading": "ஏற்றுகிறது…",
+    "loadMore": "மேலும் ஏற்று"
   }
 }

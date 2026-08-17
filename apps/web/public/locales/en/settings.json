@@ -57,5 +57,45 @@
     "revokeDescription": "Device \"{{label}}\" will no longer be able to sign in with this token.",
     "revoke": "Revoke",
     "noActiveTokens": "No active tokens."
+  },
+  "gdriveConfig": {
+    "title": "Google Drive configuration",
+    "loading": "Loading…",
+    "enableIntegration": "Enable Google Drive integration",
+    "clientIdLabel": "OAuth Client ID",
+    "clientSecretLabel": "OAuth Client Secret",
+    "clientSecretAlreadySet": "(already set)",
+    "clientSecretPlaceholderSet": "Leave empty to keep the current one",
+    "clientSecretPlaceholderUnset": "Not set",
+    "rootFolderLabel": "Drive root folder ID (created manually in your Drive)",
+    "savedMessage": "Saved to .env — restart the service (sudo systemctl restart pwa-admin) to apply.",
+    "saving": "Saving…",
+    "save": "Save"
+  },
+  "gdriveConnection": {
+    "title": "Google Drive",
+    "loading": "Loading…",
+    "disabledByServer": "Disabled (GDRIVE_ENABLED=false on the server).",
+    "missingCredentials": "Missing OAuth credentials (GDRIVE_OAUTH_CLIENT_ID / GDRIVE_OAUTH_CLIENT_SECRET).",
+    "connected": "Connected",
+    "testConnection": "Test connection",
+    "disconnectTitle": "Disconnect Google Drive?",
+    "disconnectDescription": "Jobs targeting \"gdrive\" will fail until re-authorized.",
+    "disconnect": "Disconnect",
+    "notConnected": "Not connected",
+    "authorize": "Authorize Google Drive access",
+    "authorizedSuccess": "Successfully connected to Google Drive.",
+    "testUploadSuccess": "Test file successfully uploaded to Google Drive.",
+    "disconnectedSuccess": "Disconnected from Google Drive.",
+    "authWindowInstructions": "A Google window has opened. Sign in, authorize access, then paste the code shown below.",
+    "authCodePlaceholder": "Authorization code",
+    "validating": "Validating…",
+    "validateCode": "Validate code"
+  },
+  "auditLog": {
+    "title": "Audit log",
+    "noEntries": "No entries.",
+    "loading": "Loading…",
+    "loadMore": "Load more"
   }
 }
