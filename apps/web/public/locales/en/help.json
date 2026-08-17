@@ -1,0 +1,142 @@
+{
+  "intro": {
+    "title": "Help",
+    "tagline": "Server management · Admin tools",
+    "description": "Quick guide to every menu in the application, plus the list of system dependencies required for the tool to work correctly on the server (Raspberry Pi or Ubuntu/Debian)."
+  },
+  "menusHeading": "Using the menus",
+  "sections": {
+    "dashboard": {
+      "summary": "Home screen: server health at a glance.",
+      "details": [
+        "CPU, RAM, disk, and temperature gauges update in real time over WebSocket.",
+        "An alert banner appears automatically when a critical threshold is crossed (temperature, disk full, etc.).",
+        "Click an alert to see its detail in the System screen."
+      ]
+    },
+    "docker": {
+      "summary": "Full management of containers, images, volumes, and networks.",
+      "details": [
+        "Containers tab: start/stop/restart/remove, view live logs and CPU/RAM stats, a \"Backup\" button that opens Applications pre-filled.",
+        "Images tab: export an image to .tar (downloadable), import a .tar, delete.",
+        "Volumes tab: back up in one click, restore the latest backup, delete.",
+        "Networks tab: list of configured Docker networks."
+      ]
+    },
+    "nginx": {
+      "summary": "Web server administration: sites, configuration, certificates.",
+      "details": [
+        "List of vhosts with enabled/disabled status, ports, proxy target, and site folder location.",
+        "Each site has a clickable link that opens it in a new tab, a real HTTP accessibility test, traffic for the last 7 days, and recent errors.",
+        "Configuration editing with automatic validation (nginx -t) before applying — a version history lets you roll back.",
+        "SSL certificate status (Let's Encrypt or manual certificate) with expiration date.",
+        "Full backup of the Nginx configuration (local and/or Google Drive)."
+      ]
+    },
+    "sites": {
+      "summary": "Combined view of a site: its Nginx config, its associated Docker container, and duplication for failover.",
+      "details": [
+        "Useful to quickly find everything about a site without navigating between two screens.",
+        "\"Clone\" button: creates a full duplicate of the site (content folder, database if selected, and a second container on a different port if the site uses a Docker container) — a standby copy ready to take over.",
+        "\"Switch to duplicate\" button: redirects all site traffic to this copy in one click, useful in case of an outage or system error on the primary site. The action is reversible via \"Switch back to primary\".",
+        "The duplicate is a frozen snapshot at the time it was created — later changes to the original are not automatically reflected in it. Use \"Update from original\" to resync it.",
+        "You cannot fail over a site currently in maintenance mode (exit maintenance first) — the two states cannot be active at the same time."
+      ]
+    },
+    "os": {
+      "summary": "Updates and packages for the Debian system.",
+      "details": [
+        "List of installed packages and those with an available update.",
+        "Check for updates and apply them (upgrade/full-upgrade) with live progress tracking.",
+        "Management of \"held\" packages (pinned, excluded from updates)."
+      ]
+    },
+    "pm2": {
+      "summary": "Node.js applications running directly on the server (outside Docker), managed by PM2.",
+      "details": [
+        "List of processes with status, CPU, RAM, uptime, and restart count.",
+        "Start/stop/restart/reload actions and live log viewing.",
+        "Node.js apps running inside a Docker container remain managed from the Docker screen."
+      ]
+    },
+    "network": {
+      "summary": "Network exposure, IP blocking, and hardware information about the server.",
+      "details": [
+        "Open ports on the machine, with the owning process or container.",
+        "Blocking/unblocking IP addresses via fail2ban.",
+        "System tab: hardware model (on Raspberry Pi: supply voltage and throttling), date/time and timezone, network interfaces and IPs, Wi-Fi (scan and connect), SSH status, active and failed services."
+      ]
+    },
+    "applications": {
+      "summary": "The most complete backup system: container + folders + volumes + database bundled together.",
+      "details": [
+        "An \"Application\" links one or more containers, their disk-mounted folders (bind mounts), their named Docker volumes, and an optional database.",
+        "Full backup: a complete snapshot, including an image export of each container (so everything can be recreated even if the original image is lost). Partial backup: only copies files that are new/changed since the last snapshot (saves disk space, no image export).",
+        "Can be scheduled automatically (e.g. daily partial, weekly full) via simple presets.",
+        "An application can also have only a database, with no folder or volume, if the container is stateless (e.g. a plain reverse proxy).",
+        "This screen is only for creating/managing backups — to restore, go to the Restore screen."
+      ]
+    },
+    "backups": {
+      "summary": "Creation and deletion of one-off or scheduled backups of volumes, folders, and databases.",
+      "details": [
+        "Two steps: choose the type (Full, or Partial for a database dump), then the destination (local, USB if a drive is plugged in, Google Drive if connected, and/or direct download to your device).",
+        "A plugged-in USB/SSD drive is detected and mounted automatically — backups are stored in a folder dedicated to this server.",
+        "History of every backup with deletion available (the local file is deleted; existing USB/Drive copies are untouched).",
+        "This screen no longer offers any restore action — that's deliberate, to avoid an accidental click that would overwrite data. Restoring is done exclusively from the Restore screen."
+      ]
+    },
+    "restore": {
+      "summary": "Guided 3-step restore, the only place in the application where data can be overwritten.",
+      "details": [
+        "Step 1: choose the source — Local (backups already on this server), USB (a plugged-in drive containing archives), Google Drive, or upload a backup file from your PC/phone.",
+        "Step 2: choose the exact item to restore, grouped by category (databases, volumes, folders, container images, full/partial applications) to stay readable even with many archives.",
+        "Step 3: explicit confirmation (type \"RESTORE\") before any irreversible action.",
+        "Restoring a container image causes no service interruption on failure: the new container is created and verified before the old one is stopped — if recreation fails, the running application stays intact.",
+        "An archive found on a USB drive with no known history (e.g. after a full reinstall) can be imported directly from this screen to become restorable."
+      ]
+    },
+    "system": {
+      "summary": "Detailed monitoring beyond the Dashboard gauges.",
+      "details": [
+        "Per-disk and per-network-interface detail, throttling/under-voltage status, operating system information."
+      ]
+    },
+    "services": {
+      "summary": "Status and update actions for services installed on the server (Tailscale, Docker, PM2).",
+      "details": [
+        "Each service shows whether it's installed, running, its version, and a few extra details (container count, process count, etc.).",
+        "Available actions: update Tailscale, update or restart Docker (restart = brief interruption of all containers), reload the PM2 daemon.",
+        "The result of each action (output of the executed command) stays viewable to diagnose a possible failure."
+      ]
+    },
+    "settings": {
+      "summary": "Administrator account and audit log.",
+      "details": [
+        "Enable 2FA (recommended) via a QR code to scan with an authenticator app.",
+        "Audit log listing every sensitive action performed (who, what, when, result)."
+      ]
+    }
+  },
+  "tipsHeading": "Tips",
+  "tips": [
+    "The server icon in the top right lets you save multiple deployments (e.g. a Raspberry Pi and an Ubuntu server) and quickly switch between them — each remains an independent installation with its own connection.",
+    "Pull the screen down from the top of a page and hold for a few seconds to force a full reload of the application — useful to get the latest version after an update."
+  ],
+  "dependenciesHeading": "System dependencies to install",
+  "dependenciesIntro": "These programs must be present on the server for the corresponding modules to work. Most are already standard on Raspberry Pi OS / Debian / Ubuntu.",
+  "dependencies": {
+    "docker": { "name": "Docker", "purpose": "Required for the Docker module and volume/container backups." },
+    "nginx": { "name": "Nginx", "purpose": "Required for the Nginx module and site monitoring." },
+    "systemd": { "name": "systemd", "purpose": "Manages the application service and the services listed in Network & Security." },
+    "sudo": { "name": "sudo + scoped rules", "purpose": "Allows privileged actions (reload nginx, apt, etc.) without running the service as root." },
+    "fail2ban": { "name": "fail2ban", "purpose": "Required for IP blocking/unblocking." },
+    "vcgencmd": { "name": "vcgencmd (Raspberry Pi OS/firmware)", "purpose": "Temperature, voltage, and throttling — specific to Raspberry Pi hardware." },
+    "networkmanager": { "name": "NetworkManager (nmcli)", "purpose": "Wi-Fi management (scan, connect) in Network & Security." },
+    "openssh": { "name": "openssh-server", "purpose": "SSH access and status shown in Network & Security." },
+    "pm2": { "name": "PM2", "purpose": "Required for the Node.js (PM2) module if Node apps run outside Docker." },
+    "database": { "name": "MariaDB / MySQL / PostgreSQL / Redis (optional)", "purpose": "Auto-detected if installed natively, for database backups." },
+    "rsync": { "name": "rsync", "purpose": "Used by the Applications module for full/partial snapshots." },
+    "tailscale": { "name": "Tailscale", "purpose": "Secure network access — the app must never be exposed publicly." }
+  }
+}
