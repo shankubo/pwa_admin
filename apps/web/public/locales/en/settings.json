@@ -4,5 +4,58 @@
     "fr": "Français",
     "en": "English",
     "ta": "தமிழ்"
+  },
+  "account": {
+    "title": "Account",
+    "twoFactorStatus": "2FA: {{status}}",
+    "twoFactorEnabled": "enabled",
+    "twoFactorDisabled": "disabled",
+    "loading": "Loading…",
+    "logout": "Log out"
+  },
+  "appUpdate": {
+    "title": "Application",
+    "checking": "Checking…",
+    "checkForUpdate": "Check for updates",
+    "statusRunning": "Checking and deploying…",
+    "statusUpToDate": "Already up to date.",
+    "statusSucceeded": "Deployed: {{commit}} — reload the page.",
+    "statusFailed": "Failed — see the log below.",
+    "forceUpdateHint": "If the app seems stuck on an old version despite the update banner (common on iOS, which rarely wakes up the service worker on its own), this button forces a full cache clear and reloads the app.",
+    "clearing": "Clearing…",
+    "forceFullUpdate": "Force full update"
+  },
+  "twoFactorEnroll": {
+    "title": "Enable 2FA",
+    "starting": "…",
+    "startEnrollment": "Start enrollment",
+    "qrCodeAlt": "2FA QR code",
+    "scanInstructions": "Scan this QR code with your authenticator app, then enter the generated code.",
+    "verifying": "Verifying…",
+    "confirm": "Confirm"
+  },
+  "twoFactorDisable": {
+    "title": "Disable 2FA",
+    "disable": "Disable",
+    "confirmInstructions": "Confirm your password and a code from your authenticator app.",
+    "passwordPlaceholder": "Password",
+    "verifying": "Verifying…",
+    "confirmDisable": "Confirm disabling"
+  },
+  "accessTokens": {
+    "title": "Access tokens",
+    "description": "Lets you sign in from another device without a password, via \"Sign in with token\" on the login screen. Reserved for trusted devices already on the tailnet.",
+    "createdFor": "Token created for \"{{label}}\" — copy it now, it won't be shown again:",
+    "tokenCopied": "I copied the token",
+    "devicePlaceholder": "Device name (e.g. Shan's iPhone)",
+    "generating": "…",
+    "generate": "Generate",
+    "createdOn": "Created on {{date}}",
+    "lastUsedOn": " · last used on {{date}}",
+    "neverUsed": " · never used",
+    "revokeTitle": "Revoke this token?",
+    "revokeDescription": "Device \"{{label}}\" will no longer be able to sign in with this token.",
+    "revoke": "Revoke",
+    "noActiveTokens": "No active tokens."
   }
 }

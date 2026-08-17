@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import type {
   AccessTokenSummary,
   AppUpdateStatus,
@@ -43,6 +44,7 @@ interface AuditLogRow {
 const PAGE_SIZE = 25;
 
 export function Settings() {
+  const { t } = useTranslation("settings");
   const navigate = useNavigate();
   const clearSession = useAuthStore((s) => s.clearSession);
   const [user, setUser] = useState<CurrentUser | null>(null);
@@ -62,16 +64,20 @@ export function Settings() {
   return (
     <div className="flex flex-col gap-4">
       <Card>
-        <CardTitle>Compte</CardTitle>
+        <CardTitle>{t("account.title")}</CardTitle>
         {user ? (
           <div className="text-sm">
             <p className="font-medium">{user.username}</p>
             <p className="text-xs text-muted-foreground">
-              2FA : {user.twoFactorEnabled ? "activée" : "désactivée"}
+              {t("account.twoFactorStatus", {
+                status: user.twoFactorEnabled
+                  ? t("account.twoFactorEnabled")
+                  : t("account.twoFactorDisabled"),
+              })}
             </p>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Chargement…</p>
+          <p className="text-sm text-muted-foreground">{t("account.loading")}</p>
         )}
       </Card>
 
@@ -96,13 +102,14 @@ export function Settings() {
       <AppUpdateCard />
 
       <Button variant="destructive" onClick={logout}>
-        <LogOut className="h-4 w-4" /> Se déconnecter
+        <LogOut className="h-4 w-4" /> {t("account.logout")}
       </Button>
     </div>
   );
 }
 
 function AppUpdateCard() {
+  const { t } = useTranslation("settings");
   const [clearing, setClearing] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | null>(null);
   const [checking, setChecking] = useState(false);
@@ -167,20 +174,20 @@ function AppUpdateCard() {
 
   const updateStatusLabel: Record<NonNullable<AppUpdateStatus>["status"], string> = {
     idle: "",
-    running: "Vérification et déploiement en cours…",
-    up_to_date: "Déjà à jour.",
-    succeeded: `Déployé : ${updateStatus?.deployedCommit ?? ""} — rechargez la page.`,
-    failed: "Échec — voir le journal ci-dessous.",
+    running: t("appUpdate.statusRunning"),
+    up_to_date: t("appUpdate.statusUpToDate"),
+    succeeded: t("appUpdate.statusSucceeded", { commit: updateStatus?.deployedCommit ?? "" }),
+    failed: t("appUpdate.statusFailed"),
   };
 
   return (
     <Card>
-      <CardTitle>Application</CardTitle>
+      <CardTitle>{t("appUpdate.title")}</CardTitle>
       <p className="text-xs text-muted-foreground">{APP_VERSION}</p>
 
       <Button size="sm" variant="outline" className="mt-2" disabled={checking} onClick={checkForUpdate}>
         <DownloadCloud className="h-3.5 w-3.5" />
-        {checking ? "Vérification…" : "Vérifier les mises à jour"}
+        {checking ? t("appUpdate.checking") : t("appUpdate.checkForUpdate")}
       </Button>
       {updateStatus && updateStatus.status !== "idle" && (
         <p
@@ -193,19 +200,16 @@ function AppUpdateCard() {
         <pre className="mt-2 max-h-48 overflow-auto rounded-md bg-muted p-2 text-xs">{updateStatus.log}</pre>
       )}
 
-      <p className="mt-2 text-xs text-muted-foreground">
-        Si l'application semble bloquée sur une ancienne version malgré le bandeau de mise à jour (fréquent sur
-        iOS, qui réveille rarement le service worker de son propre chef), ce bouton force un nettoyage complet du
-        cache et recharge l'application.
-      </p>
+      <p className="mt-2 text-xs text-muted-foreground">{t("appUpdate.forceUpdateHint")}</p>
       <Button size="sm" variant="outline" className="mt-2" disabled={clearing} onClick={forceFullUpdate}>
-        <RefreshCw className="h-3.5 w-3.5" /> {clearing ? "Nettoyage…" : "Forcer la mise à jour complète"}
+        <RefreshCw className="h-3.5 w-3.5" /> {clearing ? t("appUpdate.clearing") : t("appUpdate.forceFullUpdate")}
       </Button>
     </Card>
   );
 }
 
 function TwoFactorEnrollCard({ onEnrolled }: { onEnrolled: () => void }) {
+  const { t } = useTranslation("settings");
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -247,19 +251,21 @@ function TwoFactorEnrollCard({ onEnrolled }: { onEnrolled: () => void }) {
   return (
     <Card>
       <CardTitle className="flex items-center gap-1">
-        <ShieldCheck className="h-4 w-4" /> Activer la 2FA
+        <ShieldCheck className="h-4 w-4" /> {t("twoFactorEnroll.title")}
       </CardTitle>
 
       {!qrCodeDataUrl ? (
         <Button size="sm" disabled={enrolling} onClick={startEnrollment}>
-          {enrolling ? "…" : "Démarrer l'inscription"}
+          {enrolling ? t("twoFactorEnroll.starting") : t("twoFactorEnroll.startEnrollment")}
         </Button>
       ) : (
         <form onSubmit={confirm} className="flex flex-col items-center gap-3">
-          <img src={qrCodeDataUrl} alt="QR code 2FA" className="h-40 w-40 rounded-md border border-border" />
-          <p className="text-center text-xs text-muted-foreground">
-            Scannez ce QR code avec votre application d'authentification, puis entrez le code généré.
-          </p>
+          <img
+            src={qrCodeDataUrl}
+            alt={t("twoFactorEnroll.qrCodeAlt")}
+            className="h-40 w-40 rounded-md border border-border"
+          />
+          <p className="text-center text-xs text-muted-foreground">{t("twoFactorEnroll.scanInstructions")}</p>
           <input
             type="text"
             inputMode="numeric"
@@ -271,7 +277,7 @@ function TwoFactorEnrollCard({ onEnrolled }: { onEnrolled: () => void }) {
           />
           {error && <p className="text-xs text-destructive">{error}</p>}
           <Button type="submit" size="sm" disabled={submitting} className="w-full">
-            {submitting ? "Vérification…" : "Confirmer"}
+            {submitting ? t("twoFactorEnroll.verifying") : t("twoFactorEnroll.confirm")}
           </Button>
         </form>
       )}
@@ -280,6 +286,7 @@ function TwoFactorEnrollCard({ onEnrolled }: { onEnrolled: () => void }) {
 }
 
 function TwoFactorDisableCard({ onDisabled }: { onDisabled: () => void }) {
+  const { t } = useTranslation("settings");
   const [expanded, setExpanded] = useState(false);
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -306,21 +313,19 @@ function TwoFactorDisableCard({ onDisabled }: { onDisabled: () => void }) {
   return (
     <Card>
       <CardTitle className="flex items-center gap-1">
-        <ShieldOff className="h-4 w-4" /> Désactiver la 2FA
+        <ShieldOff className="h-4 w-4" /> {t("twoFactorDisable.title")}
       </CardTitle>
 
       {!expanded ? (
         <Button size="sm" variant="destructive" onClick={() => setExpanded(true)}>
-          Désactiver
+          {t("twoFactorDisable.disable")}
         </Button>
       ) : (
         <form onSubmit={confirm} className="flex flex-col gap-3">
-          <p className="text-xs text-muted-foreground">
-            Confirmez votre mot de passe et un code de votre application d'authentification.
-          </p>
+          <p className="text-xs text-muted-foreground">{t("twoFactorDisable.confirmInstructions")}</p>
           <input
             type="password"
-            placeholder="Mot de passe"
+            placeholder={t("twoFactorDisable.passwordPlaceholder")}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
@@ -337,7 +342,7 @@ function TwoFactorDisableCard({ onDisabled }: { onDisabled: () => void }) {
           />
           {error && <p className="text-xs text-destructive">{error}</p>}
           <Button type="submit" size="sm" variant="destructive" disabled={submitting} className="w-full">
-            {submitting ? "Vérification…" : "Confirmer la désactivation"}
+            {submitting ? t("twoFactorDisable.verifying") : t("twoFactorDisable.confirmDisable")}
           </Button>
         </form>
       )}
@@ -346,6 +351,7 @@ function TwoFactorDisableCard({ onDisabled }: { onDisabled: () => void }) {
 }
 
 function AccessTokensCard() {
+  const { t } = useTranslation("settings");
   const [tokens, setTokens] = useState<AccessTokenSummary[]>([]);
   const [label, setLabel] = useState("");
   const [creating, setCreating] = useState(false);
@@ -393,21 +399,18 @@ function AccessTokensCard() {
   return (
     <Card>
       <CardTitle className="flex items-center gap-1">
-        <KeyRound className="h-4 w-4" /> Jetons d'accès
+        <KeyRound className="h-4 w-4" /> {t("accessTokens.title")}
       </CardTitle>
-      <p className="text-xs text-muted-foreground">
-        Permet de se connecter depuis un autre appareil sans mot de passe, via "Connexion par jeton" sur l'écran de
-        connexion. Réservé à des appareils de confiance déjà sur le tailnet.
-      </p>
+      <p className="text-xs text-muted-foreground">{t("accessTokens.description")}</p>
 
       {newToken && (
         <div className="rounded-md border border-primary/50 bg-primary/5 p-3 text-xs">
           <p className="mb-1 font-medium">
-            Jeton créé pour « {newToken.label} » — copiez-le maintenant, il ne sera plus affiché :
+            {t("accessTokens.createdFor", { label: newToken.label })}
           </p>
           <code className="block break-all rounded bg-background p-2">{newToken.token}</code>
           <Button size="sm" variant="outline" className="mt-2" onClick={() => setNewToken(null)}>
-            J'ai copié le jeton
+            {t("accessTokens.tokenCopied")}
           </Button>
         </div>
       )}
@@ -415,26 +418,28 @@ function AccessTokensCard() {
       <form onSubmit={create} className="flex gap-2">
         <input
           type="text"
-          placeholder="Nom de l'appareil (ex. iPhone Shan)"
+          placeholder={t("accessTokens.devicePlaceholder")}
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
           required
         />
         <Button type="submit" size="sm" disabled={creating}>
-          {creating ? "…" : "Générer"}
+          {creating ? t("accessTokens.generating") : t("accessTokens.generate")}
         </Button>
       </form>
       {error && <p className="text-xs text-destructive">{error}</p>}
 
       <div className="flex flex-col gap-1">
-        {tokens.map((t) => (
-          <div key={t.id} className="flex items-center justify-between border-b border-border/50 py-1.5 text-xs last:border-0">
+        {tokens.map((tok) => (
+          <div key={tok.id} className="flex items-center justify-between border-b border-border/50 py-1.5 text-xs last:border-0">
             <div>
-              <p className="font-medium">{t.label}</p>
+              <p className="font-medium">{tok.label}</p>
               <p className="text-muted-foreground">
-                Créé le {new Date(t.createdAt).toLocaleDateString()}
-                {t.lastUsedAt ? ` · utilisé le ${new Date(t.lastUsedAt).toLocaleDateString()}` : " · jamais utilisé"}
+                {t("accessTokens.createdOn", { date: new Date(tok.createdAt).toLocaleDateString() })}
+                {tok.lastUsedAt
+                  ? t("accessTokens.lastUsedOn", { date: new Date(tok.lastUsedAt).toLocaleDateString() })
+                  : t("accessTokens.neverUsed")}
               </p>
             </div>
             <ConfirmDialog
@@ -443,14 +448,14 @@ function AccessTokensCard() {
                   <Trash2 className="h-4 w-4" />
                 </Button>
               }
-              title="Révoquer ce jeton ?"
-              description={`L'appareil « ${t.label} » ne pourra plus se connecter avec ce jeton.`}
-              confirmLabel="Révoquer"
-              onConfirm={() => revoke(t.id)}
+              title={t("accessTokens.revokeTitle")}
+              description={t("accessTokens.revokeDescription", { label: tok.label })}
+              confirmLabel={t("accessTokens.revoke")}
+              onConfirm={() => revoke(tok.id)}
             />
           </div>
         ))}
-        {loaded && tokens.length === 0 && <p className="text-sm text-muted-foreground">Aucun jeton actif.</p>}
+        {loaded && tokens.length === 0 && <p className="text-sm text-muted-foreground">{t("accessTokens.noActiveTokens")}</p>}
       </div>
     </Card>
   );

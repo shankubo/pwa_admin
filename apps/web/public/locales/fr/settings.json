@@ -4,5 +4,58 @@
     "fr": "Français",
     "en": "English",
     "ta": "தமிழ்"
+  },
+  "account": {
+    "title": "Compte",
+    "twoFactorStatus": "2FA : {{status}}",
+    "twoFactorEnabled": "activée",
+    "twoFactorDisabled": "désactivée",
+    "loading": "Chargement…",
+    "logout": "Se déconnecter"
+  },
+  "appUpdate": {
+    "title": "Application",
+    "checking": "Vérification…",
+    "checkForUpdate": "Vérifier les mises à jour",
+    "statusRunning": "Vérification et déploiement en cours…",
+    "statusUpToDate": "Déjà à jour.",
+    "statusSucceeded": "Déployé : {{commit}} — rechargez la page.",
+    "statusFailed": "Échec — voir le journal ci-dessous.",
+    "forceUpdateHint": "Si l'application semble bloquée sur une ancienne version malgré le bandeau de mise à jour (fréquent sur iOS, qui réveille rarement le service worker de son propre chef), ce bouton force un nettoyage complet du cache et recharge l'application.",
+    "clearing": "Nettoyage…",
+    "forceFullUpdate": "Forcer la mise à jour complète"
+  },
+  "twoFactorEnroll": {
+    "title": "Activer la 2FA",
+    "starting": "…",
+    "startEnrollment": "Démarrer l'inscription",
+    "qrCodeAlt": "QR code 2FA",
+    "scanInstructions": "Scannez ce QR code avec votre application d'authentification, puis entrez le code généré.",
+    "verifying": "Vérification…",
+    "confirm": "Confirmer"
+  },
+  "twoFactorDisable": {
+    "title": "Désactiver la 2FA",
+    "disable": "Désactiver",
+    "confirmInstructions": "Confirmez votre mot de passe et un code de votre application d'authentification.",
+    "passwordPlaceholder": "Mot de passe",
+    "verifying": "Vérification…",
+    "confirmDisable": "Confirmer la désactivation"
+  },
+  "accessTokens": {
+    "title": "Jetons d'accès",
+    "description": "Permet de se connecter depuis un autre appareil sans mot de passe, via \"Connexion par jeton\" sur l'écran de connexion. Réservé à des appareils de confiance déjà sur le tailnet.",
+    "createdFor": "Jeton créé pour « {{label}} » — copiez-le maintenant, il ne sera plus affiché :",
+    "tokenCopied": "J'ai copié le jeton",
+    "devicePlaceholder": "Nom de l'appareil (ex. iPhone Shan)",
+    "generating": "…",
+    "generate": "Générer",
+    "createdOn": "Créé le {{date}}",
+    "lastUsedOn": " · utilisé le {{date}}",
+    "neverUsed": " · jamais utilisé",
+    "revokeTitle": "Révoquer ce jeton ?",
+    "revokeDescription": "L'appareil « {{label}} » ne pourra plus se connecter avec ce jeton.",
+    "revoke": "Révoquer",
+    "noActiveTokens": "Aucun jeton actif."
   }
 }
