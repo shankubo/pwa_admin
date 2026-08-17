@@ -1,0 +1,22 @@
+{
+  "installedServices": "Installed services",
+  "refresh": "Refresh",
+  "loading": "Loading…",
+  "running": "Running",
+  "installedStopped": "Installed, stopped",
+  "notInstalled": "Not installed",
+  "update": "Update",
+  "updateTailscaleTitle": "Update Tailscale?",
+  "updateTailscaleDescription": "Runs tailscale update on the server.",
+  "updateDockerTitle": "Update Docker?",
+  "updateDockerDescription": "Updates docker-ce, docker-ce-cli, and containerd.io via apt.",
+  "restart": "Restart",
+  "restartDockerTitle": "Restart Docker?",
+  "restartDockerDescription": "All containers will be briefly stopped then relaunched (per their restart policy). Disruptive action.",
+  "reloadDaemon": "Reload daemon",
+  "reloadPm2Title": "Reload PM2 daemon?",
+  "reloadPm2Description": "Runs pm2 update to reload the daemon in memory.",
+  "reload": "Reload",
+  "resultSuccess": "Result: success",
+  "resultFailure": "Result: failure"
+}

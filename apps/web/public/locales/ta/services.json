@@ -1,0 +1,22 @@
+{
+  "installedServices": "நிறுவப்பட்ட சேவைகள்",
+  "refresh": "புதுப்பி",
+  "loading": "ஏற்றுகிறது…",
+  "running": "இயங்குகிறது",
+  "installedStopped": "நிறுவப்பட்டது, நிறுத்தப்பட்டது",
+  "notInstalled": "நிறுவப்படவில்லை",
+  "update": "புதுப்பிக்கவும்",
+  "updateTailscaleTitle": "Tailscale ஐ புதுப்பிக்கவா?",
+  "updateTailscaleDescription": "சேவையகத்தில் tailscale update ஐ இயக்குகிறது.",
+  "updateDockerTitle": "Docker ஐ புதுப்பிக்கவா?",
+  "updateDockerDescription": "apt வழியாக docker-ce, docker-ce-cli மற்றும் containerd.io ஐ புதுப்பிக்கிறது.",
+  "restart": "மறுதொடக்கம்",
+  "restartDockerTitle": "Docker ஐ மறுதொடக்கம் செய்யவா?",
+  "restartDockerDescription": "அனைத்து கொள்கலன்களும் சுருக்கமாக நிறுத்தப்பட்டு பின்னர் மீண்டும் தொடங்கப்படும் (அவற்றின் மறுதொடக்கக் கொள்கையின்படி). இடையூறு விளைவிக்கும் செயல்.",
+  "reloadDaemon": "டீமனை மீண்டும் ஏற்று",
+  "reloadPm2Title": "PM2 டீமனை மீண்டும் ஏற்றவா?",
+  "reloadPm2Description": "நினைவகத்தில் டீமனை மீண்டும் ஏற்ற pm2 update ஐ இயக்குகிறது.",
+  "reload": "மீண்டும் ஏற்று",
+  "resultSuccess": "முடிவு: வெற்றி",
+  "resultFailure": "முடிவு: தோல்வி"
+}

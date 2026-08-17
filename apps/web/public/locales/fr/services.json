@@ -1,0 +1,22 @@
+{
+  "installedServices": "Services installés",
+  "refresh": "Rafraîchir",
+  "loading": "Chargement…",
+  "running": "En cours d'exécution",
+  "installedStopped": "Installé, arrêté",
+  "notInstalled": "Non installé",
+  "update": "Mettre à jour",
+  "updateTailscaleTitle": "Mettre à jour Tailscale ?",
+  "updateTailscaleDescription": "Lance tailscale update sur le serveur.",
+  "updateDockerTitle": "Mettre à jour Docker ?",
+  "updateDockerDescription": "Met à jour docker-ce, docker-ce-cli et containerd.io via apt.",
+  "restart": "Redémarrer",
+  "restartDockerTitle": "Redémarrer Docker ?",
+  "restartDockerDescription": "Tous les conteneurs seront brièvement arrêtés puis relancés (selon leur politique de redémarrage). Action disruptive.",
+  "reloadDaemon": "Recharger le daemon",
+  "reloadPm2Title": "Recharger le daemon PM2 ?",
+  "reloadPm2Description": "Lance pm2 update pour recharger le daemon en mémoire.",
+  "reload": "Recharger",
+  "resultSuccess": "Résultat : succès",
+  "resultFailure": "Résultat : échec"
+}
