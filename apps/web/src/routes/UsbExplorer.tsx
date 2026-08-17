@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { UsbStatus, UsbExplorerListing, UsbExplorerEntry } from "@pwa-admin/shared";
+import { useTranslation } from "react-i18next";
 import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -22,6 +23,7 @@ function iconFor(entry: UsbExplorerEntry) {
 }
 
 export function UsbExplorer() {
+  const { t } = useTranslation("usbExplorer");
   const navigate = useNavigate();
   const [status, setStatus] = useState<UsbStatus | null>(null);
   const [mountpoint, setMountpoint] = useState<string | null>(null);
@@ -79,17 +81,14 @@ export function UsbExplorer() {
   if (status && status.drives.length === 0) {
     return (
       <Card>
-        <p className="text-sm text-muted-foreground">Aucun disque USB/SSD détecté.</p>
+        <p className="text-sm text-muted-foreground">{t("noDriveDetected")}</p>
       </Card>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground">
-        Parcourir le contenu brut du dossier BACKUP/ de chaque disque externe — sauvegardes et instantanés de
-        migration de toutes les machines présentes sur ce disque, pas seulement ce serveur.
-      </p>
+      <p className="text-sm text-muted-foreground">{t("intro")}</p>
 
       {status && status.drives.length > 1 && (
         <div className="flex gap-2">
@@ -129,11 +128,11 @@ export function UsbExplorer() {
         <Card className="md:col-span-2">
           {loading && (
             <p className="flex items-center gap-1 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
+              <Loader2 className="h-4 w-4 animate-spin" /> {t("loading")}
             </p>
           )}
           {!loading && listing && listing.entries.length === 0 && (
-            <p className="text-sm text-muted-foreground">Dossier vide.</p>
+            <p className="text-sm text-muted-foreground">{t("emptyFolder")}</p>
           )}
           {!loading && listing && listing.entries.length > 0 && (
             <div className="flex flex-col gap-1">
@@ -172,16 +171,16 @@ export function UsbExplorer() {
         </Card>
 
         <Card>
-          <CardTitle>Détail</CardTitle>
-          {!selected && <p className="text-sm text-muted-foreground">Sélectionnez un fichier pour voir le détail.</p>}
+          <CardTitle>{t("detailTitle")}</CardTitle>
+          {!selected && <p className="text-sm text-muted-foreground">{t("selectFilePrompt")}</p>}
           {selected && (
             <div className="flex flex-col gap-2 text-sm">
               <p className="font-medium break-all">{selected.name}</p>
               {selected.hostname && (
-                <p className="text-xs text-muted-foreground">Machine : {selected.hostname}</p>
+                <p className="text-xs text-muted-foreground">{t("machineLabel", { hostname: selected.hostname })}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                {selected.isDirectory ? "Dossier" : formatBytes(selected.sizeBytes ?? 0)}
+                {selected.isDirectory ? t("folderLabel") : formatBytes(selected.sizeBytes ?? 0)}
               </p>
               <p className="text-xs text-muted-foreground">{new Date(selected.modifiedAt).toLocaleString()}</p>
               {selected.kind === "manifest" && selected.migrationManifestId && (
@@ -190,14 +189,11 @@ export function UsbExplorer() {
                   className="mt-2"
                   onClick={() => navigate("/restore", { state: { manifestId: selected.migrationManifestId } })}
                 >
-                  <Shuffle className="h-3.5 w-3.5" /> Ouvrir dans Restore
+                  <Shuffle className="h-3.5 w-3.5" /> {t("openInRestore")}
                 </Button>
               )}
               {selected.kind !== "manifest" && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Utilisez Restore &gt; USB pour restaurer une sauvegarde de ce serveur ; les instantanés de
-                  migration (manifest.json) s'ouvrent directement depuis ici.
-                </p>
+                <p className="mt-1 text-xs text-muted-foreground">{t("restoreHint")}</p>
               )}
             </div>
           )}

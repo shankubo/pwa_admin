@@ -1,0 +1,12 @@
+{
+  "noDriveDetected": "No USB/SSD drive detected.",
+  "intro": "Browse the raw content of the BACKUP/ folder on each external drive — backups and migration snapshots from every machine present on this drive, not just this server.",
+  "loading": "Loading…",
+  "emptyFolder": "Empty folder.",
+  "detailTitle": "Detail",
+  "selectFilePrompt": "Select a file to see its detail.",
+  "machineLabel": "Machine: {{hostname}}",
+  "folderLabel": "Folder",
+  "openInRestore": "Open in Restore",
+  "restoreHint": "Use Restore > USB to restore a backup from this server; migration snapshots (manifest.json) open directly from here."
+}

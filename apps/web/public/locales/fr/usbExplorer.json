@@ -1,0 +1,12 @@
+{
+  "noDriveDetected": "Aucun disque USB/SSD détecté.",
+  "intro": "Parcourir le contenu brut du dossier BACKUP/ de chaque disque externe — sauvegardes et instantanés de migration de toutes les machines présentes sur ce disque, pas seulement ce serveur.",
+  "loading": "Chargement…",
+  "emptyFolder": "Dossier vide.",
+  "detailTitle": "Détail",
+  "selectFilePrompt": "Sélectionnez un fichier pour voir le détail.",
+  "machineLabel": "Machine : {{hostname}}",
+  "folderLabel": "Dossier",
+  "openInRestore": "Ouvrir dans Restore",
+  "restoreHint": "Utilisez Restore > USB pour restaurer une sauvegarde de ce serveur ; les instantanés de migration (manifest.json) s'ouvrent directement depuis ici."
+}
