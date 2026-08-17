@@ -1,0 +1,50 @@
+{
+  "tagline": "Gestion des serveurs · Admin tools",
+  "version": "Version {{version}}",
+  "description": "Application web progressive (PWA) mobile complète pour administrer un serveur Linux sans avoir à ouvrir un terminal SSH. Elle centralise la gestion des sites web (Nginx), des conteneurs Docker, des sauvegardes et restaurations (locales, USB/SSD et Google Drive), la surveillance système temps réel (CPU, RAM, disque, température), la gestion des paquets Debian/OS, du réseau et de la sécurité, des services installés (Tailscale, Docker, PM2) et des processus Node.js — le tout depuis un téléphone, en toute sécurité via Tailscale. Plusieurs déploiements indépendants (ex. Pi + serveur Ubuntu) peuvent être enregistrés et basculés depuis la même interface.",
+  "developerHeading": "Développeur",
+  "structureHeading": "Structure de l'application",
+  "structure": {
+    "api": {
+      "title": "apps/api — Backend",
+      "description": "Fastify (Node.js) : sert l'API REST/WebSocket et le frontend buildé. Authentification JWT + 2FA (TOTP), contrôle Docker (dockerode), monitoring (systeminformation), sauvegardes, Google Drive, planification (node-cron)."
+    },
+    "web": {
+      "title": "apps/web — Frontend",
+      "description": "React + Vite, PWA installable (manifest + service worker). Interface mobile-first avec navigation par menu hamburger."
+    },
+    "shared": {
+      "title": "packages/shared — Types partagés",
+      "description": "Types TypeScript communs entre l'API et le frontend (DTOs, protocole WebSocket)."
+    },
+    "deploy": {
+      "title": "deploy/ — Déploiement",
+      "description": "Unit systemd, règles sudoers scoped (moindre privilège), scripts d'installation et de renouvellement de certificat."
+    }
+  },
+  "modulesHeading": "Modules",
+  "modules": {
+    "dashboard": "Vue d'ensemble : CPU, RAM, disque, température, disque USB/SSD connecté et alertes actives en un coup d'œil.",
+    "docker": "Conteneurs, images, volumes et réseaux : démarrer, arrêter, logs et stats en direct, export/import d'images, sauvegarde de volumes.",
+    "nginx": "Vhosts, activation/désactivation, édition de configuration validée, certificats, accessibilité, trafic, sauvegarde de config, mode maintenance par site.",
+    "sites": "Vue agrégée par site combinant les infos Nginx et les conteneurs Docker associés.",
+    "os": "Informations système, paquets installés, mises à jour Debian/apt avec suivi en direct.",
+    "pm2": "Processus Node.js gérés par PM2 directement sur l'hôte : statut, logs en direct, start/stop/restart.",
+    "network": "Ports ouverts, blocage d'IP (fail2ban), matériel (modèle, tension, IP, Wi-Fi, SSH), services système.",
+    "applications": "Sauvegardes complètes composées (conteneurs + dossiers + volumes Docker + base de données), pleines ou partielles, locales/USB/Google Drive.",
+    "backups": "Création et suppression de sauvegardes de volumes, dossiers et bases de données — local, USB ou Google Drive.",
+    "restore": "Restauration guidée en 3 étapes (source → archive → confirmation), seul point d'entrée de l'app pour restaurer des données.",
+    "system": "Monitoring détaillé : température, throttling, disques, réseau, système d'exploitation.",
+    "services": "Statut et mise à jour des services installés sur le serveur (Tailscale, Docker, PM2).",
+    "settings": "Compte administrateur, activation de la 2FA, journal d'audit de toutes les actions sensibles."
+  },
+  "securityHeading": "Sécurité",
+  "security": [
+    "Aucune commande shell construite par concaténation de chaîne (argv-array uniquement).",
+    "Privilèges élevés strictement scoped via sudoers, jamais le service lancé en root.",
+    "Authentification JWT + 2FA (TOTP), journal d'audit de toutes les actions destructives.",
+    "Accès réseau exclusivement via Tailscale (VPN privé) — jamais exposé publiquement."
+  ],
+  "storageHeading": "Stockage des sauvegardes",
+  "storageDescription": "Local (disque du serveur), disque USB/SSD externe (détecté et monté automatiquement) et/ou Google Drive (compte personnel via OAuth2), configurable par sauvegarde. La restauration se fait depuis l'écran Restore, quelle que soit la source d'origine."
+}

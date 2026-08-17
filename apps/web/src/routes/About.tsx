@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { APP_VERSION } from "@/lib/appVersion";
 import {
@@ -24,23 +25,24 @@ import {
 
 const DEVELOPER = "Shan.K";
 
-const MODULES: { icon: typeof LayoutDashboard; title: string; description: string }[] = [
-  { icon: LayoutDashboard, title: "Dashboard", description: "Vue d'ensemble : CPU, RAM, disque, température, disque USB/SSD connecté et alertes actives en un coup d'œil." },
-  { icon: Container, title: "Docker", description: "Conteneurs, images, volumes et réseaux : démarrer, arrêter, logs et stats en direct, export/import d'images, sauvegarde de volumes." },
-  { icon: Server, title: "Nginx", description: "Vhosts, activation/désactivation, édition de configuration validée, certificats, accessibilité, trafic, sauvegarde de config, mode maintenance par site." },
-  { icon: Globe, title: "Sites", description: "Vue agrégée par site combinant les infos Nginx et les conteneurs Docker associés." },
-  { icon: Package, title: "OS / Paquets", description: "Informations système, paquets installés, mises à jour Debian/apt avec suivi en direct." },
-  { icon: Hexagon, title: "Node.js (PM2)", description: "Processus Node.js gérés par PM2 directement sur l'hôte : statut, logs en direct, start/stop/restart." },
-  { icon: Network, title: "Réseau & Sécurité", description: "Ports ouverts, blocage d'IP (fail2ban), matériel (modèle, tension, IP, Wi-Fi, SSH), services système." },
-  { icon: Boxes, title: "Applications", description: "Sauvegardes complètes composées (conteneurs + dossiers + volumes Docker + base de données), pleines ou partielles, locales/USB/Google Drive." },
-  { icon: DatabaseBackup, title: "Backups", description: "Création et suppression de sauvegardes de volumes, dossiers et bases de données — local, USB ou Google Drive." },
-  { icon: RotateCcw, title: "Restore", description: "Restauration guidée en 3 étapes (source → archive → confirmation), seul point d'entrée de l'app pour restaurer des données." },
-  { icon: Activity, title: "System", description: "Monitoring détaillé : température, throttling, disques, réseau, système d'exploitation." },
-  { icon: Wrench, title: "Services", description: "Statut et mise à jour des services installés sur le serveur (Tailscale, Docker, PM2)." },
-  { icon: SettingsIcon, title: "Settings", description: "Compte administrateur, activation de la 2FA, journal d'audit de toutes les actions sensibles." },
+const MODULES: { icon: typeof LayoutDashboard; title: string; slug: string }[] = [
+  { icon: LayoutDashboard, title: "Dashboard", slug: "dashboard" },
+  { icon: Container, title: "Docker", slug: "docker" },
+  { icon: Server, title: "Nginx", slug: "nginx" },
+  { icon: Globe, title: "Sites", slug: "sites" },
+  { icon: Package, title: "OS / Paquets", slug: "os" },
+  { icon: Hexagon, title: "Node.js (PM2)", slug: "pm2" },
+  { icon: Network, title: "Réseau & Sécurité", slug: "network" },
+  { icon: Boxes, title: "Applications", slug: "applications" },
+  { icon: DatabaseBackup, title: "Backups", slug: "backups" },
+  { icon: RotateCcw, title: "Restore", slug: "restore" },
+  { icon: Activity, title: "System", slug: "system" },
+  { icon: Wrench, title: "Services", slug: "services" },
+  { icon: SettingsIcon, title: "Settings", slug: "settings" },
 ];
 
 export function About() {
+  const { t } = useTranslation("about");
   return (
     <div className="flex flex-col gap-4">
       <Card>
@@ -50,66 +52,46 @@ export function About() {
           </div>
           <div>
             <h1 className="text-lg font-semibold">Server Admin PWA</h1>
-            <p className="text-xs font-medium text-primary">Gestion des serveurs · Admin tools</p>
-            <p className="text-xs text-muted-foreground">Version {APP_VERSION}</p>
+            <p className="text-xs font-medium text-primary">{t("tagline")}</p>
+            <p className="text-xs text-muted-foreground">{t("version", { version: APP_VERSION })}</p>
           </div>
         </div>
-        <p className="mt-3 text-sm text-muted-foreground">
-          Application web progressive (PWA) mobile complète pour administrer un serveur Linux sans avoir à
-          ouvrir un terminal SSH. Elle centralise la gestion des sites web (Nginx), des conteneurs Docker, des
-          sauvegardes et restaurations (locales, USB/SSD et Google Drive), la surveillance système temps réel
-          (CPU, RAM, disque, température), la gestion des paquets Debian/OS, du réseau et de la sécurité, des
-          services installés (Tailscale, Docker, PM2) et des processus Node.js — le tout depuis un téléphone,
-          en toute sécurité via Tailscale. Plusieurs déploiements indépendants (ex. Pi + serveur Ubuntu) peuvent
-          être enregistrés et basculés depuis la même interface.
-        </p>
+        <p className="mt-3 text-sm text-muted-foreground">{t("description")}</p>
       </Card>
 
       <Card>
         <CardTitle className="flex items-center gap-1">
-          <User className="h-4 w-4" /> Développeur
+          <User className="h-4 w-4" /> {t("developerHeading")}
         </CardTitle>
         <p className="text-sm font-medium">{DEVELOPER}</p>
       </Card>
 
       <Card>
         <CardTitle className="flex items-center gap-1">
-          <Layers className="h-4 w-4" /> Structure de l'application
+          <Layers className="h-4 w-4" /> {t("structureHeading")}
         </CardTitle>
         <div className="flex flex-col gap-2 text-sm">
           <div>
-            <p className="font-medium">apps/api — Backend</p>
-            <p className="text-xs text-muted-foreground">
-              Fastify (Node.js) : sert l'API REST/WebSocket et le frontend buildé. Authentification JWT + 2FA
-              (TOTP), contrôle Docker (dockerode), monitoring (systeminformation), sauvegardes, Google Drive,
-              planification (node-cron).
-            </p>
+            <p className="font-medium">{t("structure.api.title")}</p>
+            <p className="text-xs text-muted-foreground">{t("structure.api.description")}</p>
           </div>
           <div>
-            <p className="font-medium">apps/web — Frontend</p>
-            <p className="text-xs text-muted-foreground">
-              React + Vite, PWA installable (manifest + service worker). Interface mobile-first avec navigation
-              par menu hamburger.
-            </p>
+            <p className="font-medium">{t("structure.web.title")}</p>
+            <p className="text-xs text-muted-foreground">{t("structure.web.description")}</p>
           </div>
           <div>
-            <p className="font-medium">packages/shared — Types partagés</p>
-            <p className="text-xs text-muted-foreground">
-              Types TypeScript communs entre l'API et le frontend (DTOs, protocole WebSocket).
-            </p>
+            <p className="font-medium">{t("structure.shared.title")}</p>
+            <p className="text-xs text-muted-foreground">{t("structure.shared.description")}</p>
           </div>
           <div>
-            <p className="font-medium">deploy/ — Déploiement</p>
-            <p className="text-xs text-muted-foreground">
-              Unit systemd, règles sudoers scoped (moindre privilège), scripts d'installation et de renouvellement
-              de certificat.
-            </p>
+            <p className="font-medium">{t("structure.deploy.title")}</p>
+            <p className="text-xs text-muted-foreground">{t("structure.deploy.description")}</p>
           </div>
         </div>
       </Card>
 
       <div>
-        <h2 className="mb-2 text-sm font-semibold text-muted-foreground">Modules</h2>
+        <h2 className="mb-2 text-sm font-semibold text-muted-foreground">{t("modulesHeading")}</h2>
         <div className="flex flex-col gap-2">
           {MODULES.map((m) => (
             <Card key={m.title} className="flex items-start gap-3">
@@ -118,7 +100,7 @@ export function About() {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-medium">{m.title}</p>
-                <p className="text-xs text-muted-foreground">{m.description}</p>
+                <p className="text-xs text-muted-foreground">{t(`modules.${m.slug}`)}</p>
               </div>
             </Card>
           ))}
@@ -127,25 +109,20 @@ export function About() {
 
       <Card>
         <CardTitle className="flex items-center gap-1">
-          <ShieldCheck className="h-4 w-4" /> Sécurité
+          <ShieldCheck className="h-4 w-4" /> {t("securityHeading")}
         </CardTitle>
         <ul className="flex flex-col gap-1 text-xs text-muted-foreground">
-          <li>• Aucune commande shell construite par concaténation de chaîne (argv-array uniquement).</li>
-          <li>• Privilèges élevés strictement scoped via sudoers, jamais le service lancé en root.</li>
-          <li>• Authentification JWT + 2FA (TOTP), journal d'audit de toutes les actions destructives.</li>
-          <li>• Accès réseau exclusivement via Tailscale (VPN privé) — jamais exposé publiquement.</li>
+          {(t("security", { returnObjects: true }) as string[]).map((item, i) => (
+            <li key={i}>• {item}</li>
+          ))}
         </ul>
       </Card>
 
       <Card>
         <CardTitle className="flex items-center gap-1">
-          <Cloud className="h-4 w-4" /> Stockage des sauvegardes
+          <Cloud className="h-4 w-4" /> {t("storageHeading")}
         </CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Local (disque du serveur), disque USB/SSD externe (détecté et monté automatiquement) et/ou Google
-          Drive (compte personnel via OAuth2), configurable par sauvegarde. La restauration se fait depuis
-          l'écran Restore, quelle que soit la source d'origine.
-        </p>
+        <p className="text-xs text-muted-foreground">{t("storageDescription")}</p>
       </Card>
 
       <div className="flex items-center justify-center gap-1 py-2 text-xs text-muted-foreground">

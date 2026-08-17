@@ -1,0 +1,50 @@
+{
+  "tagline": "Server management · Admin tools",
+  "version": "Version {{version}}",
+  "description": "A complete mobile progressive web app (PWA) for administering a Linux server without ever opening an SSH terminal. It centralizes management of web sites (Nginx), Docker containers, backups and restores (local, USB/SSD, and Google Drive), real-time system monitoring (CPU, RAM, disk, temperature), Debian/OS package management, network and security, installed services (Tailscale, Docker, PM2), and Node.js processes — all from a phone, securely over Tailscale. Multiple independent deployments (e.g. a Pi + an Ubuntu server) can be saved and switched between from the same interface.",
+  "developerHeading": "Developer",
+  "structureHeading": "Application structure",
+  "structure": {
+    "api": {
+      "title": "apps/api — Backend",
+      "description": "Fastify (Node.js): serves the REST/WebSocket API and the built frontend. JWT + 2FA (TOTP) authentication, Docker control (dockerode), monitoring (systeminformation), backups, Google Drive, scheduling (node-cron)."
+    },
+    "web": {
+      "title": "apps/web — Frontend",
+      "description": "React + Vite, installable PWA (manifest + service worker). Mobile-first interface with hamburger-menu navigation."
+    },
+    "shared": {
+      "title": "packages/shared — Shared types",
+      "description": "TypeScript types shared between the API and the frontend (DTOs, WebSocket protocol)."
+    },
+    "deploy": {
+      "title": "deploy/ — Deployment",
+      "description": "systemd unit, scoped sudoers rules (least privilege), install and certificate renewal scripts."
+    }
+  },
+  "modulesHeading": "Modules",
+  "modules": {
+    "dashboard": "Overview: CPU, RAM, disk, temperature, connected USB/SSD drive, and active alerts at a glance.",
+    "docker": "Containers, images, volumes, and networks: start, stop, live logs and stats, image export/import, volume backup.",
+    "nginx": "Vhosts, enable/disable, validated configuration editing, certificates, accessibility, traffic, config backup, per-site maintenance mode.",
+    "sites": "Aggregated per-site view combining Nginx info and associated Docker containers.",
+    "os": "System information, installed packages, Debian/apt updates with live progress tracking.",
+    "pm2": "Node.js processes managed by PM2 directly on the host: status, live logs, start/stop/restart.",
+    "network": "Open ports, IP blocking (fail2ban), hardware (model, voltage, IP, Wi-Fi, SSH), system services.",
+    "applications": "Composite full backups (containers + folders + Docker volumes + database), full or partial, local/USB/Google Drive.",
+    "backups": "Creation and deletion of volume, folder, and database backups — local, USB, or Google Drive.",
+    "restore": "Guided 3-step restore (source → archive → confirmation), the app's only entry point for restoring data.",
+    "system": "Detailed monitoring: temperature, throttling, disks, network, operating system.",
+    "services": "Status and updates for services installed on the server (Tailscale, Docker, PM2).",
+    "settings": "Administrator account, 2FA activation, audit log of all sensitive actions."
+  },
+  "securityHeading": "Security",
+  "security": [
+    "No shell command built by string concatenation (argv-array only).",
+    "Elevated privileges strictly scoped via sudoers, the service is never run as root.",
+    "JWT + 2FA (TOTP) authentication, audit log of every destructive action.",
+    "Network access exclusively via Tailscale (private VPN) — never exposed publicly."
+  ],
+  "storageHeading": "Backup storage",
+  "storageDescription": "Local (server disk), external USB/SSD drive (auto-detected and mounted), and/or Google Drive (personal account via OAuth2), configurable per backup. Restoring is always done from the Restore screen, regardless of the original source."
+}
