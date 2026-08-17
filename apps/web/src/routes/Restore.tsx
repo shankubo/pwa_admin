@@ -1098,6 +1098,7 @@ function StepMigration({
   currentHostname: string | null;
   onSelect: (manifest: MigrationManifest) => void;
 }) {
+  const { t } = useTranslation("restore");
   const [expandedHosts, setExpandedHosts] = useState<Set<string>>(new Set());
 
   const groups = useMemo(() => {
@@ -1126,11 +1127,9 @@ function StepMigration({
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm text-muted-foreground">
-        Étape 2 — Instantanés de migration disponibles sur le disque USB.
-      </p>
+      <p className="text-sm text-muted-foreground">{t("stepMigration.intro")}</p>
       {manifests.length === 0 && (
-        <p className="text-sm text-muted-foreground">Aucun instantané de migration trouvé.</p>
+        <p className="text-sm text-muted-foreground">{t("stepMigration.empty")}</p>
       )}
 
       {groups.ownManifests.length > 0 && (
@@ -1143,7 +1142,7 @@ function StepMigration({
 
       {manifests.length > 0 && groups.ownManifests.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          Aucun instantané pour ce serveur ({currentHostname ?? "hôte inconnu"}) — voir les autres machines ci-dessous.
+          {t("stepMigration.noneForThisServer", { hostname: currentHostname ?? t("stepMigration.unknownHost") })}
         </p>
       )}
 
@@ -1153,7 +1152,7 @@ function StepMigration({
           <div key={slug} className="flex flex-col gap-2">
             <Button size="sm" variant="outline" className="self-start" onClick={() => toggleHost(slug)}>
               {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-              Autres — {slug} ({hostManifests.length})
+              {t("stepMigration.otherHosts", { slug, count: hostManifests.length })}
             </Button>
             {expanded && (
               <div className="ml-2 flex flex-col gap-2 border-l border-border pl-3">
@@ -1170,6 +1169,7 @@ function StepMigration({
 }
 
 function ManifestTile({ manifest: m, onSelect }: { manifest: MigrationManifest; onSelect: (manifest: MigrationManifest) => void }) {
+  const { t } = useTranslation("restore");
   const successCount = m.items.filter((i) => i.status === "success").length;
   return (
     <button
@@ -1179,11 +1179,17 @@ function ManifestTile({ manifest: m, onSelect }: { manifest: MigrationManifest; 
     >
       <p className="flex items-center gap-2 font-medium">
         <Shuffle className="h-4 w-4 text-primary" />
-        {m.scope.type === "site" ? `Site : ${m.scope.siteName}` : `Serveur complet (${m.hostname})`}
+        {m.scope.type === "site"
+          ? t("manifestTile.siteScope", { name: m.scope.siteName })
+          : t("manifestTile.serverScope", { hostname: m.hostname })}
       </p>
       <p className="text-xs text-muted-foreground">
-        {new Date(m.createdAt).toLocaleString()} · {successCount}/{m.items.length} éléments capturés ·{" "}
-        {m.osDistro} {m.osRelease}
+        {t("manifestTile.summary", {
+          date: new Date(m.createdAt).toLocaleString(),
+          success: successCount,
+          total: m.items.length,
+          os: `${m.osDistro} ${m.osRelease}`,
+        })}
       </p>
     </button>
   );
@@ -1210,6 +1216,7 @@ async function uploadManifestFileToDrive(manifestId: string, fileId: string): Pr
  * Drive upload, which only ever ADDS a copy elsewhere, never touches the
  * USB archive or the restore flow itself. */
 function MigrationFileListPanel({ manifestId, gdriveAuthorized }: { manifestId: string; gdriveAuthorized: boolean }) {
+  const { t } = useTranslation("restore");
   const [list, setList] = useState<MigrationManifestFileList | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
@@ -1242,19 +1249,17 @@ function MigrationFileListPanel({ manifestId, gdriveAuthorized }: { manifestId: 
       {error && <p className="text-xs text-destructive">{error}</p>}
       {!list && !error && (
         <p className="flex items-center gap-1 text-xs text-muted-foreground">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Chargement…
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> {t("fileListPanel.loading")}
         </p>
       )}
       {list && (
         <div className="flex flex-col gap-2">
           <p className="text-xs text-muted-foreground">
-            Tous ces fichiers se trouvent déjà ensemble dans le même dossier sur le disque USB — pour une
-            installation manuelle complète, copiez-le directement (<code className="font-mono">scp -r</code> ou
-            disque monté) :
+            {t("fileListPanel.explanation")}<code className="font-mono">scp -r</code>{t("fileListPanel.explanationSuffix")}
           </p>
           <p className="break-all rounded-md bg-muted p-2 font-mono text-[11px]">{list.usbRoot}</p>
           {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
-          {list.files.length === 0 && <p className="text-xs text-muted-foreground">Aucun fichier disponible.</p>}
+          {list.files.length === 0 && <p className="text-xs text-muted-foreground">{t("fileListPanel.empty")}</p>}
           {list.files.length > 0 && (
             <div className="flex flex-col gap-1">
               {list.files.map((f) => (
@@ -1270,14 +1275,14 @@ function MigrationFileListPanel({ manifestId, gdriveAuthorized }: { manifestId: 
                     {f.sizeBytes != null && <span className="text-muted-foreground">{formatBytes(f.sizeBytes)}</span>}
                     {uploadedIds.has(f.fileId) ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-1 text-primary">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Envoyé
+                        <CheckCircle2 className="h-3.5 w-3.5" /> {t("fileListPanel.sent")}
                       </span>
                     ) : (
                       <Button
                         size="sm"
                         variant="outline"
                         disabled={!gdriveAuthorized || uploadingId === f.fileId}
-                        title={gdriveAuthorized ? "Envoyer vers Google Drive" : "Google Drive non connecté (voir Settings)"}
+                        title={gdriveAuthorized ? t("localRunActions.sendToDriveTitle") : t("localRunActions.sendToDriveDisabledTitle")}
                         onClick={() => uploadToDrive(f.fileId)}
                       >
                         {uploadingId === f.fileId ? (
@@ -1310,6 +1315,7 @@ function StepMigrationConfirm({
   gdriveAuthorized: boolean;
   onReset: () => void;
 }) {
+  const { t } = useTranslation("restore");
   const [includeOsPackages, setIncludeOsPackages] = useState(false);
   const [restoreId, setRestoreId] = useState<string | null>(null);
   const [run, setRun] = useState<MigrationRestoreRun | null>(null);
@@ -1448,14 +1454,14 @@ function StepMigrationConfirm({
             <XCircle className="h-4 w-4" />
           )}
           {run.status === "success"
-            ? "Restauration terminée avec succès."
+            ? t("migrationConfirm.success")
             : run.status === "partial"
-              ? "Restauration terminée avec des erreurs partielles."
-              : "Échec de la restauration."}
+              ? t("migrationConfirm.partialSuccess")
+              : t("migrationConfirm.failed")}
         </p>
         <RestoreItemsList items={run.items} />
         <Button size="sm" variant="outline" className="mt-3" onClick={onReset}>
-          Nouvelle restauration
+          {t("stepConfirm.newRestore")}
         </Button>
       </Card>
     );
@@ -1465,7 +1471,7 @@ function StepMigrationConfirm({
     return (
       <Card>
         <p className="flex items-center gap-1 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Restauration en cours…
+          <Loader2 className="h-4 w-4 animate-spin" /> {t("migrationConfirm.running")}
         </p>
         <RestoreItemsList items={run.items} />
       </Card>
@@ -1474,14 +1480,16 @@ function StepMigrationConfirm({
 
   return (
     <Card>
-      <CardTitle>Étape 3 — Confirmation</CardTitle>
+      <CardTitle>{t("stepConfirm.title")}</CardTitle>
       <p className="mt-1 text-xs text-muted-foreground">
-        {manifest.scope.type === "site" ? `Site : ${manifest.scope.siteName}` : `Serveur complet (${manifest.hostname})`}{" "}
+        {manifest.scope.type === "site"
+          ? t("manifestTile.siteScope", { name: manifest.scope.siteName })
+          : t("manifestTile.serverScope", { hostname: manifest.hostname })}{" "}
         · {new Date(manifest.createdAt).toLocaleString()}
       </p>
 
       <Button size="sm" variant="outline" className="mt-2" onClick={() => setShowFiles((v) => !v)}>
-        <FileText className="h-3.5 w-3.5" /> {showFiles ? "Masquer les fichiers" : "Voir les fichiers"}
+        <FileText className="h-3.5 w-3.5" /> {showFiles ? t("migrationConfirm.hideFiles") : t("migrationConfirm.showFiles")}
       </Button>
       {showFiles && <MigrationFileListPanel manifestId={manifest.manifestId} gdriveAuthorized={gdriveAuthorized} />}
 
@@ -1489,7 +1497,7 @@ function StepMigrationConfirm({
 
       {!plan && !planError && (
         <p className="mt-3 flex items-center gap-1 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Analyse de l'état actuel du serveur…
+          <Loader2 className="h-4 w-4 animate-spin" /> {t("migrationConfirm.analyzing")}
         </p>
       )}
 
@@ -1498,8 +1506,10 @@ function StepMigrationConfirm({
           {!plan.osMatch && (
             <p className="flex items-start gap-1 rounded-md border border-warning/40 bg-warning/10 p-2 text-xs text-warning">
               <span>
-                OS différent : instantané pris sur {plan.manifestOsDistro} {plan.manifestOsRelease}, ce serveur est{" "}
-                {plan.currentOsDistro} {plan.currentOsRelease} — les paquets seront installés en best-effort.
+                {t("migrationConfirm.osMismatch", {
+                  manifestOs: `${plan.manifestOsDistro} ${plan.manifestOsRelease}`,
+                  currentOs: `${plan.currentOsDistro} ${plan.currentOsRelease}`,
+                })}
               </span>
             </p>
           )}
@@ -1512,7 +1522,7 @@ function StepMigrationConfirm({
                   checked={includeOsPackages}
                   onChange={(e) => setIncludeOsPackages(e.target.checked)}
                 />
-                Paquets système ({plan.packages.length})
+                {t("migrationConfirm.packagesTitle", { count: plan.packages.length })}
               </label>
               {includeOsPackages && (
                 <div className="ml-6 flex max-h-64 flex-col gap-0.5 overflow-y-auto rounded-md border border-border p-2">
@@ -1527,12 +1537,12 @@ function StepMigrationConfirm({
                         />
                         <span className="font-mono">{p.name}</span> :{" "}
                         {p.action === "install"
-                          ? `installer (${p.manifestVersion})`
-                          : `mettre à jour ${p.currentVersion} → ${p.manifestVersion}`}
+                          ? t("migrationConfirm.packageInstall", { version: p.manifestVersion })
+                          : t("migrationConfirm.packageUpdate", { from: p.currentVersion, to: p.manifestVersion })}
                       </label>
                     ))}
                   {plan.packages.every((p) => p.action === "up-to-date") && (
-                    <p className="text-xs text-muted-foreground">Tous les paquets sont déjà à jour.</p>
+                    <p className="text-xs text-muted-foreground">{t("migrationConfirm.packagesUpToDate")}</p>
                   )}
                 </div>
               )}
@@ -1566,10 +1576,10 @@ function StepMigrationConfirm({
                   }
                 >
                   {line.action === "replace"
-                    ? "remplacer"
+                    ? t("migrationConfirm.actionReplace")
                     : line.action === "skip-unchanged"
-                      ? "déjà à jour"
-                      : "restaurer"}
+                      ? t("migrationConfirm.actionUpToDate")
+                      : t("migrationConfirm.actionRestore")}
                 </span>
               </label>
             ))}
@@ -1582,13 +1592,13 @@ function StepMigrationConfirm({
       <ConfirmDialog
         trigger={
           <Button size="sm" variant="destructive" className="mt-3" disabled={starting || !plan}>
-            {starting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Restaurer"}
+            {starting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("stepConfirm.restore")}
           </Button>
         }
-        title="Restaurer cet instantané de migration ?"
-        description="Cette opération va appliquer uniquement les éléments cochés ci-dessus (les éléments décochés seront ignorés). Les éléments marqués « remplacer »/« restaurer » seront écrasés. Action irréversible."
+        title={t("migrationConfirm.restoreConfirm.title")}
+        description={t("migrationConfirm.restoreConfirm.description")}
         requireTypedConfirmation="RESTORE"
-        confirmLabel="Restaurer"
+        confirmLabel={t("stepConfirm.restore")}
         onConfirm={start}
       />
     </Card>

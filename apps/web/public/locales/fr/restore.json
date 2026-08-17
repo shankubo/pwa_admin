@@ -93,5 +93,45 @@
     "sendToDrive": "Envoyer sur Drive",
     "sendToDriveTitle": "Envoyer vers Google Drive",
     "sendToDriveDisabledTitle": "Google Drive non connecté (voir Settings)"
+  },
+  "stepMigration": {
+    "intro": "Étape 2 — Instantanés de migration disponibles sur le disque USB.",
+    "empty": "Aucun instantané de migration trouvé.",
+    "noneForThisServer": "Aucun instantané pour ce serveur ({{hostname}}) — voir les autres machines ci-dessous.",
+    "unknownHost": "hôte inconnu",
+    "otherHosts": "Autres — {{slug}} ({{count}})"
+  },
+  "manifestTile": {
+    "siteScope": "Site : {{name}}",
+    "serverScope": "Serveur complet ({{hostname}})",
+    "summary": "{{date}} · {{success}}/{{total}} éléments capturés · {{os}}"
+  },
+  "fileListPanel": {
+    "loading": "Chargement…",
+    "explanation": "Tous ces fichiers se trouvent déjà ensemble dans le même dossier sur le disque USB — pour une installation manuelle complète, copiez-le directement (",
+    "explanationSuffix": " ou disque monté) :",
+    "empty": "Aucun fichier disponible.",
+    "sent": "Envoyé"
+  },
+  "migrationConfirm": {
+    "success": "Restauration terminée avec succès.",
+    "partialSuccess": "Restauration terminée avec des erreurs partielles.",
+    "failed": "Échec de la restauration.",
+    "running": "Restauration en cours…",
+    "hideFiles": "Masquer les fichiers",
+    "showFiles": "Voir les fichiers",
+    "analyzing": "Analyse de l'état actuel du serveur…",
+    "osMismatch": "OS différent : instantané pris sur {{manifestOs}}, ce serveur est {{currentOs}} — les paquets seront installés en best-effort.",
+    "packagesTitle": "Paquets système ({{count}})",
+    "packageInstall": "installer ({{version}})",
+    "packageUpdate": "mettre à jour {{from}} → {{to}}",
+    "packagesUpToDate": "Tous les paquets sont déjà à jour.",
+    "actionReplace": "remplacer",
+    "actionUpToDate": "déjà à jour",
+    "actionRestore": "restaurer",
+    "restoreConfirm": {
+      "title": "Restaurer cet instantané de migration ?",
+      "description": "Cette opération va appliquer uniquement les éléments cochés ci-dessus (les éléments décochés seront ignorés). Les éléments marqués « remplacer »/« restaurer » seront écrasés. Action irréversible."
+    }
   }
 }

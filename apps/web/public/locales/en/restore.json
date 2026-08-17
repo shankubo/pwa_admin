@@ -93,5 +93,45 @@
     "sendToDrive": "Send to Drive",
     "sendToDriveTitle": "Send to Google Drive",
     "sendToDriveDisabledTitle": "Google Drive not connected (see Settings)"
+  },
+  "stepMigration": {
+    "intro": "Step 2 — Migration snapshots available on the USB drive.",
+    "empty": "No migration snapshot found.",
+    "noneForThisServer": "No snapshot for this server ({{hostname}}) — see other machines below.",
+    "unknownHost": "unknown host",
+    "otherHosts": "Other — {{slug}} ({{count}})"
+  },
+  "manifestTile": {
+    "siteScope": "Site: {{name}}",
+    "serverScope": "Full server ({{hostname}})",
+    "summary": "{{date}} · {{success}}/{{total}} items captured · {{os}}"
+  },
+  "fileListPanel": {
+    "loading": "Loading…",
+    "explanation": "All these files are already together in the same folder on the USB drive — for a full manual install, copy it directly (",
+    "explanationSuffix": " or mounted drive):",
+    "empty": "No file available.",
+    "sent": "Sent"
+  },
+  "migrationConfirm": {
+    "success": "Restore completed successfully.",
+    "partialSuccess": "Restore completed with partial errors.",
+    "failed": "Restore failed.",
+    "running": "Restore in progress…",
+    "hideFiles": "Hide files",
+    "showFiles": "View files",
+    "analyzing": "Analyzing the server's current state…",
+    "osMismatch": "Different OS: snapshot taken on {{manifestOs}}, this server is {{currentOs}} — packages will be installed on a best-effort basis.",
+    "packagesTitle": "System packages ({{count}})",
+    "packageInstall": "install ({{version}})",
+    "packageUpdate": "update {{from}} → {{to}}",
+    "packagesUpToDate": "All packages are already up to date.",
+    "actionReplace": "replace",
+    "actionUpToDate": "up to date",
+    "actionRestore": "restore",
+    "restoreConfirm": {
+      "title": "Restore this migration snapshot?",
+      "description": "This operation will only apply the items checked above (unchecked items will be skipped). Items marked \"replace\"/\"restore\" will be overwritten. Irreversible action."
+    }
   }
 }
