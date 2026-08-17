@@ -49,5 +49,49 @@
     "groupPartialApps": "Applications — partial backup",
     "groupImages": "Saved container images",
     "empty": "No local backup available."
+  },
+  "stepUsb": {
+    "intro": "Step 2 — Archives present on the USB drive.",
+    "loading": "Loading…",
+    "empty": "No archive found on the drive.",
+    "groupDbs": "Databases",
+    "groupImages": "Container images",
+    "groupVolumes": "Docker volumes",
+    "groupPaths": "Folders (paths)"
+  },
+  "stepGDrive": {
+    "intro": "Step 2 — Backups sent to Google Drive.",
+    "empty": "No Drive backup available.",
+    "localNote": "Present locally — immediate restore from the file already on this server.",
+    "driveOnlyNote": "Present on Drive only — download them to this server before you can restore them.",
+    "downloading": "Downloading…",
+    "downloadAndRestore": "Download and restore"
+  },
+  "stepConfirm": {
+    "appFull": "full backup",
+    "appPartial": "partial backup",
+    "appSummary": "{{name}} · {{kind}}",
+    "imageSummary": "Container image: {{name}}",
+    "success": "Restore completed successfully.",
+    "newRestore": "New restore",
+    "title": "Step 3 — Confirmation",
+    "sourceLabel": "Source: {{summary}}",
+    "restore": "Restore",
+    "restoreConfirm": {
+      "title": "Restore this backup?",
+      "description": "This operation will overwrite the target's existing data. Irreversible action."
+    }
+  },
+  "localRunActions": {
+    "title": "Other actions on this local backup",
+    "download": "Download",
+    "alreadyOnUsb": "Already on USB",
+    "sendToUsb": "Send to USB",
+    "sendToUsbTitle": "Copy to the backup USB drive",
+    "sendToUsbDisabledTitle": "No backup USB drive configured",
+    "alreadyOnDrive": "Already on Google Drive",
+    "sendToDrive": "Send to Drive",
+    "sendToDriveTitle": "Send to Google Drive",
+    "sendToDriveDisabledTitle": "Google Drive not connected (see Settings)"
   }
 }

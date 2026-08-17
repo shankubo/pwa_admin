@@ -49,5 +49,49 @@
     "groupPartialApps": "பயன்பாடுகள் — பகுதி காப்புப்பிரதி",
     "groupImages": "காப்புப்பிரதி எடுக்கப்பட்ட கொள்கலன் படங்கள்",
     "empty": "உள்ளூர் காப்புப்பிரதி எதுவும் இல்லை."
+  },
+  "stepUsb": {
+    "intro": "படி 2 — USB வட்டில் உள்ள காப்பகங்கள்.",
+    "loading": "ஏற்றுகிறது…",
+    "empty": "வட்டில் காப்பகம் எதுவும் கிடைக்கவில்லை.",
+    "groupDbs": "தரவுத்தளங்கள்",
+    "groupImages": "கொள்கலன் படங்கள்",
+    "groupVolumes": "Docker தொகுதிகள்",
+    "groupPaths": "கோப்புறைகள் (பாதைகள்)"
+  },
+  "stepGDrive": {
+    "intro": "படி 2 — Google Drive க்கு அனுப்பப்பட்ட காப்புப்பிரதிகள்.",
+    "empty": "Drive காப்புப்பிரதி எதுவும் இல்லை.",
+    "localNote": "உள்ளூரில் உள்ளது — இந்த சேவையகத்தில் ஏற்கனவே உள்ள கோப்பிலிருந்து உடனடி மீட்டமைப்பு.",
+    "driveOnlyNote": "Drive இல் மட்டுமே உள்ளது — மீட்டமைக்க முடியும் முன் இந்த சேவையகத்திற்கு பதிவிறக்கவும்.",
+    "downloading": "பதிவிறக்குகிறது…",
+    "downloadAndRestore": "பதிவிறக்கி மீட்டமை"
+  },
+  "stepConfirm": {
+    "appFull": "முழு காப்புப்பிரதி",
+    "appPartial": "பகுதி காப்புப்பிரதி",
+    "appSummary": "{{name}} · {{kind}}",
+    "imageSummary": "கொள்கலன் படம்: {{name}}",
+    "success": "மீட்டமைப்பு வெற்றிகரமாக முடிந்தது.",
+    "newRestore": "புதிய மீட்டமைப்பு",
+    "title": "படி 3 — உறுதிப்படுத்தல்",
+    "sourceLabel": "மூலம்: {{summary}}",
+    "restore": "மீட்டமை",
+    "restoreConfirm": {
+      "title": "இந்த காப்புப்பிரதியை மீட்டமைக்கவா?",
+      "description": "இந்த செயல் இலக்கின் தற்போதைய தரவை மேலெழுதும். மீளமுடியாத செயல்."
+    }
+  },
+  "localRunActions": {
+    "title": "இந்த உள்ளூர் காப்புப்பிரதியில் மற்ற செயல்கள்",
+    "download": "பதிவிறக்கு",
+    "alreadyOnUsb": "ஏற்கனவே USB இல் உள்ளது",
+    "sendToUsb": "USB க்கு அனுப்பு",
+    "sendToUsbTitle": "காப்புப்பிரதி USB வட்டிற்கு நகலெடு",
+    "sendToUsbDisabledTitle": "காப்புப்பிரதி USB வட்டு கட்டமைக்கப்படவில்லை",
+    "alreadyOnDrive": "ஏற்கனவே Google Drive இல் உள்ளது",
+    "sendToDrive": "Drive க்கு அனுப்பு",
+    "sendToDriveTitle": "Google Drive க்கு அனுப்பு",
+    "sendToDriveDisabledTitle": "Google Drive இணைக்கப்படவில்லை (Settings ஐப் பார்க்கவும்)"
   }
 }

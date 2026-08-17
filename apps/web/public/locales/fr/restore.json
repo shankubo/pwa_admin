@@ -49,5 +49,49 @@
     "groupPartialApps": "Applications — backup partiel",
     "groupImages": "Images de conteneur sauvegardées",
     "empty": "Aucune sauvegarde locale disponible."
+  },
+  "stepUsb": {
+    "intro": "Étape 2 — Archives présentes sur le disque USB.",
+    "loading": "Chargement…",
+    "empty": "Aucune archive trouvée sur le disque.",
+    "groupDbs": "Bases de données",
+    "groupImages": "Images de conteneur",
+    "groupVolumes": "Volumes Docker",
+    "groupPaths": "Dossiers (chemins)"
+  },
+  "stepGDrive": {
+    "intro": "Étape 2 — Sauvegardes envoyées sur Google Drive.",
+    "empty": "Aucune sauvegarde Drive disponible.",
+    "localNote": "Présentes localement — restauration immédiate à partir du fichier déjà sur ce serveur.",
+    "driveOnlyNote": "Présentes uniquement sur Drive — téléchargez-les sur ce serveur avant de pouvoir les restaurer.",
+    "downloading": "Téléchargement…",
+    "downloadAndRestore": "Télécharger et restaurer"
+  },
+  "stepConfirm": {
+    "appFull": "backup complet",
+    "appPartial": "backup partiel",
+    "appSummary": "{{name}} · {{kind}}",
+    "imageSummary": "Image de conteneur : {{name}}",
+    "success": "Restauration effectuée avec succès.",
+    "newRestore": "Nouvelle restauration",
+    "title": "Étape 3 — Confirmation",
+    "sourceLabel": "Source : {{summary}}",
+    "restore": "Restaurer",
+    "restoreConfirm": {
+      "title": "Restaurer cette sauvegarde ?",
+      "description": "Cette opération va écraser les données existantes de la cible. Action irréversible."
+    }
+  },
+  "localRunActions": {
+    "title": "Autres actions sur cette sauvegarde locale",
+    "download": "Télécharger",
+    "alreadyOnUsb": "Déjà sur USB",
+    "sendToUsb": "Envoyer sur USB",
+    "sendToUsbTitle": "Copier vers le disque USB de sauvegarde",
+    "sendToUsbDisabledTitle": "Aucun disque USB de sauvegarde configuré",
+    "alreadyOnDrive": "Déjà sur Google Drive",
+    "sendToDrive": "Envoyer sur Drive",
+    "sendToDriveTitle": "Envoyer vers Google Drive",
+    "sendToDriveDisabledTitle": "Google Drive non connecté (voir Settings)"
   }
 }

@@ -695,6 +695,7 @@ function StepUsb({
   archives: UsbBackupArchive[] | null;
   onSelect: (archive: UsbBackupArchive) => void;
 }) {
+  const { t } = useTranslation("restore");
   const groups = useMemo(() => {
     if (!archives) return null;
     const db: UsbBackupArchive[] = [];
@@ -718,17 +719,17 @@ function StepUsb({
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground">Étape 2 — Archives présentes sur le disque USB.</p>
-      {!groups && <p className="text-sm text-muted-foreground">Chargement…</p>}
+      <p className="text-sm text-muted-foreground">{t("stepUsb.intro")}</p>
+      {!groups && <p className="text-sm text-muted-foreground">{t("stepUsb.loading")}</p>}
       {groups && archives?.length === 0 && (
-        <p className="text-sm text-muted-foreground">Aucune archive trouvée sur le disque.</p>
+        <p className="text-sm text-muted-foreground">{t("stepUsb.empty")}</p>
       )}
       {groups && (
         <>
-          <ArchiveGroup title="Bases de données" icon={Database} archives={groups.db} onSelect={onSelect} />
-          <ArchiveGroup title="Images de conteneur" icon={Container} archives={groups.images} onSelect={onSelect} />
-          <ArchiveGroup title="Volumes Docker" icon={Boxes} archives={groups.volumes} onSelect={onSelect} />
-          <ArchiveGroup title="Dossiers (chemins)" icon={HardDrive} archives={groups.paths} onSelect={onSelect} />
+          <ArchiveGroup title={t("stepUsb.groupDbs")} icon={Database} archives={groups.db} onSelect={onSelect} />
+          <ArchiveGroup title={t("stepUsb.groupImages")} icon={Container} archives={groups.images} onSelect={onSelect} />
+          <ArchiveGroup title={t("stepUsb.groupVolumes")} icon={Boxes} archives={groups.volumes} onSelect={onSelect} />
+          <ArchiveGroup title={t("stepUsb.groupPaths")} icon={HardDrive} archives={groups.paths} onSelect={onSelect} />
         </>
       )}
     </div>
@@ -780,6 +781,7 @@ function StepGDrive({
   onSelect: (item: SelectedItem) => void;
   onError: (message: string) => void;
 }) {
+  const { t } = useTranslation("restore");
   const [comparison, setComparison] = useState<GDriveComparisonResult | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
@@ -831,17 +833,15 @@ function StepGDrive({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm text-muted-foreground">Étape 2 — Sauvegardes envoyées sur Google Drive.</p>
+      <p className="text-sm text-muted-foreground">{t("stepGDrive.intro")}</p>
 
       {history.length === 0 && downloadableGroups.length === 0 && (
-        <p className="text-sm text-muted-foreground">Aucune sauvegarde Drive disponible.</p>
+        <p className="text-sm text-muted-foreground">{t("stepGDrive.empty")}</p>
       )}
 
       {history.length > 0 && (
         <>
-          <p className="text-xs text-muted-foreground">
-            Présentes localement — restauration immédiate à partir du fichier déjà sur ce serveur.
-          </p>
+          <p className="text-xs text-muted-foreground">{t("stepGDrive.localNote")}</p>
           {history.map((h) => (
             <button
               key={h.runId}
@@ -863,9 +863,7 @@ function StepGDrive({
 
       {downloadableGroups.length > 0 && (
         <>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Présentes uniquement sur Drive — téléchargez-les sur ce serveur avant de pouvoir les restaurer.
-          </p>
+          <p className="mt-2 text-xs text-muted-foreground">{t("stepGDrive.driveOnlyNote")}</p>
           {downloadableGroups.map((group) =>
             group.files.map((f) => (
               <div key={f.fileId} className="rounded-md border border-border p-2 text-sm">
@@ -882,7 +880,7 @@ function StepGDrive({
                   disabled={downloadingId === f.fileId}
                   onClick={() => downloadAndSelect(f.fileId, group.category, group.sourceRef)}
                 >
-                  {downloadingId === f.fileId ? "Téléchargement…" : "Télécharger et restaurer"}
+                  {downloadingId === f.fileId ? t("stepGDrive.downloading") : t("stepGDrive.downloadAndRestore")}
                 </Button>
               </div>
             ))
@@ -912,12 +910,16 @@ function StepConfirm({
   onRestore: () => void;
   onReset: () => void;
 }) {
+  const { t } = useTranslation("restore");
   const summary =
     selected.kind === "generic"
       ? `${selected.run.sourceType}:${selected.run.sourceRef}`
       : selected.kind === "app"
-        ? `${selected.appName} · ${selected.run.kind === "full" ? "backup complet" : "backup partiel"}`
-        : `Image de conteneur : ${selected.containerName}`;
+        ? t("stepConfirm.appSummary", {
+            name: selected.appName,
+            kind: selected.run.kind === "full" ? t("stepConfirm.appFull") : t("stepConfirm.appPartial"),
+          })
+        : t("stepConfirm.imageSummary", { name: selected.containerName });
   const startedAt = selected.run.startedAt;
   const sizeBytes = selected.run.sizeBytes;
 
@@ -925,10 +927,10 @@ function StepConfirm({
     return (
       <Card>
         <p className="flex items-center gap-1 text-sm text-primary">
-          <CheckCircle2 className="h-4 w-4" /> Restauration effectuée avec succès.
+          <CheckCircle2 className="h-4 w-4" /> {t("stepConfirm.success")}
         </p>
         <Button size="sm" variant="outline" className="mt-3" onClick={onReset}>
-          Nouvelle restauration
+          {t("stepConfirm.newRestore")}
         </Button>
       </Card>
     );
@@ -936,9 +938,9 @@ function StepConfirm({
 
   return (
     <Card>
-      <CardTitle>Étape 3 — Confirmation</CardTitle>
+      <CardTitle>{t("stepConfirm.title")}</CardTitle>
       <div className="mt-2 flex flex-col gap-1 text-sm">
-        <p>Source : {summary}</p>
+        <p>{t("stepConfirm.sourceLabel", { summary })}</p>
         <p className="text-xs text-muted-foreground">
           {new Date(startedAt).toLocaleString()}
           {sizeBytes != null ? ` · ${formatBytes(sizeBytes)}` : ""}
@@ -952,13 +954,13 @@ function StepConfirm({
       <ConfirmDialog
         trigger={
           <Button size="sm" variant="destructive" className="mt-3" disabled={restoring}>
-            {restoring ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Restaurer"}
+            {restoring ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("stepConfirm.restore")}
           </Button>
         }
-        title="Restaurer cette sauvegarde ?"
-        description="Cette opération va écraser les données existantes de la cible. Action irréversible."
+        title={t("stepConfirm.restoreConfirm.title")}
+        description={t("stepConfirm.restoreConfirm.description")}
         requireTypedConfirmation="RESTORE"
-        confirmLabel="Restaurer"
+        confirmLabel={t("stepConfirm.restore")}
         onConfirm={onRestore}
       />
     </Card>
@@ -981,6 +983,7 @@ function LocalRunActions({
   usbConfigured: boolean;
   gdriveAuthorized: boolean;
 }) {
+  const { t } = useTranslation("restore");
   const [usbPath, setUsbPath] = useState(run.usbPath);
   const [driveFileId, setDriveFileId] = useState(run.driveFileId);
   const [busy, setBusy] = useState<"usb" | "gdrive" | "download" | null>(null);
@@ -1033,43 +1036,43 @@ function LocalRunActions({
 
   return (
     <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
-      <p className="text-xs font-medium text-muted-foreground">Autres actions sur cette sauvegarde locale</p>
+      <p className="text-xs font-medium text-muted-foreground">{t("localRunActions.title")}</p>
       {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" disabled={busy !== null} onClick={downloadLocal}>
           {busy === "download" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-          Télécharger
+          {t("localRunActions.download")}
         </Button>
         {usbPath ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-1 text-xs text-primary">
-            <CheckCircle2 className="h-3.5 w-3.5" /> Déjà sur USB
+            <CheckCircle2 className="h-3.5 w-3.5" /> {t("localRunActions.alreadyOnUsb")}
           </span>
         ) : (
           <Button
             size="sm"
             variant="outline"
             disabled={!usbConfigured || busy !== null}
-            title={usbConfigured ? "Copier vers le disque USB de sauvegarde" : "Aucun disque USB de sauvegarde configuré"}
+            title={usbConfigured ? t("localRunActions.sendToUsbTitle") : t("localRunActions.sendToUsbDisabledTitle")}
             onClick={copyToUsb}
           >
             {busy === "usb" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Usb className="h-3.5 w-3.5" />}
-            Envoyer sur USB
+            {t("localRunActions.sendToUsb")}
           </Button>
         )}
         {driveFileId ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-1 text-xs text-primary">
-            <CheckCircle2 className="h-3.5 w-3.5" /> Déjà sur Google Drive
+            <CheckCircle2 className="h-3.5 w-3.5" /> {t("localRunActions.alreadyOnDrive")}
           </span>
         ) : (
           <Button
             size="sm"
             variant="outline"
             disabled={!gdriveAuthorized || busy !== null}
-            title={gdriveAuthorized ? "Envoyer vers Google Drive" : "Google Drive non connecté (voir Settings)"}
+            title={gdriveAuthorized ? t("localRunActions.sendToDriveTitle") : t("localRunActions.sendToDriveDisabledTitle")}
             onClick={copyToGDrive}
           >
             {busy === "gdrive" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Cloud className="h-3.5 w-3.5" />}
-            Envoyer sur Drive
+            {t("localRunActions.sendToDrive")}
           </Button>
         )}
       </div>
