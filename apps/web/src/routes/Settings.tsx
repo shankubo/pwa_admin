@@ -122,7 +122,14 @@ function AppUpdateCard() {
     }
   }
 
-  useEffect(() => stopPolling, []);
+  // Loads passively on mount (GET only, never triggers a run) so a cron-only
+  // failure — nobody clicked "check", the cron itself hit an error — shows up
+  // as soon as this card renders instead of staying invisible until someone
+  // manually clicks "Vérifier les mises à jour".
+  useEffect(() => {
+    void pollStatus();
+    return stopPolling;
+  }, []);
 
   // The final step of deploy/auto-update.sh is `sudo systemctl restart
   // pwa-admin`, which kills this very request mid-flight along with every

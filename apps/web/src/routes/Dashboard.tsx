@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { SystemStatsSnapshot, SystemAlert, UsbStatus, SiteSummary, HardwareOverview } from "@pwa-admin/shared";
+import type {
+  SystemStatsSnapshot,
+  SystemAlert,
+  UsbStatus,
+  SiteSummary,
+  HardwareOverview,
+  AppUpdateStatus,
+} from "@pwa-admin/shared";
 import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -61,6 +68,7 @@ export function Dashboard() {
   const [usb, setUsb] = useState<UsbStatus | null>(null);
   const [sites, setSites] = useState<SiteSummary[] | null>(null);
   const [hardware, setHardware] = useState<HardwareOverview | null>(null);
+  const [appUpdateStatus, setAppUpdateStatus] = useState<AppUpdateStatus | null>(null);
   const [ejecting, setEjecting] = useState<string | null>(null);
   const [ejected, setEjected] = useState<string | null>(null);
   const hostname = useHostname();
@@ -86,6 +94,12 @@ export function Dashboard() {
     apiJson<HardwareOverview>("/hardware/overview")
       .then(setHardware)
       .catch(() => setHardware(null));
+    // Passive GET only, never triggers a run — surfaces a cron-only
+    // auto-update failure here too, not just in Settings, since this is the
+    // screen actually seen on every app open.
+    apiJson<AppUpdateStatus>("/app-update/status")
+      .then(setAppUpdateStatus)
+      .catch(() => setAppUpdateStatus(null));
   }, []);
 
   async function ejectDrive(mountpoint: string) {
@@ -106,6 +120,16 @@ export function Dashboard() {
 
   return (
     <div className="flex flex-col gap-4">
+      {appUpdateStatus?.status === "failed" && (
+        <button
+          onClick={() => navigate("/settings")}
+          className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-left text-sm text-destructive"
+        >
+          <AlertTriangle className="h-5 w-5 shrink-0" />
+          <span>La dernière mise à jour automatique a échoué — voir Paramètres pour le détail.</span>
+        </button>
+      )}
+
       {alerts.length > 0 && (
         <div className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning">
           <AlertTriangle className="h-5 w-5 shrink-0" />

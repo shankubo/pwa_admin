@@ -8,6 +8,7 @@ import type { AppUpdateRunStatus, AppUpdateStatus } from "@pwa-admin/shared";
 const LOG_PATH = join(env.APP_DIR, "data", "auto-update.log");
 const LOG_TAIL_CHARS = 20_000;
 const DEPLOYED_RE = /Deployed ([0-9a-f]{7,40}) and restarted pwa-admin successfully/g;
+const ERROR_RE = /^\[.+?] ERROR: /m;
 
 let running = false;
 let lastFinishedAt: string | null = null;
@@ -98,6 +99,20 @@ export const AppUpdateService = {
           lastStatus = "succeeded";
           lastDeployedCommit = lastMatch[1];
         }
+      }
+    }
+
+    // A cron-triggered run that failed never restarts this process (only a
+    // successful run's final `sudo systemctl restart` does), so its failure
+    // would otherwise stay invisible until someone opens Settings and clicks
+    // "check" themselves. Detect it here too: the log's last ERROR line with
+    // no later "Deployed ... successfully" line after it means the most
+    // recent run — cron or manual — never completed.
+    if (lastStatus === "idle" && ERROR_RE.test(log)) {
+      const lastErrorIndex = log.lastIndexOf("ERROR: ");
+      const lastDeployedIndex = log.lastIndexOf("and restarted pwa-admin successfully");
+      if (lastErrorIndex > lastDeployedIndex) {
+        lastStatus = "failed";
       }
     }
 
