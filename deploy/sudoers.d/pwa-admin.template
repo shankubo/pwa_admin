@@ -204,6 +204,10 @@ __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tailscale update
 # Weekly cert-renew timer (renew-tailscale-cert.sh) runs non-interactively,
 # so it needs this scoped to the single machine domain `tailscale status` reports.
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tailscale cert *
+# Same script then hands the two cert files back to the service account. Exact
+# command line (no wildcard: `*` would also match extra arguments, i.e. other
+# files); __TAILSCALE_DOMAIN__ is filled in by install.sh from `tailscale status`.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/chown __PWA_ADMIN_USER__\:__PWA_ADMIN_USER__ __PWA_ADMIN_APP_DIR__/secrets/tailscale-cert/__TAILSCALE_DOMAIN__.crt __PWA_ADMIN_APP_DIR__/secrets/tailscale-cert/__TAILSCALE_DOMAIN__.key
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/apt-get install --only-upgrade -y docker-ce docker-ce-cli containerd.io
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /bin/systemctl restart docker
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /bin/systemctl is-active docker

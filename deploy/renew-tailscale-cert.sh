@@ -13,7 +13,9 @@ DOMAIN="$(tailscale status --json | python3 -c 'import sys,json; d=json.load(sys
 mkdir -p "$CERT_DIR"
 cd "$CERT_DIR"
 sudo tailscale cert "$DOMAIN"
-sudo chown "$(whoami)":"$(whoami)" "$DOMAIN.crt" "$DOMAIN.key"
+# Absolute paths: the sudoers rule matches this exact command line (see
+# deploy/sudoers.d/pwa-admin.template), a relative path would not match.
+sudo chown "$(whoami)":"$(whoami)" "$CERT_DIR/$DOMAIN.crt" "$CERT_DIR/$DOMAIN.key"
 chmod 644 "$DOMAIN.crt"
 chmod 600 "$DOMAIN.key"
 

@@ -67,7 +67,11 @@ if [ "$CREATE_USER" = true ]; then
 fi
 
 echo "== Installing sudoers rules =="
-sed "s#__PWA_ADMIN_USER__#${SERVICE_USER}#g; s#__PWA_ADMIN_APP_DIR__#${APP_DIR}#g" \
+# Machine domain for the cert-renew chown rule; "unknown.invalid" never matches
+# a real file, so the rule stays inert if tailscale is not available yet.
+TS_DOMAIN="$(tailscale status --json 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))' 2>/dev/null || true)"
+TS_DOMAIN="${TS_DOMAIN:-unknown.invalid}"
+sed "s#__PWA_ADMIN_USER__#${SERVICE_USER}#g; s#__PWA_ADMIN_APP_DIR__#${APP_DIR}#g; s#__TAILSCALE_DOMAIN__#${TS_DOMAIN}#g" \
   "${DEPLOY_DIR}/sudoers.d/pwa-admin.template" | sudo tee /etc/sudoers.d/pwa-admin > /dev/null
 sudo chmod 440 /etc/sudoers.d/pwa-admin
 sudo visudo -c -f /etc/sudoers.d/pwa-admin
