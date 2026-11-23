@@ -176,6 +176,16 @@ export const BackupHistoryModel = {
     db.prepare("UPDATE backup_history SET usb_path = ? WHERE run_id = ?").run(usbPath, runId);
   },
 
+  /** Every successful backup run that recorded a local file, for the server cleanup
+   * (which picks the old ones per source). Restores and safety snapshots are excluded. */
+  listSuccessfulBackups(): BackupHistoryRow[] {
+    return db
+      .prepare(
+        "SELECT * FROM backup_history WHERE type = 'backup' AND status = 'success' AND file_path IS NOT NULL ORDER BY started_at DESC"
+      )
+      .all() as BackupHistoryRow[];
+  },
+
   /** Detaches every history row whose USB copy was the given file, or lived under
    * the given folder, after that copy was deleted from the drive. Only usb_path is
    * cleared: the run itself and any local or Drive copy stay as they were. */

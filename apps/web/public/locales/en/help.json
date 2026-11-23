@@ -103,6 +103,16 @@
         "Per-disk and per-network-interface detail, throttling/under-voltage status, operating system information."
       ]
     },
+    "cleanup": {
+      "summary": "Disk scan and cleanup of temporary files, caches, old logs and old local backups.",
+      "details": [
+        "\"Scan the server\" measures what can be freed without deleting anything: the application's working files, the service account's temporary files, the npm cache, unused Docker images and build cache, downloaded apt packages, old system logs and old local backups.",
+        "Each category is marked \"Safe\" (rebuilds itself) or \"Review\" (old backups, logs); only the safe ones are ticked by default. The biggest items can be inspected before cleaning.",
+        "Old backups: choose the age (30 days by default). The newest backups of each source are always kept, and copies on USB and Google Drive are never touched.",
+        "Never touched: installed packages, kernels, Docker volumes, stopped containers, databases. Cleaning apt packages and logs needs the sudo rules installed by deploy/install.sh.",
+        "The \"Where local backup space goes\" block shows the size of each data/backups folder."
+      ]
+    },
     "services": {
       "summary": "Status and update actions for services installed on the server (Tailscale, Docker, PM2).",
       "details": [

@@ -1,0 +1,87 @@
+{
+  "intro": "Analysez le disque du serveur puis supprimez ce qui est inutile : fichiers temporaires, caches, anciens journaux et anciennes sauvegardes locales. L'analyse ne supprime rien ; vous choisissez ensuite ce qu'il faut nettoyer.",
+  "noScanYet": "Aucune analyse pour le moment : lancez-en une pour voir ce qui peut être libéré.",
+  "scan": "Analyser le serveur",
+  "rescan": "Relancer l'analyse",
+  "scanning": "Analyse en cours…",
+  "backupAge": "Anciennes sauvegardes : plus de",
+  "daysOption": "{{count}} jours",
+  "scannedAt": "Dernière analyse : {{when}}",
+  "disk": {
+    "title": "Espace disque du serveur",
+    "usage": "{{pct}} % utilisé — {{free}} libres sur {{total}}"
+  },
+  "risk": {
+    "safe": "Sans risque",
+    "review": "À vérifier"
+  },
+  "unavailable": "Non disponible sur ce serveur.",
+  "itemCount": "{{count}} élément(s)",
+  "showDetails": "Voir le détail",
+  "hideDetails": "Masquer le détail",
+  "andMore": "… et {{count}} autre(s)",
+  "categories": {
+    "app-temp": {
+      "title": "Fichiers de travail de l'application",
+      "description": "Copies et chiffrements en cours restés plus de 2 h dans data/backups/_tmp-* (envoi vers Drive, USB, chiffrement)."
+    },
+    "tmp-owned": {
+      "title": "Fichiers temporaires",
+      "description": "Fichiers du compte du service dans /tmp et /var/tmp, ni modifiés ni lus depuis plus de 7 jours. Les fichiers des autres comptes ne sont jamais touchés."
+    },
+    "npm-cache": {
+      "title": "Cache npm",
+      "description": "Cache de téléchargement npm du compte du service. Il se reconstitue tout seul au prochain build (mise à jour automatique)."
+    },
+    "docker-dangling-images": {
+      "title": "Images Docker orphelines",
+      "description": "Images sans nom (« dangling ») qu'aucun conteneur n'utilise : restes de reconstructions. Les images étiquetées ne sont pas touchées."
+    },
+    "docker-build-cache": {
+      "title": "Cache de construction Docker",
+      "description": "Cache de build Docker inutilisé. Il se reconstitue à la prochaine construction d'image."
+    },
+    "apt-cache": {
+      "title": "Paquets téléchargés (apt)",
+      "description": "Fichiers .deb déjà installés conservés dans /var/cache/apt. apt les retélécharge si besoin."
+    },
+    "journal": {
+      "title": "Anciens journaux système",
+      "description": "Journaux systemd : garde les 14 derniers jours et supprime le reste. Peut effacer d'anciens logs utiles à un diagnostic."
+    },
+    "old-backups": {
+      "title": "Anciennes sauvegardes locales",
+      "description": "Sauvegardes locales de plus de {{days}} jours. Les {{keep}} plus récentes de chaque source sont toujours conservées, et les copies sur USB et Google Drive ne sont pas touchées."
+    }
+  },
+  "scanErrors": {
+    "journal_unreadable": "Taille illisible : la règle sudo du journal est absente. Relancez deploy/install.sh sur ce serveur."
+  },
+  "selection": {
+    "title": "{{count}} catégorie(s) sélectionnée(s)",
+    "estimate": "Gain estimé : {{size}}",
+    "run": "Nettoyer la sélection",
+    "running": "Nettoyage en cours…"
+  },
+  "confirm": {
+    "title": "Nettoyer {{count}} catégorie(s) ?",
+    "description": "Environ {{size}} seront supprimés. Cette opération est définitive.",
+    "reviewWarning": "La sélection contient des éléments à vérifier (anciennes sauvegardes ou journaux) : ils ne pourront pas être récupérés.",
+    "confirmLabel": "Nettoyer"
+  },
+  "result": {
+    "title": "Nettoyage terminé",
+    "freed": "Espace libéré : {{size}}",
+    "done": "fait"
+  },
+  "errors": {
+    "cleanup_already_running": "Un nettoyage est déjà en cours.",
+    "someFailed": "{{count}} fichier(s) n'ont pas pu être supprimés."
+  },
+  "localBackups": {
+    "title": "Où va l'espace des sauvegardes locales",
+    "description": "Taille de chaque dossier de data/backups. Les copies hors de ce serveur (USB, Google Drive) n'y comptent pas.",
+    "link": "Gérer les sauvegardes"
+  },
+  "neverTouched": "Jamais touchés par cet écran : paquets installés, noyaux, volumes Docker, conteneurs arrêtés, bases de données et sauvegardes récentes."
+}

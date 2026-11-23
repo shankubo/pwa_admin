@@ -1,0 +1,87 @@
+{
+  "intro": "Scan the server disk, then remove what is useless: temporary files, caches, old logs and old local backups. The scan removes nothing; you then choose what to clean.",
+  "noScanYet": "No scan yet: run one to see what can be freed.",
+  "scan": "Scan the server",
+  "rescan": "Scan again",
+  "scanning": "Scanning…",
+  "backupAge": "Old backups: older than",
+  "daysOption": "{{count}} days",
+  "scannedAt": "Last scan: {{when}}",
+  "disk": {
+    "title": "Server disk space",
+    "usage": "{{pct}}% used — {{free}} free of {{total}}"
+  },
+  "risk": {
+    "safe": "Safe",
+    "review": "Review"
+  },
+  "unavailable": "Not available on this server.",
+  "itemCount": "{{count}} item(s)",
+  "showDetails": "Show details",
+  "hideDetails": "Hide details",
+  "andMore": "… and {{count}} more",
+  "categories": {
+    "app-temp": {
+      "title": "Application working files",
+      "description": "In-progress copies and encryptions left for more than 2 h in data/backups/_tmp-* (Drive upload, USB, encryption)."
+    },
+    "tmp-owned": {
+      "title": "Temporary files",
+      "description": "The service account's files in /tmp and /var/tmp, neither modified nor read for more than 7 days. Other accounts' files are never touched."
+    },
+    "npm-cache": {
+      "title": "npm cache",
+      "description": "npm download cache of the service account. It rebuilds itself on the next build (auto-update)."
+    },
+    "docker-dangling-images": {
+      "title": "Orphaned Docker images",
+      "description": "Untagged (\"dangling\") images no container uses: leftovers of rebuilds. Tagged images are not touched."
+    },
+    "docker-build-cache": {
+      "title": "Docker build cache",
+      "description": "Unused Docker build cache. It rebuilds on the next image build."
+    },
+    "apt-cache": {
+      "title": "Downloaded packages (apt)",
+      "description": ".deb files already installed, kept in /var/cache/apt. apt downloads them again if needed."
+    },
+    "journal": {
+      "title": "Old system logs",
+      "description": "systemd journal: keeps the last 14 days and removes the rest. May erase old logs you would need for a diagnosis."
+    },
+    "old-backups": {
+      "title": "Old local backups",
+      "description": "Local backups older than {{days}} days. The {{keep}} newest of each source are always kept, and copies on USB and Google Drive are not touched."
+    }
+  },
+  "scanErrors": {
+    "journal_unreadable": "Size unreadable: the journal sudo rule is missing. Re-run deploy/install.sh on this server."
+  },
+  "selection": {
+    "title": "{{count}} categor(ies) selected",
+    "estimate": "Estimated gain: {{size}}",
+    "run": "Clean the selection",
+    "running": "Cleaning…"
+  },
+  "confirm": {
+    "title": "Clean {{count}} categor(ies)?",
+    "description": "About {{size}} will be deleted. This cannot be undone.",
+    "reviewWarning": "The selection includes items to review (old backups or logs): they cannot be recovered.",
+    "confirmLabel": "Clean"
+  },
+  "result": {
+    "title": "Cleanup finished",
+    "freed": "Space freed: {{size}}",
+    "done": "done"
+  },
+  "errors": {
+    "cleanup_already_running": "A cleanup is already running.",
+    "someFailed": "{{count}} file(s) could not be deleted."
+  },
+  "localBackups": {
+    "title": "Where local backup space goes",
+    "description": "Size of each data/backups folder. Copies outside this server (USB, Google Drive) are not counted.",
+    "link": "Manage backups"
+  },
+  "neverTouched": "Never touched by this screen: installed packages, kernels, Docker volumes, stopped containers, databases and recent backups."
+}

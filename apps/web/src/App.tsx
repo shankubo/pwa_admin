@@ -15,6 +15,7 @@ import { Backups } from "@/routes/Backups";
 import { Restore } from "@/routes/Restore";
 import { Wizard } from "@/routes/Wizard";
 import { UsbExplorer } from "@/routes/UsbExplorer";
+import { Cleanup } from "@/routes/Cleanup";
 import { Applications } from "@/routes/Applications";
 import { System } from "@/routes/System";
 import { Services } from "@/routes/Services";
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="/restore" element={<Restore />} />
           <Route path="/wizard" element={<Wizard />} />
           <Route path="/usb-explorer" element={<UsbExplorer />} />
+          <Route path="/cleanup" element={<Cleanup />} />
           <Route path="/system" element={<System />} />
           <Route path="/services" element={<Services />} />
           <Route path="/help" element={<Help />} />

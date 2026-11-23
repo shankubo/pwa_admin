@@ -37,6 +37,7 @@ import appUpdateRoutes from "./modules/appUpdate/appUpdate.routes.js";
 import auditRoutes from "./modules/audit/audit.routes.js";
 import migrationRoutes from "./modules/migration/migration.routes.js";
 import usbExplorerRoutes from "./modules/usbExplorer/usbExplorer.routes.js";
+import cleanupRoutes from "./modules/cleanup/cleanup.routes.js";
 import { registerExternalModules } from "./modules/_external/index.js";
 import { SchedulerService } from "./services/scheduler.js";
 import { resolveWebServerService } from "./modules/webserver/webserver.registry.js";
@@ -104,6 +105,7 @@ await app.register(async (api) => {
   await api.register(auditRoutes);
   await api.register(migrationRoutes);
   await api.register(usbExplorerRoutes);
+  await api.register(cleanupRoutes);
   await registerExternalModules(api);
   await api.register(wsRoutePlugin);
 }, { prefix: "/api" });

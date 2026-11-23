@@ -206,6 +206,14 @@ __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /bin/systemctl stop backup-usb-mount@*.s
 # are passed on stdin, never as arguments.
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/local/bin/backup-usb-luks.sh *
 
+# --- Cleanup module: free disk space (apt cache, systemd journal) ---
+# Exact commands only, no wildcard: `apt-get clean` empties the downloaded-package
+# cache, `journalctl --disk-usage` is read-only (the scan), and the vacuum keeps the
+# last 14 days of logs (the same fixed value cleanup.service.ts passes).
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/apt-get clean
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/journalctl --disk-usage
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/journalctl --vacuum-time=14d
+
 # --- Services module: status/update for Tailscale, Docker, PM2 ---
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tailscale update
 # Weekly cert-renew timer (renew-tailscale-cert.sh) runs non-interactively,
@@ -303,4 +311,4 @@ __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/mkdir -p /home/*
 # an allocated pseudo-terminal — fine for interactive SSH use, but the
 # pwa-admin service invokes sudo via execFile with no TTY at all, so every
 # scoped command here needs both `!requiretty` and `!use_pty` to run non-interactively.
-Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/usr/sbin/apache2ctl,/usr/sbin/a2ensite,/usr/sbin/a2dissite,/usr/sbin/a2enmod,/bin/systemctl,/usr/bin/fail2ban-client,/usr/bin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/pg_dump,/usr/bin/pg_restore,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat,/usr/sbin/ufw,/usr/bin/tail,/usr/bin/tailscale,/usr/sbin/useradd,/usr/bin/mkdir,/usr/bin/test,/usr/bin/kill,/usr/local/bin/backup-usb-luks.sh !requiretty,!use_pty
+Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/usr/sbin/apache2ctl,/usr/sbin/a2ensite,/usr/sbin/a2dissite,/usr/sbin/a2enmod,/bin/systemctl,/usr/bin/fail2ban-client,/usr/bin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/pg_dump,/usr/bin/pg_restore,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat,/usr/sbin/ufw,/usr/bin/tail,/usr/bin/tailscale,/usr/sbin/useradd,/usr/bin/mkdir,/usr/bin/test,/usr/bin/kill,/usr/local/bin/backup-usb-luks.sh,/usr/bin/journalctl !requiretty,!use_pty

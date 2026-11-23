@@ -103,6 +103,16 @@
         "Détail par disque, par interface réseau, statut de throttling/sous-tension, informations sur le système d'exploitation."
       ]
     },
+    "cleanup": {
+      "summary": "Analyse du disque et nettoyage des fichiers temporaires, caches, anciens journaux et anciennes sauvegardes locales.",
+      "details": [
+        "« Analyser le serveur » mesure ce qui peut être libéré sans rien supprimer : fichiers de travail de l'application, fichiers temporaires du compte du service, cache npm, images et cache de build Docker inutilisés, paquets apt téléchargés, anciens journaux système et anciennes sauvegardes locales.",
+        "Chaque catégorie est marquée « Sans risque » (se reconstitue toute seule) ou « À vérifier » (anciennes sauvegardes, journaux) ; seules les catégories sans risque sont cochées par défaut. Le détail des plus gros éléments est consultable avant de nettoyer.",
+        "Anciennes sauvegardes : choisissez l'âge (30 jours par défaut). Les plus récentes sauvegardes de chaque source sont toujours conservées, et les copies sur USB et Google Drive ne sont jamais touchées.",
+        "Jamais touchés : paquets installés, noyaux, volumes Docker, conteneurs arrêtés, bases de données. Le nettoyage des paquets apt et des journaux demande les règles sudo installées par deploy/install.sh.",
+        "Le bloc « Où va l'espace des sauvegardes locales » montre la taille de chaque dossier de data/backups."
+      ]
+    },
     "services": {
       "summary": "Statut et actions de mise à jour pour les services installés sur le serveur (Tailscale, Docker, PM2).",
       "details": [

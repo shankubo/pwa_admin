@@ -16,6 +16,7 @@ import {
   RotateCcw,
   Wrench,
   Activity,
+  Eraser,
   Settings as SettingsIcon,
   ChevronDown,
   ChevronUp,
@@ -41,6 +42,7 @@ const SECTIONS: HelpSection[] = [
   { icon: DatabaseBackup, title: "Backups", slug: "backups" },
   { icon: RotateCcw, title: "Restore", slug: "restore" },
   { icon: Activity, title: "System", slug: "system" },
+  { icon: Eraser, title: "Nettoyage serveur", slug: "cleanup" },
   { icon: Wrench, title: "Services", slug: "services" },
   { icon: SettingsIcon, title: "Settings", slug: "settings" },
 ];

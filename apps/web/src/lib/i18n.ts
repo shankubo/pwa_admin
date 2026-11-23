@@ -13,7 +13,7 @@ i18n
   .init({
     fallbackLng: "fr",
     supportedLngs: [...SUPPORTED_LANGUAGES],
-    ns: ["common", "nav", "settings", "login", "pm2", "security", "os", "network", "sites", "docker", "nginx", "wizard", "applications", "backups", "backupEncryption", "restore", "usbExplorer", "system", "services", "help", "about"],
+    ns: ["common", "nav", "settings", "login", "pm2", "security", "os", "network", "sites", "docker", "nginx", "wizard", "applications", "backups", "backupEncryption", "restore", "usbExplorer", "cleanup", "system", "services", "help", "about"],
     defaultNS: "common",
     backend: {
       loadPath: "/locales/{{lng}}/{{ns}}.json",

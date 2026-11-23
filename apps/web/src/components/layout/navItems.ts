@@ -19,6 +19,7 @@ import {
   Wrench,
   Usb,
   Wand2,
+  Eraser,
 } from "lucide-react";
 import { externalNavItems } from "./externalNavItems";
 
@@ -50,6 +51,7 @@ export const navItems: NavItem[] = [
   { to: "/restore", labelKey: "restore", icon: RotateCcw, group: "ops" },
   { to: "/usb-explorer", labelKey: "usbExplorer", icon: Usb, group: "ops" },
   { to: "/system", labelKey: "system", icon: Activity, group: "ops" },
+  { to: "/cleanup", labelKey: "cleanup", icon: Eraser, group: "ops" },
   { to: "/services", labelKey: "services", icon: Wrench, group: "ops" },
   { to: "/help", labelKey: "help", icon: HelpCircle, group: "bottom" },
   { to: "/about", labelKey: "about", icon: Info, group: "bottom" },
