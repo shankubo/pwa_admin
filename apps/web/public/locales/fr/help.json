@@ -83,7 +83,8 @@
         "Deux étapes : choisir le type (Complet, ou Partiel pour un dump de base de données), puis la destination (local, USB si un disque est branché, Google Drive si connecté, et/ou téléchargement direct vers votre appareil).",
         "Un disque USB/SSD branché est détecté et monté automatiquement — les sauvegardes y sont rangées dans un dossier propre à ce serveur.",
         "Historique de toutes les sauvegardes avec suppression possible (le fichier local est supprimé ; les copies USB/Drive existantes ne sont pas touchées).",
-        "Cet écran ne propose plus aucune action de restauration — c'est volontaire, pour éviter tout clic accidentel qui écraserait des données. La restauration se fait exclusivement depuis l'écran Restore."
+        "Cet écran ne propose plus aucune action de restauration — c'est volontaire, pour éviter tout clic accidentel qui écraserait des données. La restauration se fait exclusivement depuis l'écran Restore.",
+        "Chiffrement des copies, disque USB chiffré (LUKS), lecture sur un autre ordinateur et dépannage : voir le guide « Sauvegardes, chiffrement et disque USB » plus bas sur cette page."
       ]
     },
     "restore": {
@@ -114,9 +115,262 @@
       "summary": "Compte administrateur et journal d'audit.",
       "details": [
         "Activation de la 2FA (recommandé) via un QR code à scanner avec une application d'authentification.",
-        "Journal d'audit listant toutes les actions sensibles effectuées (qui, quoi, quand, résultat)."
+        "Journal d'audit listant toutes les actions sensibles effectuées (qui, quoi, quand, résultat).",
+        "Chiffrement des copies de sauvegarde : choisissez si les nouvelles copies USB et Google Drive sont chiffrées avec la clé de l'application."
       ]
     }
+  },
+  "backupGuide": {
+    "heading": "Sauvegardes, chiffrement et disque USB : guide complet",
+    "intro": "Tout ce qu'il faut savoir pour sauvegarder, protéger et récupérer vos données, y compris sans l'application.",
+    "downloadTool": "Télécharger l'outil de déchiffrement",
+    "cards": [
+      {
+        "id": "overview",
+        "title": "Vue d'ensemble : où sont mes sauvegardes, comment sont-elles protégées ?",
+        "summary": "Trois niveaux de protection indépendants, à combiner selon vos besoins.",
+        "blocks": [
+          {
+            "type": "p",
+            "text": "Une sauvegarde peut exister à trois endroits, chacun avec sa propre protection :"
+          },
+          {
+            "type": "list",
+            "items": [
+              "Copie locale (dossier data/backups du serveur) : jamais chiffrée. Elle sert aux restaurations rapides et protège d'une erreur de manipulation, pas du vol ou de la perte du serveur.",
+              "Copie sur disque USB/SSD : peut être protégée de deux façons qui se cumulent — chaque archive chiffrée avec la clé de l'application (option des Settings), et le disque entier chiffré en LUKS.",
+              "Copie sur Google Drive : chiffrée avec la clé de l'application (option des Settings). Si l'option est active, Google ne peut pas la lire."
+            ]
+          },
+          {
+            "type": "p",
+            "text": "Combinaisons conseillées :"
+          },
+          {
+            "type": "list",
+            "items": [
+              "Disque USB chiffré (LUKS) et chiffrement des archives USB désactivé : simple, et le disque est illisible s'il est perdu ou volé (verrouillé ou débranché).",
+              "Disque USB non chiffré : laissez le chiffrement des archives activé.",
+              "Google Drive : laissez toujours le chiffrement des archives activé."
+            ]
+          },
+          {
+            "type": "warn",
+            "text": "Tant qu'un disque LUKS est déverrouillé et monté (état normal pour des sauvegardes planifiées), ses fichiers sont lisibles par quiconque a accès au serveur. Le chiffrement des archives protège aussi dans ce cas."
+          },
+          {
+            "type": "p",
+            "text": "Le paquet de migration (Backups → « Migration serveur ») n'est pas chiffré archive par archive sur l'USB : placez-le sur un disque LUKS, ou supprimez-le après usage."
+          },
+          {
+            "type": "p",
+            "text": "Les sauvegardes sont rangées sur le disque USB dans BACKUP/<nom-du-serveur>/ avec les dossiers volumes, paths (dossiers et images de conteneur), db (bases de données), apps (applications) et migration."
+          }
+        ]
+      },
+      {
+        "id": "archives",
+        "title": "Chiffrement des archives (clé de l'application)",
+        "summary": "Comment les copies USB et Drive sont chiffrées, la clé privée, et comment restaurer.",
+        "blocks": [
+          {
+            "type": "p",
+            "text": "Au premier démarrage, l'application crée une paire de clés. La clé publique chiffre chaque archive copiée sur l'USB ou envoyée sur Google Drive ; chaque fichier reçoit son propre secret aléatoire (X25519 + AES-256-GCM, bibliothèque cryptographique de Node.js). Le résultat est un fichier .tar.gz.enc, illisible sans la clé privée, et toute altération est détectée."
+          },
+          {
+            "type": "p",
+            "text": "La clé privée est conservée sur le serveur (fichier secrets/backup-encryption.private, droits 0600) pour que les restaurations depuis l'application se fassent sans rien demander. Elle n'est jamais écrite sur le disque USB ni sur Drive."
+          },
+          {
+            "type": "steps",
+            "title": "Faire votre copie de la clé (indispensable) :",
+            "items": [
+              "Backups, carte « Gardez une copie de votre clé privée de chiffrement » : cliquez sur « Afficher la clé privée ».",
+              "Copiez-la ou téléchargez-la, et rangez-la hors du serveur (gestionnaire de mots de passe, impression).",
+              "Cochez « J'ai sauvegardé cette clé en lieu sûr » puis « Confirmer »."
+            ]
+          },
+          {
+            "type": "warn",
+            "text": "Si le serveur est détruit et que vous n'avez pas votre copie de la clé, les archives chiffrées sur l'USB et sur Drive sont définitivement illisibles."
+          },
+          {
+            "type": "list",
+            "items": [
+              "Options : Settings → « Chiffrement des copies de sauvegarde » permet de chiffrer ou non les nouvelles copies USB et/ou Drive. Cela ne concerne que les nouvelles copies ; les anciennes restent lisibles avec la clé.",
+              "Restaurer : Restore → USB ou Google Drive. Avec la clé sur le serveur, tout est automatique. Si la clé n'est plus sur ce serveur ou ne correspond pas à l'archive (venue d'un autre serveur), l'application vous demande de coller la clé privée (format pwa-admin-key-v1:…). Elle n'est envoyée qu'une fois et n'est pas enregistrée.",
+              "Bouton « Supprimer la clé de ce serveur » (disponible une fois votre copie confirmée) : durcissement facultatif — les restaurations demanderont alors toujours la clé.",
+              "Limite : un fichier de plus de 60 Go ne peut pas être chiffré. Les copies locales ne sont jamais chiffrées."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "luks",
+        "title": "Disque USB chiffré (LUKS)",
+        "summary": "Chiffrer le disque entier, le déverrouiller, l'éjecter et le reconnecter.",
+        "blocks": [
+          {
+            "type": "p",
+            "text": "LUKS est le chiffrement de disque standard de Linux : sans la passphrase (ou le fichier clé), un disque branché sur un autre ordinateur n'est qu'un bloc illisible."
+          },
+          {
+            "type": "steps",
+            "title": "Chiffrer un disque (Backups → carte « Disque USB / SSD ») :",
+            "items": [
+              "Cliquez sur « Chiffrer ce disque (LUKS) ». ATTENTION : cela efface tout le contenu du disque.",
+              "Saisissez deux fois une passphrase (8 caractères minimum) et notez-la hors du serveur.",
+              "Choisissez le déverrouillage automatique (fichier clé stocké sur le serveur) ou non.",
+              "Tapez le nom de la partition (par exemple sda1) pour confirmer, puis « Effacer et chiffrer ». Comptez plusieurs minutes et laissez la page ouverte.",
+              "Une fois le disque monté, cliquez sur « Activer » pour en faire le disque de sauvegarde."
+            ]
+          },
+          {
+            "type": "p",
+            "text": "Le disque est formaté en LUKS2 avec un système de fichiers ext4 (nom BACKUP) monté sur /media/backup-usb. Les pastilles indiquent son état : « Non chiffré » (gris), « Chiffré · déverrouillé » (vert, utilisable), « Chiffré · verrouillé » (orange, passphrase requise)."
+          },
+          {
+            "type": "list",
+            "items": [
+              "Déverrouillage automatique : un fichier clé (/etc/pwa-admin/usb-luks.key, lisible par root seulement) ouvre le disque au branchement. Pratique pour les sauvegardes planifiées, mais la clé est sur le serveur : cela protège contre la perte du disque seul, pas contre le vol du serveur avec le disque. Activable ou désactivable après coup avec la passphrase.",
+              "Sans déverrouillage automatique : saisissez la passphrase à chaque branchement (carte « Disque USB chiffré verrouillé »). Tant que le disque est verrouillé, les copies USB planifiées sont ignorées.",
+              "Éjecter : démonte le disque et referme le volume chiffré ; vous pouvez alors le débrancher sans risque.",
+              "Reconnecter : remonte un disque encore branché après une éjection, sans le débrancher (disque chiffré avec déverrouillage automatique, ou disque non chiffré). Sinon, utilisez « Déverrouiller » avec la passphrase.",
+              "Reformater : sur un disque chiffré verrouillé (passphrase perdue, formatage interrompu), efface tout et recommence."
+            ]
+          },
+          {
+            "type": "warn",
+            "text": "Passphrase perdue = disque définitivement illisible, sans aucun recours. Ne débranchez jamais le disque pendant une sauvegarde, un formatage ou un changement de déverrouillage automatique : utilisez toujours « Éjecter »."
+          },
+          {
+            "type": "p",
+            "text": "Protection du système : un serveur qui démarre sur un SSD USB (par exemple un Raspberry Pi) ne propose jamais son propre disque. Toute partition d'un disque qui héberge le système est exclue de l'activation, du chiffrement, du formatage et de la reconnexion."
+          }
+        ]
+      },
+      {
+        "id": "readluks",
+        "title": "Lire un disque LUKS sur un autre ordinateur",
+        "summary": "Linux, Windows (WSL2) et macOS.",
+        "blocks": [
+          {
+            "type": "p",
+            "text": "Le disque contient une partition LUKS avec un système de fichiers ext4 à l'intérieur. Il faut la passphrase."
+          },
+          {
+            "type": "p",
+            "text": "Linux (le plus simple) : le gestionnaire de fichiers (Nautilus, Dolphin…) détecte le disque, demande la passphrase et le monte. En ligne de commande (remplacez sdX1 par la partition du disque, repérée avec lsblk) :"
+          },
+          {
+            "type": "code",
+            "lines": [
+              "lsblk",
+              "sudo cryptsetup open /dev/sdX1 backup",
+              "sudo mkdir -p /mnt/backup && sudo mount /dev/mapper/backup /mnt/backup",
+              "# vos fichiers sont dans /mnt/backup/BACKUP/<nom-du-serveur>/",
+              "sudo umount /mnt/backup && sudo cryptsetup close backup"
+            ]
+          },
+          {
+            "type": "p",
+            "text": "Windows ne lit pas LUKS et proposera de formater le disque : répondez toujours « Annuler ». Deux solutions : démarrer le PC sur une clé USB Linux (Ubuntu, « Essayer sans installer ») et suivre la méthode Linux ; ou utiliser WSL2 (Windows 10 21H2 ou plus, Windows 11) dans un PowerShell lancé en administrateur :"
+          },
+          {
+            "type": "code",
+            "lines": [
+              "Get-CimInstance Win32_DiskDrive | Select-Object DeviceID, Model, Size",
+              "wsl --mount \\\\.\\PHYSICALDRIVE2 --bare"
+            ]
+          },
+          {
+            "type": "p",
+            "text": "Remplacez 2 par le numéro du disque (environ la taille du T7). Ensuite, dans WSL (Ubuntu), utilisez les commandes Linux ci-dessus : vos fichiers apparaissent dans l'Explorateur sous \\\\wsl$\\Ubuntu\\mnt\\backup. Pour détacher le disque ensuite :"
+          },
+          {
+            "type": "code",
+            "lines": [
+              "wsl --unmount \\\\.\\PHYSICALDRIVE2"
+            ]
+          },
+          {
+            "type": "p",
+            "text": "Si cryptsetup échoue sous WSL (module dm-crypt absent), mettez WSL à jour avec « wsl --update »."
+          },
+          {
+            "type": "p",
+            "text": "macOS : pas de prise en charge native. Utilisez une machine virtuelle Linux avec accès au périphérique USB, ou démarrez un PC sur une clé Linux."
+          },
+          {
+            "type": "warn",
+            "text": "VeraCrypt, BitLocker et les pilotes « ext4 pour Windows » ne savent pas lire LUKS."
+          }
+        ]
+      },
+      {
+        "id": "decrypt",
+        "title": "Ouvrir une archive .tar.gz.enc hors de l'application",
+        "summary": "Déchiffrer à la main avec l'outil autonome et la clé privée.",
+        "blocks": [
+          {
+            "type": "p",
+            "text": "Si l'application n'est plus disponible (serveur détruit, nouvelle installation…), vous pouvez déchiffrer une archive avec l'outil autonome decrypt-backup.mjs : il demande Node.js 16 ou plus récent et aucune autre installation. Téléchargez-le avec le bouton ci-dessous (ou depuis le dépôt, dossier apps/web/public/tools)."
+          },
+          {
+            "type": "steps",
+            "title": "Déchiffrer une archive :",
+            "items": [
+              "Enregistrez votre clé privée dans un fichier texte, par exemple cle.txt (une seule ligne : pwa-admin-key-v1:…).",
+              "Lancez le déchiffrement, puis l'extraction de l'archive obtenue :"
+            ]
+          },
+          {
+            "type": "code",
+            "lines": [
+              "node decrypt-backup.mjs archive.tar.gz.enc archive.tar.gz --key-file cle.txt",
+              "mkdir restauration && tar xzf archive.tar.gz -C restauration"
+            ]
+          },
+          {
+            "type": "p",
+            "text": "Le déchiffrement vérifie l'intégrité : si la clé est fausse, ou si le fichier est modifié ou tronqué, l'outil refuse et ne laisse aucun fichier de sortie. La clé peut aussi être fournie par la variable d'environnement PWA_BACKUP_KEY (évitez l'option --key, qui reste dans l'historique du terminal)."
+          },
+          {
+            "type": "p",
+            "text": "Une archive sans .enc se décompresse directement avec tar. Exception : les sauvegardes de bases de données (noms en .dump.gz.tar.gz) sont un simple flux gzip contenant le dump, malgré l'extension :"
+          },
+          {
+            "type": "code",
+            "lines": [
+              "gunzip -c 2026-01-01T00-00-00.000Z.dump.gz.tar.gz > dump.sql"
+            ]
+          },
+          {
+            "type": "p",
+            "text": "Pour un disque LUKS, déverrouillez d'abord le disque (section précédente), puis déchiffrez les archives .enc qu'il contient si l'option de chiffrement des archives était active."
+          }
+        ]
+      },
+      {
+        "id": "troubleshoot",
+        "title": "Dépannage",
+        "summary": "Problèmes fréquents avec le disque USB et le chiffrement.",
+        "blocks": [
+          {
+            "type": "list",
+            "items": [
+              "« Aucun disque USB détecté » : disque débranché, ou disque système (jamais proposé). Branchez-le ; s'il est chiffré et verrouillé, la carte « Disque USB chiffré verrouillé » apparaît.",
+              "« Passphrase incorrecte » : vérifiez la saisie (majuscules, disposition du clavier). Sans la bonne passphrase, il n'existe aucun moyen de lire le disque.",
+              "Le disque se déconnecte pendant une grosse écriture : problème de liaison USB 3. Essayez un autre câble ou un autre port, et désactivez le mode UAS pour ce disque ; sur un matériel très récent, utilisez un noyau Linux récent. Le journal du noyau (journalctl -k) montre les erreurs xhci/usb.",
+              "Volume fantôme après un débranchement brutal : l'application nettoie normalement ces restes au rebranchement. À la main : sudo umount -l /media/backup-usb puis sudo cryptsetup close backup-usb-crypt (ou sudo dmsetup remove --force backup-usb-crypt).",
+              "La restauration demande la clé privée : la clé n'est plus sur ce serveur, ou l'archive vient d'un autre serveur. Collez la clé du serveur d'origine.",
+              "« Le disque est chiffré mais ne contient pas de système de fichiers lisible » : formatage interrompu. Utilisez « Reformater ».",
+              "Après une mise à jour de l'application : relancez deploy/install.sh sur le serveur pour mettre à jour les scripts du disque USB (montage, outil LUKS, règles sudo). Un simple git pull ne suffit pas."
+            ]
+          }
+        ]
+      }
+    ]
   },
   "tipsHeading": "Astuces",
   "tips": [
@@ -126,17 +380,53 @@
   "dependenciesHeading": "Dépendances système à installer",
   "dependenciesIntro": "Ces logiciels doivent être présents sur le serveur pour que les modules correspondants fonctionnent. La plupart sont déjà standards sur Raspberry Pi OS / Debian / Ubuntu.",
   "dependencies": {
-    "docker": { "name": "Docker", "purpose": "Requis pour le module Docker et les sauvegardes de volumes/conteneurs." },
-    "nginx": { "name": "Nginx", "purpose": "Requis pour le module Nginx et le monitoring des sites." },
-    "systemd": { "name": "systemd", "purpose": "Gère le service de l'application et les services listés dans Réseau & Sécurité." },
-    "sudo": { "name": "sudo + règles scoped", "purpose": "Permet les actions privilégiées (reload nginx, apt, etc.) sans lancer le service en root." },
-    "fail2ban": { "name": "fail2ban", "purpose": "Requis pour le blocage/déblocage d'IP." },
-    "vcgencmd": { "name": "vcgencmd (Raspberry Pi OS/firmware)", "purpose": "Température, tension et throttling — spécifique au matériel Raspberry Pi." },
-    "networkmanager": { "name": "NetworkManager (nmcli)", "purpose": "Gestion Wi-Fi (scan, connexion) dans Réseau & Sécurité." },
-    "openssh": { "name": "openssh-server", "purpose": "Accès SSH et statut affiché dans Réseau & Sécurité." },
-    "pm2": { "name": "PM2", "purpose": "Requis pour le module Node.js (PM2) si des apps Node tournent hors Docker." },
-    "database": { "name": "MariaDB / MySQL / PostgreSQL / Redis (optionnel)", "purpose": "Détectés automatiquement si installés en natif, pour les sauvegardes de base de données." },
-    "rsync": { "name": "rsync", "purpose": "Utilisé par le module Applications pour les instantanés complets/partiels." },
-    "tailscale": { "name": "Tailscale", "purpose": "Accès réseau sécurisé — l'app ne doit jamais être exposée publiquement." }
+    "docker": {
+      "name": "Docker",
+      "purpose": "Requis pour le module Docker et les sauvegardes de volumes/conteneurs."
+    },
+    "nginx": {
+      "name": "Nginx",
+      "purpose": "Requis pour le module Nginx et le monitoring des sites."
+    },
+    "systemd": {
+      "name": "systemd",
+      "purpose": "Gère le service de l'application et les services listés dans Réseau & Sécurité."
+    },
+    "sudo": {
+      "name": "sudo + règles scoped",
+      "purpose": "Permet les actions privilégiées (reload nginx, apt, etc.) sans lancer le service en root."
+    },
+    "fail2ban": {
+      "name": "fail2ban",
+      "purpose": "Requis pour le blocage/déblocage d'IP."
+    },
+    "vcgencmd": {
+      "name": "vcgencmd (Raspberry Pi OS/firmware)",
+      "purpose": "Température, tension et throttling — spécifique au matériel Raspberry Pi."
+    },
+    "networkmanager": {
+      "name": "NetworkManager (nmcli)",
+      "purpose": "Gestion Wi-Fi (scan, connexion) dans Réseau & Sécurité."
+    },
+    "openssh": {
+      "name": "openssh-server",
+      "purpose": "Accès SSH et statut affiché dans Réseau & Sécurité."
+    },
+    "pm2": {
+      "name": "PM2",
+      "purpose": "Requis pour le module Node.js (PM2) si des apps Node tournent hors Docker."
+    },
+    "database": {
+      "name": "MariaDB / MySQL / PostgreSQL / Redis (optionnel)",
+      "purpose": "Détectés automatiquement si installés en natif, pour les sauvegardes de base de données."
+    },
+    "rsync": {
+      "name": "rsync",
+      "purpose": "Utilisé par le module Applications pour les instantanés complets/partiels."
+    },
+    "tailscale": {
+      "name": "Tailscale",
+      "purpose": "Accès réseau sécurisé — l'app ne doit jamais être exposée publiquement."
+    }
   }
 }

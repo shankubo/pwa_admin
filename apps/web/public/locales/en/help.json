@@ -83,7 +83,8 @@
         "Two steps: choose the type (Full, or Partial for a database dump), then the destination (local, USB if a drive is plugged in, Google Drive if connected, and/or direct download to your device).",
         "A plugged-in USB/SSD drive is detected and mounted automatically — backups are stored in a folder dedicated to this server.",
         "History of every backup with deletion available (the local file is deleted; existing USB/Drive copies are untouched).",
-        "This screen no longer offers any restore action — that's deliberate, to avoid an accidental click that would overwrite data. Restoring is done exclusively from the Restore screen."
+        "This screen no longer offers any restore action — that's deliberate, to avoid an accidental click that would overwrite data. Restoring is done exclusively from the Restore screen.",
+        "Copy encryption, the encrypted (LUKS) USB drive, reading it on another computer and troubleshooting: see the \"Backups, encryption and the USB drive\" guide further down this page."
       ]
     },
     "restore": {
@@ -114,9 +115,262 @@
       "summary": "Administrator account and audit log.",
       "details": [
         "Enable 2FA (recommended) via a QR code to scan with an authenticator app.",
-        "Audit log listing every sensitive action performed (who, what, when, result)."
+        "Audit log listing every sensitive action performed (who, what, when, result).",
+        "Backup copy encryption: choose whether new USB and Google Drive copies are encrypted with the application's key."
       ]
     }
+  },
+  "backupGuide": {
+    "heading": "Backups, encryption and the USB drive: complete guide",
+    "intro": "Everything you need to back up, protect and recover your data, including without the application.",
+    "downloadTool": "Download the decryption tool",
+    "cards": [
+      {
+        "id": "overview",
+        "title": "Overview: where are my backups and how are they protected?",
+        "summary": "Three independent layers of protection, to combine as you need.",
+        "blocks": [
+          {
+            "type": "p",
+            "text": "A backup can exist in three places, each with its own protection:"
+          },
+          {
+            "type": "list",
+            "items": [
+              "Local copy (the server's data/backups folder): never encrypted. It serves quick restores and protects against handling mistakes, not against theft or loss of the server.",
+              "Copy on a USB/SSD drive: can be protected in two ways that stack — each archive encrypted with the application's key (Settings option), and the whole drive encrypted with LUKS.",
+              "Copy on Google Drive: encrypted with the application's key (Settings option). While the option is on, Google cannot read it."
+            ]
+          },
+          {
+            "type": "p",
+            "text": "Recommended combinations:"
+          },
+          {
+            "type": "list",
+            "items": [
+              "Encrypted (LUKS) USB drive and USB archive encryption off: simple, and the drive is unreadable if lost or stolen (locked or unplugged).",
+              "Unencrypted USB drive: keep archive encryption on.",
+              "Google Drive: always keep archive encryption on."
+            ]
+          },
+          {
+            "type": "warn",
+            "text": "While a LUKS drive is unlocked and mounted (the normal state for scheduled backups), anyone with access to the server can read its files. Archive encryption protects in that case too."
+          },
+          {
+            "type": "p",
+            "text": "The migration bundle (Backups → \"Server migration\") is not encrypted archive by archive on the USB drive: put it on a LUKS drive, or delete it after use."
+          },
+          {
+            "type": "p",
+            "text": "Backups are stored on the USB drive in BACKUP/<server-name>/ with the folders volumes, paths (folders and container images), db (databases), apps (applications) and migration."
+          }
+        ]
+      },
+      {
+        "id": "archives",
+        "title": "Archive encryption (the application's key)",
+        "summary": "How USB and Drive copies are encrypted, the private key, and how to restore.",
+        "blocks": [
+          {
+            "type": "p",
+            "text": "On first start the application creates a key pair. The public key encrypts each archive copied to USB or uploaded to Google Drive; every file gets its own random secret (X25519 + AES-256-GCM, Node.js's built-in crypto). The result is a .tar.gz.enc file, unreadable without the private key, and any tampering is detected."
+          },
+          {
+            "type": "p",
+            "text": "The private key is kept on the server (secrets/backup-encryption.private, mode 0600) so restores from the application work without asking. It is never written to the USB drive or to Drive."
+          },
+          {
+            "type": "steps",
+            "title": "Make your own copy of the key (essential):",
+            "items": [
+              "Backups, card \"Keep a copy of your private encryption key\": click \"Show private key\".",
+              "Copy or download it and store it away from the server (password manager, printout).",
+              "Tick \"I have saved this key somewhere safe\" then \"Confirm\"."
+            ]
+          },
+          {
+            "type": "warn",
+            "text": "If the server is destroyed and you have no copy of the key, the encrypted archives on USB and Drive are permanently unreadable."
+          },
+          {
+            "type": "list",
+            "items": [
+              "Options: Settings → \"Backup copy encryption\" lets you encrypt or not the new USB and/or Drive copies. It only affects new copies; older ones stay readable with the key.",
+              "Restoring: Restore → USB or Google Drive. With the key on the server everything is automatic. If the key is no longer on this server or doesn't match the archive (it came from another server), the application asks you to paste the private key (format pwa-admin-key-v1:…). It is sent once and not stored.",
+              "\"Remove the key from this server\" button (available once your copy is confirmed): optional hardening — restores will then always ask for the key.",
+              "Limit: a file larger than 60 GB cannot be encrypted. Local copies are never encrypted."
+            ]
+          }
+        ]
+      },
+      {
+        "id": "luks",
+        "title": "Encrypted USB drive (LUKS)",
+        "summary": "Encrypt the whole drive, unlock it, eject it and reconnect it.",
+        "blocks": [
+          {
+            "type": "p",
+            "text": "LUKS is Linux's standard disk encryption: without the passphrase (or the keyfile), a drive plugged into another computer is just unreadable data."
+          },
+          {
+            "type": "steps",
+            "title": "Encrypt a drive (Backups → \"USB / SSD drive\" card):",
+            "items": [
+              "Click \"Encrypt this drive (LUKS)\". WARNING: this erases everything on the drive.",
+              "Enter a passphrase twice (at least 8 characters) and write it down away from the server.",
+              "Choose automatic unlock (keyfile stored on the server) or not.",
+              "Type the partition name (for example sda1) to confirm, then \"Erase and encrypt\". Allow several minutes and keep the page open.",
+              "Once the drive is mounted, click \"Activate\" to make it the backup drive."
+            ]
+          },
+          {
+            "type": "p",
+            "text": "The drive is formatted as LUKS2 with an ext4 filesystem (name BACKUP) mounted on /media/backup-usb. Badges show its state: \"Not encrypted\" (grey), \"Encrypted · unlocked\" (green, usable), \"Encrypted · locked\" (orange, passphrase needed)."
+          },
+          {
+            "type": "list",
+            "items": [
+              "Automatic unlock: a keyfile (/etc/pwa-admin/usb-luks.key, readable by root only) opens the drive when plugged in. Handy for scheduled backups, but the key is on the server: it protects against losing the drive alone, not against the server being stolen along with it. Can be turned on or off later with the passphrase.",
+              "Without automatic unlock: enter the passphrase each time you plug the drive in (\"Encrypted USB drive is locked\" card). While it is locked, scheduled USB copies are skipped.",
+              "Eject: unmounts the drive and closes the encrypted volume; you can then unplug it safely.",
+              "Reconnect: mounts a still-plugged-in drive again after an eject, without unplugging it (encrypted drive with automatic unlock, or unencrypted drive). Otherwise use \"Unlock\" with the passphrase.",
+              "Reformat: on a locked encrypted drive (lost passphrase, interrupted format), erases everything and starts over."
+            ]
+          },
+          {
+            "type": "warn",
+            "text": "Lost passphrase = drive permanently unreadable, with no recourse. Never unplug the drive during a backup, a format or an automatic-unlock change: always use \"Eject\"."
+          },
+          {
+            "type": "p",
+            "text": "System protection: a server that boots from a USB SSD (for example a Raspberry Pi) never offers its own disk. Any partition of a disk that hosts the system is excluded from activation, encryption, formatting and reconnect."
+          }
+        ]
+      },
+      {
+        "id": "readluks",
+        "title": "Reading a LUKS drive on another computer",
+        "summary": "Linux, Windows (WSL2) and macOS.",
+        "blocks": [
+          {
+            "type": "p",
+            "text": "The drive holds a LUKS partition with an ext4 filesystem inside. You need the passphrase."
+          },
+          {
+            "type": "p",
+            "text": "Linux (easiest): the file manager (Nautilus, Dolphin…) detects the drive, asks for the passphrase and mounts it. On the command line (replace sdX1 with the drive's partition, found with lsblk):"
+          },
+          {
+            "type": "code",
+            "lines": [
+              "lsblk",
+              "sudo cryptsetup open /dev/sdX1 backup",
+              "sudo mkdir -p /mnt/backup && sudo mount /dev/mapper/backup /mnt/backup",
+              "# your files are in /mnt/backup/BACKUP/<server-name>/",
+              "sudo umount /mnt/backup && sudo cryptsetup close backup"
+            ]
+          },
+          {
+            "type": "p",
+            "text": "Windows cannot read LUKS and will offer to format the drive: always answer \"Cancel\". Two options: boot the PC from a Linux USB stick (Ubuntu, \"Try without installing\") and follow the Linux method; or use WSL2 (Windows 10 21H2 or later, Windows 11) in a PowerShell run as administrator:"
+          },
+          {
+            "type": "code",
+            "lines": [
+              "Get-CimInstance Win32_DiskDrive | Select-Object DeviceID, Model, Size",
+              "wsl --mount \\\\.\\PHYSICALDRIVE2 --bare"
+            ]
+          },
+          {
+            "type": "p",
+            "text": "Replace 2 with the drive's number (about the size of the T7). Then, inside WSL (Ubuntu), use the Linux commands above: your files appear in Explorer under \\\\wsl$\\Ubuntu\\mnt\\backup. To detach the drive afterwards:"
+          },
+          {
+            "type": "code",
+            "lines": [
+              "wsl --unmount \\\\.\\PHYSICALDRIVE2"
+            ]
+          },
+          {
+            "type": "p",
+            "text": "If cryptsetup fails under WSL (dm-crypt module missing), update WSL with \"wsl --update\"."
+          },
+          {
+            "type": "p",
+            "text": "macOS: no native support. Use a Linux virtual machine with access to the USB device, or boot a PC from a Linux stick."
+          },
+          {
+            "type": "warn",
+            "text": "VeraCrypt, BitLocker and \"ext4 for Windows\" drivers cannot read LUKS."
+          }
+        ]
+      },
+      {
+        "id": "decrypt",
+        "title": "Opening a .tar.gz.enc archive outside the application",
+        "summary": "Decrypt by hand with the standalone tool and the private key.",
+        "blocks": [
+          {
+            "type": "p",
+            "text": "If the application is no longer available (destroyed server, fresh install…), you can decrypt an archive with the standalone decrypt-backup.mjs tool: it needs Node.js 16 or newer and nothing else. Download it with the button below (or from the repository, folder apps/web/public/tools)."
+          },
+          {
+            "type": "steps",
+            "title": "Decrypt an archive:",
+            "items": [
+              "Save your private key in a text file, for example key.txt (a single line: pwa-admin-key-v1:…).",
+              "Run the decryption, then extract the resulting archive:"
+            ]
+          },
+          {
+            "type": "code",
+            "lines": [
+              "node decrypt-backup.mjs archive.tar.gz.enc archive.tar.gz --key-file key.txt",
+              "mkdir restored && tar xzf archive.tar.gz -C restored"
+            ]
+          },
+          {
+            "type": "p",
+            "text": "Decryption checks integrity: if the key is wrong, or the file is modified or truncated, the tool refuses and leaves no output file. The key can also come from the PWA_BACKUP_KEY environment variable (avoid the --key option, which stays in your shell history)."
+          },
+          {
+            "type": "p",
+            "text": "An archive without .enc unpacks directly with tar. Exception: database backups (names ending in .dump.gz.tar.gz) are a plain gzip stream holding the dump, despite the extension:"
+          },
+          {
+            "type": "code",
+            "lines": [
+              "gunzip -c 2026-01-01T00-00-00.000Z.dump.gz.tar.gz > dump.sql"
+            ]
+          },
+          {
+            "type": "p",
+            "text": "For a LUKS drive, unlock the drive first (previous section), then decrypt the .enc archives it contains if archive encryption was on."
+          }
+        ]
+      },
+      {
+        "id": "troubleshoot",
+        "title": "Troubleshooting",
+        "summary": "Common problems with the USB drive and encryption.",
+        "blocks": [
+          {
+            "type": "list",
+            "items": [
+              "\"No USB drive detected\": drive unplugged, or a system disk (never offered). Plug it in; if it is encrypted and locked, the \"Encrypted USB drive is locked\" card appears.",
+              "\"Wrong passphrase\": check what you typed (capitals, keyboard layout). Without the right passphrase there is no way to read the drive.",
+              "The drive disconnects during a large write: a USB 3 link problem. Try another cable or port, and disable UAS mode for this drive; on very recent hardware, use a recent Linux kernel. The kernel log (journalctl -k) shows xhci/usb errors.",
+              "Ghost volume after an abrupt unplug: the application normally cleans these up when the drive is plugged back in. By hand: sudo umount -l /media/backup-usb then sudo cryptsetup close backup-usb-crypt (or sudo dmsetup remove --force backup-usb-crypt).",
+              "Restore asks for the private key: the key is no longer on this server, or the archive comes from another server. Paste the original server's key.",
+              "\"The drive is encrypted but has no readable filesystem\": interrupted format. Use \"Reformat\".",
+              "After an application update: re-run deploy/install.sh on the server to update the USB drive scripts (mounting, LUKS tool, sudo rules). A plain git pull is not enough."
+            ]
+          }
+        ]
+      }
+    ]
   },
   "tipsHeading": "Tips",
   "tips": [
@@ -126,17 +380,53 @@
   "dependenciesHeading": "System dependencies to install",
   "dependenciesIntro": "These programs must be present on the server for the corresponding modules to work. Most are already standard on Raspberry Pi OS / Debian / Ubuntu.",
   "dependencies": {
-    "docker": { "name": "Docker", "purpose": "Required for the Docker module and volume/container backups." },
-    "nginx": { "name": "Nginx", "purpose": "Required for the Nginx module and site monitoring." },
-    "systemd": { "name": "systemd", "purpose": "Manages the application service and the services listed in Network & Security." },
-    "sudo": { "name": "sudo + scoped rules", "purpose": "Allows privileged actions (reload nginx, apt, etc.) without running the service as root." },
-    "fail2ban": { "name": "fail2ban", "purpose": "Required for IP blocking/unblocking." },
-    "vcgencmd": { "name": "vcgencmd (Raspberry Pi OS/firmware)", "purpose": "Temperature, voltage, and throttling — specific to Raspberry Pi hardware." },
-    "networkmanager": { "name": "NetworkManager (nmcli)", "purpose": "Wi-Fi management (scan, connect) in Network & Security." },
-    "openssh": { "name": "openssh-server", "purpose": "SSH access and status shown in Network & Security." },
-    "pm2": { "name": "PM2", "purpose": "Required for the Node.js (PM2) module if Node apps run outside Docker." },
-    "database": { "name": "MariaDB / MySQL / PostgreSQL / Redis (optional)", "purpose": "Auto-detected if installed natively, for database backups." },
-    "rsync": { "name": "rsync", "purpose": "Used by the Applications module for full/partial snapshots." },
-    "tailscale": { "name": "Tailscale", "purpose": "Secure network access — the app must never be exposed publicly." }
+    "docker": {
+      "name": "Docker",
+      "purpose": "Required for the Docker module and volume/container backups."
+    },
+    "nginx": {
+      "name": "Nginx",
+      "purpose": "Required for the Nginx module and site monitoring."
+    },
+    "systemd": {
+      "name": "systemd",
+      "purpose": "Manages the application service and the services listed in Network & Security."
+    },
+    "sudo": {
+      "name": "sudo + scoped rules",
+      "purpose": "Allows privileged actions (reload nginx, apt, etc.) without running the service as root."
+    },
+    "fail2ban": {
+      "name": "fail2ban",
+      "purpose": "Required for IP blocking/unblocking."
+    },
+    "vcgencmd": {
+      "name": "vcgencmd (Raspberry Pi OS/firmware)",
+      "purpose": "Temperature, voltage, and throttling — specific to Raspberry Pi hardware."
+    },
+    "networkmanager": {
+      "name": "NetworkManager (nmcli)",
+      "purpose": "Wi-Fi management (scan, connect) in Network & Security."
+    },
+    "openssh": {
+      "name": "openssh-server",
+      "purpose": "SSH access and status shown in Network & Security."
+    },
+    "pm2": {
+      "name": "PM2",
+      "purpose": "Required for the Node.js (PM2) module if Node apps run outside Docker."
+    },
+    "database": {
+      "name": "MariaDB / MySQL / PostgreSQL / Redis (optional)",
+      "purpose": "Auto-detected if installed natively, for database backups."
+    },
+    "rsync": {
+      "name": "rsync",
+      "purpose": "Used by the Applications module for full/partial snapshots."
+    },
+    "tailscale": {
+      "name": "Tailscale",
+      "purpose": "Secure network access — the app must never be exposed publicly."
+    }
   }
 }

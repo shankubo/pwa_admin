@@ -81,7 +81,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        navigateFallbackDenylist: [/^\/api\//],
+        // /tools/* are static downloads (e.g. decrypt-backup.mjs): a download is a
+        // navigation request, so without this the SW would answer with index.html.
+        navigateFallbackDenylist: [/^\/api\//, /^\/tools\//],
         runtimeCaching: [
           {
             urlPattern: /^\/api\//,

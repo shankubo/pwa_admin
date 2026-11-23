@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardTitle } from "@/components/ui/Card";
+import { BackupGuide } from "@/components/help/BackupGuide";
 import {
   HelpCircle,
   LayoutDashboard,
@@ -124,6 +125,8 @@ export function Help() {
           ))}
         </div>
       </div>
+
+      <BackupGuide />
 
       <div>
         <h2 className="mb-2 text-sm font-semibold text-muted-foreground">{t("tipsHeading")}</h2>
