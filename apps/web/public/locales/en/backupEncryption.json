@@ -72,6 +72,8 @@
       "mapper_busy": "The encrypted volume is in use by another process.",
       "invalid_passphrase_length": "The passphrase must be 8 to 256 characters.",
       "not_a_luks_partition": "This partition is not LUKS-encrypted.",
+      "eject_failed_still_mounted": "Eject failed: the drive is still mounted, do not unplug it.",
+      "unmount_failed": "Could not unmount the drive (files still in use?).",
       "device_disconnected": "The USB drive disconnected during the operation: check the cable and port, then try again.",
       "luks_format_failed": "Failed to initialise LUKS encryption.",
       "luks_open_failed": "Failed to open the encrypted volume.",

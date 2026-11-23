@@ -1,10 +1,9 @@
 import { spawnCommandWithStdin } from "../utils/exec.js";
-import { UsbBackupService } from "./usbBackup.client.js";
+import { UsbBackupService, LUKS_HELPER as HELPER } from "./usbBackup.client.js";
 
-// Everything privileged happens in this root script (see deploy/usb-backup/
+// Everything privileged happens in the root script (see deploy/usb-backup/
 // backup-usb-luks.sh); the service only ever shells out to it through the one
 // scoped sudoers rule. Passphrases go over stdin, never argv.
-const HELPER = "/usr/local/bin/backup-usb-luks.sh";
 const PARTITION_RE = /^(sd[a-z]+[0-9]+|nvme[0-9]+n[0-9]+p[0-9]+|mmcblk[0-9]+p[0-9]+)$/;
 const HELPER_TIMEOUT_MS = 10 * 60_000;
 

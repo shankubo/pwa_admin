@@ -30,10 +30,11 @@ export function UsbDriveStateBadge({ state }: { state: UsbDriveState }) {
   );
 }
 
-function useLuksError() {
+export function useLuksError() {
   const { t } = useTranslation("backupEncryption");
   return (code: string) => {
     const known = [
+      "eject_failed_still_mounted", "unmount_failed",
       "wrong_passphrase", "confirmation_mismatch", "usb_partition_not_found", "partition_still_mounted",
       "mapper_busy", "invalid_passphrase_length", "not_a_luks_partition", "device_disconnected",
       "luks_format_failed", "luks_open_failed", "mkfs_failed", "unsupported_inner_filesystem",

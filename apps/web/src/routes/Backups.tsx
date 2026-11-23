@@ -16,7 +16,7 @@ import type {
 import { useTranslation } from "react-i18next";
 import { apiJson } from "@/lib/api";
 import { EncryptionKeyCard } from "@/components/backup/EncryptionKeyCard";
-import { EncryptDriveForm, KeyfileControl, LockedDriveCard, UsbDriveStateBadge } from "@/components/backup/UsbLuksControls";
+import { EncryptDriveForm, KeyfileControl, LockedDriveCard, UsbDriveStateBadge, useLuksError } from "@/components/backup/UsbLuksControls";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -880,6 +880,8 @@ function UsbConnection() {
   const [enabling, setEnabling] = useState<string | null>(null);
   const [ejecting, setEjecting] = useState<string | null>(null);
   const [ejected, setEjected] = useState<string | null>(null);
+  const [ejectError, setEjectError] = useState<string | null>(null);
+  const explainEject = useLuksError();
 
   function loadStatus() {
     apiJson<UsbStatus>("/backups/usb/status")
@@ -901,10 +903,14 @@ function UsbConnection() {
 
   async function ejectDrive(mountpoint: string) {
     setEjecting(mountpoint);
+    setEjectError(null);
+    setEjected(null);
     try {
       await apiJson("/backups/usb/eject", { method: "POST", body: JSON.stringify({ mountpoint }) });
       setEjected(mountpoint);
       loadStatus();
+    } catch (err) {
+      setEjectError(explainEject((err as Error).message));
     } finally {
       setEjecting(null);
     }
@@ -937,6 +943,12 @@ function UsbConnection() {
       {ejected && (
         <p className="flex items-center gap-1 text-sm text-primary">
           <CheckCircle2 className="h-4 w-4" /> {t("usb.ejectedSafe")}
+        </p>
+      )}
+
+      {ejectError && (
+        <p className="flex items-center gap-1 text-sm text-destructive">
+          <XCircle className="h-4 w-4" /> {ejectError}
         </p>
       )}
 

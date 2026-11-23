@@ -72,6 +72,8 @@
       "mapper_busy": "Le volume chiffré est utilisé par un autre processus.",
       "invalid_passphrase_length": "La passphrase doit faire entre 8 et 256 caractères.",
       "not_a_luks_partition": "Cette partition n'est pas chiffrée en LUKS.",
+      "eject_failed_still_mounted": "L'éjection a échoué : le disque est toujours monté, ne le débranchez pas.",
+      "unmount_failed": "Impossible de démonter le disque (fichiers encore utilisés ?).",
       "device_disconnected": "Le disque USB s'est déconnecté pendant l'opération : vérifiez le câble et le port, puis réessayez.",
       "luks_format_failed": "Échec de l'initialisation du chiffrement LUKS.",
       "luks_open_failed": "Échec de l'ouverture du volume chiffré.",

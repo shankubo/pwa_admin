@@ -23,6 +23,9 @@ interface LsblkOutput {
 
 const BACKUP_ROOT_SEGMENT = "BACKUP";
 
+/** Root helper (deploy/usb-backup/backup-usb-luks.sh) behind the one scoped sudoers rule. */
+export const LUKS_HELPER = "/usr/local/bin/backup-usb-luks.sh";
+
 // Mount points that are never a backup target even if lsblk reports tran=usb
 // on them — e.g. a Raspberry Pi booting its rootfs off an external USB/SSD
 // (common once the SD card is retired) would otherwise show its own system
@@ -270,9 +273,21 @@ export const UsbBackupService = {
     const drives = await this.detectDrives();
     const drive = drives.find((d) => d.mountpoint === mountpoint);
     if (!drive) throw new Error("usb_drive_not_found");
-    const devName = basename(drive.device);
-    await runCommand("sudo", ["/bin/systemctl", "stop", `backup-usb-mount@${devName}.service`], {
-      timeoutMs: 15000,
-    });
+
+    if (drive.encrypted) {
+      // An unlocked drive's `device` is the dm-crypt mapper, not the partition the
+      // mount unit is named after, and the unit may not even be active (an unlock
+      // done from the app mounts outside it). The root helper tears it down either way.
+      await runCommand("sudo", [LUKS_HELPER, "eject", drive.partition], { timeoutMs: 30000 });
+    } else {
+      await runCommand("sudo", ["/bin/systemctl", "stop", `backup-usb-mount@${drive.partition}.service`], {
+        timeoutMs: 15000,
+      });
+    }
+
+    // Never report "safe to unplug" on faith: a stop of the wrong or an inactive
+    // unit succeeds silently while leaving the drive mounted.
+    const stillMounted = (await this.detectDrives()).some((d) => d.mountpoint === mountpoint);
+    if (stillMounted) throw new Error("eject_failed_still_mounted");
   },
 };

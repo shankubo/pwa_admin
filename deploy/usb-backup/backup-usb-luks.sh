@@ -62,6 +62,11 @@ with_pass() { printf '%s' "$PASS" | "$@"; }
 
 mapper_open() { [ -e "/dev/mapper/${MAPPER}" ]; }
 
+# Mounting here happens outside the systemd unit, so the unit would stay
+# inactive and "systemctl stop" (eject) would then do nothing. Starting it
+# afterwards is safe: its ExecStart sees the drive already mounted and exits.
+align_unit() { systemctl start "backup-usb-mount@${PART}.service" 2>/dev/null || true; }
+
 # A mapping left behind by a drive that was unplugged without eject still
 # "exists" but its backing disk is gone: treating it as open would make unlock
 # mount a dead device. Drop it so the next open starts from a clean state.
@@ -103,10 +108,26 @@ case "$ACTION" in
     clear_stale_mapper
     if mapper_open; then
       mount_mapper
+      align_unit
       exit 0
     fi
     with_pass cryptsetup open --type luks --key-file=- "$DEV" "$MAPPER" || die "wrong_passphrase"
     mount_mapper
+    align_unit
+    ;;
+
+  eject)
+    # Works whether or not the mount unit is active (e.g. after an unlock done
+    # from the app), and falls back to lazy/forced teardown so an eject never
+    # silently leaves the drive mounted.
+    sync
+    systemctl stop "backup-usb-mount@${PART}.service" 2>/dev/null || true
+    if mountpoint -q "$MOUNTPOINT"; then
+      umount "$MOUNTPOINT" 2>/dev/null || umount -l "$MOUNTPOINT" || die "unmount_failed"
+    fi
+    if mapper_open; then
+      cryptsetup close "$MAPPER" 2>/dev/null || dmsetup remove --force "$MAPPER" || die "mapper_busy"
+    fi
     ;;
 
   format)
@@ -149,6 +170,7 @@ case "$ACTION" in
     step mkfs_failed mkfs.ext4 -F -q -L BACKUP -E lazy_itable_init=1,lazy_journal_init=1 "/dev/mapper/${MAPPER}"
     sync
     mount_mapper
+    align_unit
     if [ "$WITH_KEYFILE" -eq 1 ]; then
       with_pass "$0" enable-keyfile "$PART" >/dev/null || echo "backup-usb-luks: keyfile_setup_failed" >&2
     fi
