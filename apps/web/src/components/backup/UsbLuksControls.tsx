@@ -10,8 +10,14 @@ const inputClass = "w-full rounded-sm border border-border bg-muted p-2 text-sm"
 function useLuksError() {
   const { t } = useTranslation("backupEncryption");
   return (code: string) => {
-    const known = ["wrong_passphrase", "confirmation_mismatch", "usb_partition_not_found", "partition_still_mounted", "mapper_busy", "invalid_passphrase_length", "not_a_luks_partition"];
-    return known.includes(code) ? t(`luks.errors.${code}`) : code;
+    const known = [
+      "wrong_passphrase", "confirmation_mismatch", "usb_partition_not_found", "partition_still_mounted",
+      "mapper_busy", "invalid_passphrase_length", "not_a_luks_partition", "device_disconnected",
+      "luks_format_failed", "luks_open_failed", "mkfs_failed", "unsupported_inner_filesystem",
+    ];
+    // The helper may suffix a detail after a colon (e.g. unsupported_inner_filesystem:none).
+    const key = code.split(":")[0];
+    return known.includes(key) ? t(`luks.errors.${key}`) : code;
   };
 }
 
@@ -59,6 +65,7 @@ export function LockedDriveCard({ drive, onDone }: { drive: UsbLockedDriveInfo; 
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LockOpen className="h-3.5 w-3.5" />}
         {t("luks.locked.unlock")}
       </Button>
+      <EncryptDriveForm drive={drive} onDone={onDone} reformat />
     </div>
   );
 }
@@ -67,9 +74,12 @@ export function LockedDriveCard({ drive, onDone }: { drive: UsbLockedDriveInfo; 
 export function EncryptDriveForm({
   drive,
   onDone,
+  reformat = false,
 }: {
   drive: Pick<UsbDriveInfo, "partition" | "label" | "device">;
   onDone: () => void;
+  /** An already-LUKS (locked) drive: same erase flow, worded as a reformat. */
+  reformat?: boolean;
 }) {
   const { t } = useTranslation("backupEncryption");
   const explain = useLuksError();
@@ -111,7 +121,7 @@ export function EncryptDriveForm({
   if (!open) {
     return (
       <Button size="sm" variant="outline" className="mt-2" onClick={() => setOpen(true)}>
-        <Lock className="h-3.5 w-3.5" /> {t("luks.encrypt.button")}
+        <Lock className="h-3.5 w-3.5" /> {reformat ? t("luks.encrypt.reformatButton") : t("luks.encrypt.button")}
       </Button>
     );
   }

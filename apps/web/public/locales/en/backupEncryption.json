@@ -36,6 +36,7 @@
     },
     "encrypt": {
       "button": "Encrypt this drive (LUKS)",
+      "reformatButton": "Reformat (erases the drive)",
       "warning": "This ERASES EVERYTHING on {{device}} ({{label}}), backups included. It cannot be undone.",
       "passphraseConfirm": "Confirm passphrase",
       "tooShort": "At least 8 characters.",
@@ -62,7 +63,12 @@
       "partition_still_mounted": "The partition is still mounted: eject it first.",
       "mapper_busy": "The encrypted volume is in use by another process.",
       "invalid_passphrase_length": "The passphrase must be 8 to 256 characters.",
-      "not_a_luks_partition": "This partition is not LUKS-encrypted."
+      "not_a_luks_partition": "This partition is not LUKS-encrypted.",
+      "device_disconnected": "The USB drive disconnected during the operation: check the cable and port, then try again.",
+      "luks_format_failed": "Failed to initialise LUKS encryption.",
+      "luks_open_failed": "Failed to open the encrypted volume.",
+      "mkfs_failed": "Failed to create the filesystem.",
+      "unsupported_inner_filesystem": "The drive is encrypted but has no readable filesystem (interrupted format?): use \"Reformat\"."
     }
   }
 }

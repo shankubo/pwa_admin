@@ -36,6 +36,7 @@
     },
     "encrypt": {
       "button": "Chiffrer ce disque (LUKS)",
+      "reformatButton": "Reformater (efface le disque)",
       "warning": "Cette opération EFFACE TOUT le contenu de {{device}} ({{label}}), sauvegardes comprises. Elle est irréversible.",
       "passphraseConfirm": "Confirmer la passphrase",
       "tooShort": "8 caractères minimum.",
@@ -62,7 +63,12 @@
       "partition_still_mounted": "La partition est encore montée : éjectez-la d'abord.",
       "mapper_busy": "Le volume chiffré est utilisé par un autre processus.",
       "invalid_passphrase_length": "La passphrase doit faire entre 8 et 256 caractères.",
-      "not_a_luks_partition": "Cette partition n'est pas chiffrée en LUKS."
+      "not_a_luks_partition": "Cette partition n'est pas chiffrée en LUKS.",
+      "device_disconnected": "Le disque USB s'est déconnecté pendant l'opération : vérifiez le câble et le port, puis réessayez.",
+      "luks_format_failed": "Échec de l'initialisation du chiffrement LUKS.",
+      "luks_open_failed": "Échec de l'ouverture du volume chiffré.",
+      "mkfs_failed": "Échec de la création du système de fichiers.",
+      "unsupported_inner_filesystem": "Le disque est chiffré mais ne contient pas de système de fichiers lisible (formatage interrompu ?) : utilisez « Reformater »."
     }
   }
 }

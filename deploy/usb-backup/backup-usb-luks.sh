@@ -99,13 +99,40 @@ case "$ACTION" in
     if findmnt -rn -S "$DEV" >/dev/null; then die "partition_still_mounted"; fi
     if lsblk -rno MOUNTPOINT "$DEV" | grep -q .; then die "partition_still_mounted"; fi
 
-    with_pass cryptsetup luksFormat --type luks2 --batch-mode --key-file=- "$DEV"
-    with_pass cryptsetup open --type luks --key-file=- "$DEV" "$MAPPER"
-    mkfs.ext4 -F -q -L BACKUP "/dev/mapper/${MAPPER}"
+    # A USB drive can drop off the bus mid-format (seen with UAS on a Samsung
+    # T7). Name the failing step, say so explicitly when the disk vanished, and
+    # never leave a dead dm-crypt mapping behind: a stale mapper makes the next
+    # attempt think the drive is already open.
+    FORMAT_OK=0
+    OPENED_BY_US=0
+    cleanup_failed_format() {
+      [ "$FORMAT_OK" -eq 1 ] && return 0
+      umount "$MOUNTPOINT" 2>/dev/null || true
+      if [ "$OPENED_BY_US" -eq 1 ] && mapper_open; then
+        cryptsetup close "$MAPPER" 2>/dev/null || dmsetup remove --force "$MAPPER" 2>/dev/null || true
+      fi
+    }
+    trap cleanup_failed_format EXIT
+
+    step() {
+      local code="$1"; shift
+      [ -b "$DEV" ] || die "device_disconnected"
+      "$@" || { [ -b "$DEV" ] || die "device_disconnected"; die "$code"; }
+    }
+
+    step luks_format_failed with_pass cryptsetup luksFormat --type luks2 --batch-mode --key-file=- "$DEV"
+    step luks_open_failed with_pass cryptsetup open --type luks --key-file=- "$DEV" "$MAPPER"
+    OPENED_BY_US=1
+    # lazy_*_init defer most of the inode-table/journal zeroing to the kernel's
+    # background thread, so formatting a 1 TB disk is a short burst instead of a
+    # sustained write over the whole device.
+    step mkfs_failed mkfs.ext4 -F -q -L BACKUP -E lazy_itable_init=1,lazy_journal_init=1 "/dev/mapper/${MAPPER}"
+    sync
     mount_mapper
     if [ "$WITH_KEYFILE" -eq 1 ]; then
       with_pass "$0" enable-keyfile "$PART" >/dev/null || echo "backup-usb-luks: keyfile_setup_failed" >&2
     fi
+    FORMAT_OK=1
     ;;
 
   enable-keyfile)
