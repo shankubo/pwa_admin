@@ -5,8 +5,70 @@ import { useTranslation } from "react-i18next";
 import { apiJson } from "@/lib/api";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { formatBytes } from "./Docker";
-import { Folder, FileArchive, FileJson, File, Shuffle, ChevronRight, HardDrive, Loader2 } from "lucide-react";
+import {
+  Folder,
+  FileArchive,
+  FileJson,
+  File,
+  Shuffle,
+  ChevronRight,
+  HardDrive,
+  Loader2,
+  Download,
+  Trash2,
+  Lock,
+} from "lucide-react";
+
+/** BACKUP/<host>/migration/<snapshot id> — a whole-server migration snapshot. */
+function isMigrationSnapshot(entry: UsbExplorerEntry): boolean {
+  return entry.isDirectory && /^[^/]+\/migration\/[^/]+$/.test(entry.path);
+}
+
+function EntryActions({
+  entry,
+  busy,
+  onDownload,
+  onDelete,
+}: {
+  entry: UsbExplorerEntry;
+  busy: boolean;
+  onDownload: (entry: UsbExplorerEntry) => void;
+  onDelete: (entry: UsbExplorerEntry) => Promise<void>;
+}) {
+  const { t } = useTranslation("usbExplorer");
+  const description = isMigrationSnapshot(entry)
+    ? t("deleteConfirm.descriptionMigration")
+    : entry.isDirectory
+      ? t("deleteConfirm.descriptionFolder")
+      : t("deleteConfirm.descriptionFile");
+
+  return (
+    <div className="flex shrink-0 gap-1 pr-1">
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={busy}
+        onClick={() => onDownload(entry)}
+        title={entry.isDirectory ? t("actions.downloadFolder") : t("actions.download")}
+      >
+        <Download className="h-3.5 w-3.5" />
+      </Button>
+      <ConfirmDialog
+        trigger={
+          <Button size="sm" variant="destructive" disabled={busy} title={t("actions.delete")}>
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+          </Button>
+        }
+        title={t("deleteConfirm.title", { name: entry.name })}
+        description={description}
+        confirmLabel={t("deleteConfirm.confirmLabel")}
+        onConfirm={() => onDelete(entry)}
+      />
+    </div>
+  );
+}
 
 function iconFor(entry: UsbExplorerEntry) {
   if (entry.isDirectory) return Folder;
@@ -32,6 +94,17 @@ export function UsbExplorer() {
   const [selected, setSelected] = useState<UsbExplorerEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [busyPath, setBusyPath] = useState<string | null>(null);
+
+  // Server error codes → a readable message (unknown codes are shown as-is).
+  function explain(code: string): string {
+    const known = [
+      "permission_denied", "entry_busy", "not_found", "path_not_allowed",
+      "path_traversal_rejected", "symlink_rejected", "usb_drive_not_found", "unsupported_entry",
+    ];
+    return known.includes(code) ? t(`errors.${code}`) : code;
+  }
 
   useEffect(() => {
     apiJson<UsbStatus>("/backups/usb/status")
@@ -53,7 +126,7 @@ export function UsbExplorer() {
       .then(setListing)
       .catch((err) => setError((err as Error).message))
       .finally(() => setLoading(false));
-  }, [mountpoint, relativePath]);
+  }, [mountpoint, relativePath, reloadKey]);
 
   const breadcrumbs = useMemo(() => {
     const segments = relativePath ? relativePath.split("/").filter(Boolean) : [];
@@ -78,6 +151,40 @@ export function UsbExplorer() {
     }
   }
 
+  async function downloadEntry(entry: UsbExplorerEntry) {
+    if (!mountpoint) return;
+    setError(null);
+    try {
+      // A plain navigation can't carry the Authorization header, so ask for a
+      // short-lived token scoped to this one file or folder first.
+      const { token } = await apiJson<{ token: string }>("/usb-explorer/download-token", {
+        method: "POST",
+        body: JSON.stringify({ mountpoint, path: entry.path }),
+      });
+      window.location.href = `/api/usb-explorer/download?token=${encodeURIComponent(token)}`;
+    } catch (err) {
+      setError(explain((err as Error).message));
+    }
+  }
+
+  async function deleteEntry(entry: UsbExplorerEntry) {
+    if (!mountpoint) return;
+    setError(null);
+    setBusyPath(entry.path);
+    try {
+      await apiJson("/usb-explorer/delete", {
+        method: "POST",
+        body: JSON.stringify({ mountpoint, path: entry.path, confirm: true }),
+      });
+      setSelected(null);
+      setReloadKey((k) => k + 1);
+    } catch (err) {
+      setError(explain((err as Error).message));
+    } finally {
+      setBusyPath(null);
+    }
+  }
+
   if (status && status.drives.length === 0) {
     return (
       <Card>
@@ -89,6 +196,7 @@ export function UsbExplorer() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">{t("intro")}</p>
+      <p className="text-xs text-muted-foreground">{t("actionsHint")}</p>
 
       {status && status.drives.length > 1 && (
         <div className="flex gap-2">
@@ -139,31 +247,51 @@ export function UsbExplorer() {
               {listing.entries.map((entry) => {
                 const Icon = iconFor(entry);
                 return (
-                  <button
+                  <div
                     key={entry.path}
-                    type="button"
-                    onClick={() => openEntry(entry)}
-                    onDoubleClick={() => doubleClick(entry)}
-                    className={`flex items-center gap-2 rounded-md border p-2 text-left text-sm transition-colors ${
+                    className={`flex items-center gap-1 rounded-md border transition-colors ${
                       selected?.path === entry.path
                         ? "border-primary bg-primary/5"
                         : "border-transparent hover:bg-muted"
                     }`}
                   >
-                    <Icon
-                      className={`h-4 w-4 shrink-0 ${
-                        entry.isDirectory
-                          ? "text-primary"
-                          : entry.kind === "manifest"
+                    <button
+                      type="button"
+                      onClick={() => openEntry(entry)}
+                      onDoubleClick={() => doubleClick(entry)}
+                      className="flex min-w-0 flex-1 items-center gap-2 p-2 text-left text-sm"
+                    >
+                      <Icon
+                        className={`h-4 w-4 shrink-0 ${
+                          entry.isDirectory
                             ? "text-primary"
-                            : "text-muted-foreground"
-                      }`}
-                    />
-                    <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-                    {!entry.isDirectory && entry.sizeBytes != null && (
-                      <span className="shrink-0 text-xs text-muted-foreground">{formatBytes(entry.sizeBytes)}</span>
+                            : entry.kind === "manifest"
+                              ? "text-primary"
+                              : "text-muted-foreground"
+                        }`}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+                      {isMigrationSnapshot(entry) && (
+                        <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary">
+                          {t("migrationSnapshot")}
+                        </span>
+                      )}
+                      {entry.name.endsWith(".enc") && (
+                        <Lock className="h-3.5 w-3.5 shrink-0 text-primary" aria-label={t("encryptedBadge")} />
+                      )}
+                      {!entry.isDirectory && entry.sizeBytes != null && (
+                        <span className="shrink-0 text-xs text-muted-foreground">{formatBytes(entry.sizeBytes)}</span>
+                      )}
+                    </button>
+                    {entry.manageable && (
+                      <EntryActions
+                        entry={entry}
+                        busy={busyPath === entry.path}
+                        onDownload={downloadEntry}
+                        onDelete={deleteEntry}
+                      />
                     )}
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -194,6 +322,21 @@ export function UsbExplorer() {
               )}
               {selected.kind !== "manifest" && (
                 <p className="mt-1 text-xs text-muted-foreground">{t("restoreHint")}</p>
+              )}
+              {selected.name.endsWith(".enc") && (
+                <p className="flex items-start gap-1 text-xs text-muted-foreground">
+                  <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" /> {t("encryptedHint")}
+                </p>
+              )}
+              {selected.manageable && (
+                <div className="mt-2">
+                  <EntryActions
+                    entry={selected}
+                    busy={busyPath === selected.path}
+                    onDownload={downloadEntry}
+                    onDelete={deleteEntry}
+                  />
+                </div>
               )}
             </div>
           )}

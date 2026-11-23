@@ -8,5 +8,31 @@
   "machineLabel": "Machine : {{hostname}}",
   "folderLabel": "Dossier",
   "openInRestore": "Ouvrir dans Restore",
-  "restoreHint": "Utilisez Restore > USB pour restaurer une sauvegarde de ce serveur ; les instantanés de migration (manifest.json) s'ouvrent directement depuis ici."
+  "restoreHint": "Utilisez Restore > USB pour restaurer une sauvegarde de ce serveur ; les instantanés de migration (manifest.json) s'ouvrent directement depuis ici.",
+  "actionsHint": "Le téléchargement et la suppression sont disponibles à partir du niveau BACKUP/<machine>/<catégorie>/<élément> ; les niveaux au-dessus ne peuvent qu'être parcourus.",
+  "migrationSnapshot": "Instantané de migration",
+  "encryptedBadge": "Chiffré",
+  "encryptedHint": "Fichier chiffré (.enc) : déchiffrez-le avec votre clé privée (voir l'Aide, « Ouvrir une archive .tar.gz.enc hors de l'application »).",
+  "actions": {
+    "download": "Télécharger",
+    "downloadFolder": "Télécharger le dossier (.tar)",
+    "delete": "Supprimer"
+  },
+  "deleteConfirm": {
+    "title": "Supprimer « {{name}} » ?",
+    "descriptionFile": "Ce fichier de sauvegarde sera supprimé définitivement du disque USB. Si c'est la seule copie, elle sera perdue.",
+    "descriptionFolder": "Ce dossier et tout son contenu seront supprimés définitivement du disque USB. S'il s'agit des seules copies, elles seront perdues.",
+    "descriptionMigration": "Cet instantané de migration complet (images, volumes, bases de données, configuration) sera supprimé définitivement du disque USB.",
+    "confirmLabel": "Supprimer définitivement"
+  },
+  "errors": {
+    "permission_denied": "Droits insuffisants pour supprimer cet élément sur le disque.",
+    "entry_busy": "L'élément est en cours d'utilisation.",
+    "not_found": "Élément introuvable (déjà supprimé ?).",
+    "path_not_allowed": "Ce niveau ne peut être ni téléchargé ni supprimé.",
+    "path_traversal_rejected": "Chemin refusé.",
+    "symlink_rejected": "Les liens symboliques sont refusés.",
+    "usb_drive_not_found": "Disque USB introuvable (éjecté ?).",
+    "unsupported_entry": "Type d'élément non pris en charge."
+  }
 }

@@ -1,6 +1,8 @@
-import { readdir, stat } from "node:fs/promises";
-import { join, resolve, sep, basename } from "node:path";
+import { lstat, readdir, realpath, rm, stat } from "node:fs/promises";
+import type { Stats } from "node:fs";
+import { dirname, join, relative, resolve, sep, basename } from "node:path";
 import { UsbBackupService } from "./usbBackup.client.js";
+import { BackupHistoryModel } from "../db/models/backup.js";
 import type { UsbExplorerListing, UsbExplorerEntry, UsbExplorerEntryKind } from "@pwa-admin/shared";
 
 /**
@@ -28,7 +30,83 @@ async function backupRoots(): Promise<{ mountpoint: string; backupRoot: string }
   return drives.map((d) => ({ mountpoint: d.mountpoint, backupRoot: resolve(join(d.mountpoint, "BACKUP")) }));
 }
 
+/** BACKUP/<hostname>/<category>/<item> is the shallowest thing that may be
+ * downloaded or deleted. Everything above it — the drive's BACKUP folder, a
+ * machine's folder, a category folder — can only be browsed, so one click can
+ * never wipe a whole machine's backups. */
+const MIN_MANAGEABLE_DEPTH = 3;
+
+interface ResolvedEntry {
+  abs: string;
+  root: string;
+  stats: Stats;
+}
+
+/** The single gate for download and delete: resolves a client-supplied path under
+ * a drive's BACKUP/ root and rejects anything outside it, too shallow, a
+ * symlink, or reached through a symlinked parent (checked on real paths). */
+async function resolveManageable(mountpoint: string, relativePath: string): Promise<ResolvedEntry> {
+  const root = (await backupRoots()).find((r) => r.mountpoint === mountpoint);
+  if (!root) throw new Error("usb_drive_not_found");
+
+  const abs = resolve(root.backupRoot, relativePath || ".");
+  if (!abs.startsWith(root.backupRoot + sep)) throw new Error("path_traversal_rejected");
+
+  const depth = relative(root.backupRoot, abs).split(sep).filter(Boolean).length;
+  if (depth < MIN_MANAGEABLE_DEPTH) throw new Error("path_not_allowed");
+
+  let stats: Stats;
+  try {
+    stats = await lstat(abs);
+  } catch {
+    throw new Error("not_found");
+  }
+  if (stats.isSymbolicLink()) throw new Error("symlink_rejected");
+
+  const [realRoot, realAbs] = await Promise.all([realpath(root.backupRoot), realpath(abs)]);
+  if (!realAbs.startsWith(realRoot + sep)) throw new Error("path_traversal_rejected");
+
+  return { abs, root: root.backupRoot, stats };
+}
+
 export const UsbExplorerService = {
+  /** Validates a download request and describes what will be streamed: a file
+   * as-is, or a folder (e.g. a migration snapshot) packed on the fly as .tar. */
+  async prepareDownload(
+    mountpoint: string,
+    relativePath: string
+  ): Promise<{ abs: string; name: string; isDirectory: boolean; sizeBytes: number | null }> {
+    const { abs, stats } = await resolveManageable(mountpoint, relativePath);
+    const isDirectory = stats.isDirectory();
+    if (!isDirectory && !stats.isFile()) throw new Error("unsupported_entry");
+    return { abs, name: basename(abs), isDirectory, sizeBytes: isDirectory ? null : stats.size };
+  },
+
+  /** Deletes a backup file or a whole folder (a migration snapshot, a source's
+   * archives). Runs as the service account — no sudo — so a file it can't remove
+   * fails with permission_denied rather than being forced. USB copies recorded in
+   * the history are detached so the history doesn't claim a copy that is gone. */
+  async remove(mountpoint: string, relativePath: string): Promise<{ detachedHistoryRows: number }> {
+    const { abs, stats } = await resolveManageable(mountpoint, relativePath);
+    if (!stats.isDirectory() && !stats.isFile()) throw new Error("unsupported_entry");
+
+    try {
+      await rm(abs, { recursive: stats.isDirectory(), force: false });
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "EACCES" || code === "EPERM") throw new Error("permission_denied");
+      if (code === "EBUSY") throw new Error("entry_busy");
+      throw err;
+    }
+
+    return { detachedHistoryRows: BackupHistoryModel.clearUsbPathsUnder(abs) };
+  },
+
+  /** The parent folder and name `tar` needs to pack a folder download. */
+  tarArgs(abs: string): string[] {
+    return ["-cf", "-", "-C", dirname(abs), basename(abs)];
+  },
+
   /**
    * Lists one directory under a drive's BACKUP/ root. `relativePath` is
    * relative to BACKUP/ itself ("" for the top-level list of hostname
@@ -91,6 +169,7 @@ export const UsbExplorerService = {
         modifiedAt,
         hostname: relativePath ? hostnameForChildren : dirent.name,
         migrationManifestId,
+        manageable: segments.length + 1 >= MIN_MANAGEABLE_DEPTH && !dirent.isSymbolicLink(),
       });
     }
 

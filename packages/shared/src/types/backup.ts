@@ -182,6 +182,8 @@ export interface UsbExplorerEntry {
   hostname: string | null;
   /** Only set when kind === "manifest" — the manifestId to hand straight to the Restore wizard. */
   migrationManifestId: string | null;
+  /** True when this entry can be downloaded or deleted (BACKUP/<host>/<category>/<item> or deeper). */
+  manageable: boolean;
 }
 
 export interface UsbExplorerListing {

@@ -176,6 +176,16 @@ export const BackupHistoryModel = {
     db.prepare("UPDATE backup_history SET usb_path = ? WHERE run_id = ?").run(usbPath, runId);
   },
 
+  /** Detaches every history row whose USB copy was the given file, or lived under
+   * the given folder, after that copy was deleted from the drive. Only usb_path is
+   * cleared: the run itself and any local or Drive copy stay as they were. */
+  clearUsbPathsUnder(absPath: string): number {
+    const prefix = absPath.endsWith("/") ? absPath : absPath + "/";
+    return db
+      .prepare("UPDATE backup_history SET usb_path = NULL WHERE usb_path = ? OR substr(usb_path, 1, ?) = ?")
+      .run(absPath, prefix.length, prefix).changes;
+  },
+
   /** Same as setUsbPath but for drive_file_id — see its doc comment. */
   setDriveFileId(runId: string, driveFileId: string): void {
     db.prepare("UPDATE backup_history SET drive_file_id = ? WHERE run_id = ?").run(driveFileId, runId);
