@@ -66,7 +66,12 @@ mount_mapper() {
   mkdir -p "$MOUNTPOINT"
   mountpoint -q "$MOUNTPOINT" && return 0
   local fstype
-  fstype="$(lsblk -no FSTYPE "/dev/mapper/${MAPPER}")"
+  # A mapper that was just created or formatted isn't in udev's cache yet, and
+  # lsblk reads that cache: it reported "no filesystem" right after a successful
+  # mkfs. Wait for udev, then probe the device directly (blkid -p) instead.
+  udevadm settle --timeout=10 2>/dev/null || true
+  fstype="$(blkid -p -s TYPE -o value "/dev/mapper/${MAPPER}" 2>/dev/null || true)"
+  [ -n "$fstype" ] || fstype="$(lsblk -no FSTYPE "/dev/mapper/${MAPPER}")"
   case "$fstype" in
     ext4|ext3|ext2|xfs|btrfs)
       mount "/dev/mapper/${MAPPER}" "$MOUNTPOINT"
