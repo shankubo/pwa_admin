@@ -28,6 +28,14 @@
   },
   "luks": {
     "badge": "Disque chiffré (LUKS)",
+    "state": {
+      "plain": "Non chiffré",
+      "plainHint": "Disque non chiffré : quiconque le branche peut lire son contenu.",
+      "unlocked": "Chiffré · déverrouillé",
+      "unlockedHint": "Disque chiffré (LUKS), actuellement déverrouillé et utilisable.",
+      "locked": "Chiffré · verrouillé",
+      "lockedHint": "Disque chiffré (LUKS) verrouillé : il faut saisir la passphrase pour l'utiliser."
+    },
     "passphrase": "Passphrase du disque",
     "locked": {
       "title": "Disque USB chiffré verrouillé",

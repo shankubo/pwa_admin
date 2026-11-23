@@ -28,6 +28,14 @@
   },
   "luks": {
     "badge": "Encrypted drive (LUKS)",
+    "state": {
+      "plain": "Not encrypted",
+      "plainHint": "Unencrypted drive: anyone who plugs it in can read its contents.",
+      "unlocked": "Encrypted · unlocked",
+      "unlockedHint": "Encrypted (LUKS) drive, currently unlocked and usable.",
+      "locked": "Encrypted · locked",
+      "lockedHint": "Encrypted (LUKS) drive that is locked: enter the passphrase to use it."
+    },
     "passphrase": "Drive passphrase",
     "locked": {
       "title": "Encrypted USB drive is locked",

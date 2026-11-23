@@ -1,11 +1,34 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, Loader2, Lock, LockOpen } from "lucide-react";
+import { AlertTriangle, Loader2, Lock, LockOpen, ShieldCheck, ShieldOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { UsbDriveInfo, UsbLockedDriveInfo } from "@pwa-admin/shared";
 import { apiJson } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 
 const inputClass = "w-full rounded-sm border border-border bg-muted p-2 text-sm";
+
+export type UsbDriveState = "plain" | "unlocked" | "locked";
+
+const STATE_STYLE: Record<UsbDriveState, { className: string; Icon: typeof Lock }> = {
+  plain: { className: "border-border text-muted-foreground", Icon: ShieldOff },
+  unlocked: { className: "border-primary/40 text-primary", Icon: ShieldCheck },
+  locked: { className: "border-warning/40 text-warning", Icon: Lock },
+};
+
+/** At-a-glance state of a plugged-in USB drive: not encrypted, encrypted and
+ * unlocked (usable), or encrypted and still locked (needs the passphrase). */
+export function UsbDriveStateBadge({ state }: { state: UsbDriveState }) {
+  const { t } = useTranslation("backupEncryption");
+  const { className, Icon } = STATE_STYLE[state];
+  return (
+    <span
+      title={t(`luks.state.${state}Hint`)}
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${className}`}
+    >
+      <Icon className="h-3 w-3" /> {t(`luks.state.${state}`)}
+    </span>
+  );
+}
 
 function useLuksError() {
   const { t } = useTranslation("backupEncryption");
@@ -48,8 +71,11 @@ export function LockedDriveCard({ drive, onDone }: { drive: UsbLockedDriveInfo; 
 
   return (
     <div className="rounded-md border border-warning/40 bg-warning/10 p-2 text-sm">
-      <p className="flex items-center gap-1 text-warning">
-        <Lock className="h-4 w-4" /> {t("luks.locked.title")}
+      <p className="flex flex-wrap items-center gap-2 text-warning">
+        <span className="flex items-center gap-1">
+          <Lock className="h-4 w-4" /> {t("luks.locked.title")}
+        </span>
+        <UsbDriveStateBadge state="locked" />
       </p>
       <p className="text-xs text-muted-foreground">{t("luks.locked.description", { label: drive.label, device: drive.device })}</p>
       <input

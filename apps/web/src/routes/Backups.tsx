@@ -16,7 +16,7 @@ import type {
 import { useTranslation } from "react-i18next";
 import { apiJson } from "@/lib/api";
 import { EncryptionKeyCard } from "@/components/backup/EncryptionKeyCard";
-import { EncryptDriveForm, KeyfileControl, LockedDriveCard } from "@/components/backup/UsbLuksControls";
+import { EncryptDriveForm, KeyfileControl, LockedDriveCard, UsbDriveStateBadge } from "@/components/backup/UsbLuksControls";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -955,8 +955,11 @@ function UsbConnection() {
           {status.drives.map((d) =>
             d.isBackupConfigured ? (
               <div key={d.mountpoint} className="rounded-md border border-border p-2 text-sm">
-                <p className="flex items-center gap-1 text-primary">
-                  <CheckCircle2 className="h-4 w-4" /> {d.label} ({d.device})
+                <p className="flex flex-wrap items-center gap-2 text-primary">
+                  <span className="flex items-center gap-1">
+                    <CheckCircle2 className="h-4 w-4" /> {d.label} ({d.device})
+                  </span>
+                  <UsbDriveStateBadge state={d.encrypted ? "unlocked" : "plain"} />
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {d.filesystem ?? "?"} · {t("usb.freeSpace", { free: d.freeBytes != null ? formatBytes(d.freeBytes) : "?" })}
@@ -978,8 +981,11 @@ function UsbConnection() {
               </div>
             ) : (
               <div key={d.mountpoint} className="rounded-md border border-warning/40 bg-warning/10 p-2 text-sm">
-                <p className="flex items-center gap-1 text-warning">
-                  <AlertTriangle className="h-4 w-4" /> {d.label} ({d.device}) {t("usb.notConfigured")}
+                <p className="flex flex-wrap items-center gap-2 text-warning">
+                  <span className="flex items-center gap-1">
+                    <AlertTriangle className="h-4 w-4" /> {d.label} ({d.device}) {t("usb.notConfigured")}
+                  </span>
+                  <UsbDriveStateBadge state={d.encrypted ? "unlocked" : "plain"} />
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {d.filesystem ?? "?"} · {t("usb.freeSpace", { free: d.freeBytes != null ? formatBytes(d.freeBytes) : "?" })}
