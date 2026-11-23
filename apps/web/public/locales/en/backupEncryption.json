@@ -1,0 +1,29 @@
+{
+  "active": {
+    "title": "USB and Drive copies are encrypted",
+    "descriptionOnServer": "Every archive copied to the USB drive or Google Drive is encrypted and unreadable without the private key. The key is kept on this server: restores from this app use it automatically.",
+    "descriptionOffServer": "Every archive copied to the USB drive or Google Drive is encrypted. The private key is no longer on this server: restore will ask you for it.",
+    "fingerprint": "Key fingerprint:",
+    "remove": "Remove the key from this server",
+    "removeConfirm": "Remove the private key from this server? Restoring USB/Drive copies will then require pasting it. Without your own copy, those backups would be permanently unreadable."
+  },
+  "pending": {
+    "title": "Keep a copy of your private encryption key",
+    "description": "USB and Drive copies are now encrypted. The private key stays on this server for restores, but if the server is lost or destroyed it goes with it: keep a copy elsewhere.",
+    "reveal": "Show private key",
+    "copy": "Copy",
+    "copied": "Copied",
+    "download": "Download",
+    "warning": "Store it in a password manager or print it, never on the USB drive or on Drive: that would defeat the encryption.",
+    "savedCheckbox": "I have saved this key somewhere safe, outside this server.",
+    "confirm": "Confirm"
+  },
+  "prompt": {
+    "title": "Encrypted archive",
+    "description": "\"{{fileName}}\" is encrypted. Paste the backup private key to decrypt and restore it.",
+    "submit": "Decrypt",
+    "cancel": "Cancel",
+    "wrongKey": "This key does not match this archive.",
+    "invalidFormat": "Invalid key format: it must start with \"pwa-admin-key-v1:\"."
+  }
+}

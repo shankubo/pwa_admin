@@ -781,7 +781,7 @@ async function captureApplication(manifestId: string, usbRoot: string, app: Appl
     const appWithUsbTarget: ApplicationRow = existingTargets.includes("usb")
       ? app
       : { ...app, targets: JSON.stringify([...existingTargets, "usb"]) };
-    const runId = await ApplicationService.runBackup(appWithUsbTarget, "full");
+    const runId = await ApplicationService.runBackup(appWithUsbTarget, "full", { plainUsbCopy: true });
     const paths = JSON.parse(app.paths) as string[];
 
     let applicationPaths: MigrationManifestItem["applicationPaths"] = null;

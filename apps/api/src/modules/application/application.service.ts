@@ -31,7 +31,13 @@ function countChangedFiles(rsyncStdout: string): number {
 }
 
 export const ApplicationService = {
-  async runBackup(app: ApplicationRow, kind: AppBackupRunKind): Promise<string> {
+  async runBackup(
+    app: ApplicationRow,
+    kind: AppBackupRunKind,
+    // Migration capture reads the USB archives back itself with no admin present
+    // to enter the private key, so its copy stays unencrypted.
+    opts: { plainUsbCopy?: boolean } = {}
+  ): Promise<string> {
     const targets = JSON.parse(app.targets) as BackupTarget[];
     const paths = JSON.parse(app.paths) as string[];
     const volumeNames = JSON.parse(app.volume_names ?? "[]") as string[];
@@ -148,7 +154,7 @@ export const ApplicationService = {
       // gate, so availability is only checked once the async job starts.
       if (targets.includes("usb")) {
         AppBackupRunModel.setUsbCopyStatus(runId, "pending");
-        this.copySnapshotToUsb(app, runId, snapshotDir, paths).catch(() => {});
+        this.copySnapshotToUsb(app, runId, snapshotDir, paths, opts).catch(() => {});
       }
 
       return runId;
@@ -368,7 +374,8 @@ export const ApplicationService = {
     app: ApplicationRow,
     runId: string,
     snapshotDir: string,
-    paths: string[]
+    paths: string[],
+    opts: { plainUsbCopy?: boolean } = {}
   ): Promise<void> {
     // No file paths to compress (a DB-only app, e.g.) — the DB dump's own USB
     // copy (via DbBackupService.dump above) already covers this run's USB
@@ -403,7 +410,9 @@ export const ApplicationService = {
         await runCommand("sudo", ["chown", env.SERVICE_USER, archivePath], { timeoutMs: 5_000 }).catch(() => {});
 
         AppBackupRunModel.setUsbCopyStatus(runId, "uploading", { progressPct: pathBaseProgress });
-        const copied = await UsbBackupService.copyBackupFile(archivePath, "paths", `${app.name}-${label}`);
+        const copied = await UsbBackupService.copyBackupFile(archivePath, "paths", `${app.name}-${label}`, {
+          plain: opts.plainUsbCopy,
+        });
         usbPaths.push(copied.usbPath);
         await rm(archivePath, { force: true });
       }

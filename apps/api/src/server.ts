@@ -40,6 +40,7 @@ import usbExplorerRoutes from "./modules/usbExplorer/usbExplorer.routes.js";
 import { registerExternalModules } from "./modules/_external/index.js";
 import { SchedulerService } from "./services/scheduler.js";
 import { resolveWebServerService } from "./modules/webserver/webserver.registry.js";
+import { BackupCrypto } from "./services/backupCrypto.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -80,6 +81,7 @@ await app.register(fastifyMultipart, {
 // webserver.registry.ts's own doc comment for why this is boot-only (no
 // hot re-detection) and why it's a plain module-level singleton rather than
 // a DI-passed reference.
+await BackupCrypto.ensureKeyPair();
 const webServerEngine = await resolveWebServerService();
 app.log.info(`Detected web server engine: ${webServerEngine.engine}`);
 

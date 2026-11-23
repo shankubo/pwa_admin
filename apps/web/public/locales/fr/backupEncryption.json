@@ -1,0 +1,29 @@
+{
+  "active": {
+    "title": "Copies USB et Drive chiffrées",
+    "descriptionOnServer": "Chaque archive copiée sur le disque USB ou sur Google Drive est chiffrée et illisible sans la clé privée. La clé est conservée sur ce serveur : les restaurations depuis cette application l'utilisent automatiquement.",
+    "descriptionOffServer": "Chaque archive copiée sur le disque USB ou sur Google Drive est chiffrée. La clé privée n'est plus sur ce serveur : la restauration vous la demandera.",
+    "fingerprint": "Empreinte de la clé :",
+    "remove": "Supprimer la clé de ce serveur",
+    "removeConfirm": "Supprimer la clé privée de ce serveur ? La restauration des copies USB/Drive vous demandera désormais de la coller. Sans votre copie personnelle, ces sauvegardes seraient définitivement illisibles."
+  },
+  "pending": {
+    "title": "Gardez une copie de votre clé privée de chiffrement",
+    "description": "Les copies USB et Drive sont désormais chiffrées. La clé privée reste sur ce serveur pour les restaurations, mais si le serveur est perdu ou détruit, elle disparaît avec lui : gardez-en une copie ailleurs.",
+    "reveal": "Afficher la clé privée",
+    "copy": "Copier",
+    "copied": "Copié",
+    "download": "Télécharger",
+    "warning": "Rangez-la dans un gestionnaire de mots de passe ou imprimez-la, jamais sur le disque USB ni sur Drive : ce serait annuler le chiffrement.",
+    "savedCheckbox": "J'ai sauvegardé cette clé en lieu sûr, hors de ce serveur.",
+    "confirm": "Confirmer"
+  },
+  "prompt": {
+    "title": "Archive chiffrée",
+    "description": "« {{fileName}} » est chiffrée. Collez la clé privée de sauvegarde pour la déchiffrer et la restaurer.",
+    "submit": "Déchiffrer",
+    "cancel": "Annuler",
+    "wrongKey": "Cette clé ne correspond pas à cette archive.",
+    "invalidFormat": "Format de clé invalide : elle doit commencer par « pwa-admin-key-v1: »."
+  }
+}

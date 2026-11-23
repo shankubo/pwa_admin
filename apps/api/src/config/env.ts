@@ -80,6 +80,7 @@ const envSchema = z.object({
   BACKUP_LOCAL_ROOT: z.string().default("./data/backups"),
   BACKUP_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
   BACKUP_RETENTION_MIN_COPIES: z.coerce.number().int().nonnegative().default(3),
+  BACKUP_ENCRYPTION_KEY_DIR: z.string().default("./secrets"),
 
   // Google Drive backup: OAuth2 (not a Service Account — service accounts have no
   // storage quota on personal/consumer Drive, only on Workspace Shared Drives).
@@ -117,6 +118,7 @@ export const env = {
   APT_JOB_LOG_DIR: resolveFromRoot(parsed.data.APT_JOB_LOG_DIR),
   BACKUP_LOCAL_ROOT: resolveFromRoot(parsed.data.BACKUP_LOCAL_ROOT),
   GDRIVE_OAUTH_TOKEN_PATH: resolveFromRoot(parsed.data.GDRIVE_OAUTH_TOKEN_PATH),
+  BACKUP_ENCRYPTION_KEY_DIR: resolveFromRoot(parsed.data.BACKUP_ENCRYPTION_KEY_DIR),
   TLS_CERT_PATH: parsed.data.TLS_CERT_PATH ? resolveFromRoot(parsed.data.TLS_CERT_PATH) : undefined,
   TLS_KEY_PATH: parsed.data.TLS_KEY_PATH ? resolveFromRoot(parsed.data.TLS_KEY_PATH) : undefined,
 };

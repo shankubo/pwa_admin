@@ -1,8 +1,10 @@
 import { google } from "googleapis";
 import { createReadStream, existsSync } from "node:fs";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { dirname, basename } from "node:path";
+import { randomUUID } from "node:crypto";
+import { dirname, basename, join } from "node:path";
 import { env } from "../config/env.js";
+import { BackupCrypto, ENCRYPTED_SUFFIX } from "./backupCrypto.js";
 
 // Full drive scope (not the narrower drive.file) is required because
 // GDRIVE_ROOT_FOLDER_ID points at a folder the admin created manually in
@@ -125,30 +127,49 @@ export const GDriveService = {
     const categoryFolderId = await ensureFolder(category, env.GDRIVE_ROOT_FOLDER_ID);
     const sourceFolderId = await ensureFolder(sourceRef, categoryFolderId);
 
-    const fileName = basename(localPath);
-    const totalBytes = (await import("node:fs/promises").then((fs) => fs.stat(localPath))).size;
+    const fs = await import("node:fs/promises");
+    // Drive is a third-party host: encrypt first so what it stores is opaque.
+    // The ciphertext is staged next to the local backups (needs free space equal
+    // to the file) and removed right after the upload.
+    const encrypt = await BackupCrypto.isEnabled();
+    let uploadPath = localPath;
+    let fileName = basename(localPath);
+    let stagedPath: string | null = null;
+    if (encrypt) {
+      const stagingDir = join(env.BACKUP_LOCAL_ROOT, "_tmp-enc");
+      await mkdir(stagingDir, { recursive: true });
+      stagedPath = join(stagingDir, `${randomUUID()}${ENCRYPTED_SUFFIX}`);
+      await BackupCrypto.encryptFile(localPath, stagedPath);
+      uploadPath = stagedPath;
+      fileName += ENCRYPTED_SUFFIX;
+    }
 
-    const res = await drive.files.create(
-      {
-        requestBody: { name: fileName, parents: [sourceFolderId] },
-        media: { body: createReadStream(localPath) },
-        fields: "id, size",
-      },
-      onProgress
-        ? {
-            onUploadProgress: (evt) => onProgress(evt.bytesRead, totalBytes),
-          }
-        : undefined
-    );
+    try {
+      const totalBytes = (await fs.stat(uploadPath)).size;
+      const res = await drive.files.create(
+        {
+          requestBody: { name: fileName, parents: [sourceFolderId] },
+          media: { body: createReadStream(uploadPath) },
+          fields: "id, size",
+        },
+        onProgress
+          ? {
+              onUploadProgress: (evt) => onProgress(evt.bytesRead, totalBytes),
+            }
+          : undefined
+      );
 
-    return { fileId: res.data.id!, size: Number(res.data.size ?? 0) };
+      return { fileId: res.data.id!, size: Number(res.data.size ?? 0) };
+    } finally {
+      if (stagedPath) await fs.unlink(stagedPath).catch(() => {});
+    }
   },
 
   async verifyUpload(fileId: string, expectedSize: number): Promise<boolean> {
     const auth = await getAuthorizedClient();
     const drive = google.drive({ version: "v3", auth });
     const res = await drive.files.get({ fileId, fields: "size" });
-    return Number(res.data.size ?? -1) === expectedSize;
+    return BackupCrypto.sizeMatchesPlainOrEncrypted(Number(res.data.size ?? -1), expectedSize);
   },
 
   async deleteFile(fileId: string): Promise<void> {

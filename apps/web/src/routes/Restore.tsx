@@ -17,6 +17,7 @@ import type {
 } from "@pwa-admin/shared";
 import { useTranslation } from "react-i18next";
 import { apiJson, apiFetch } from "@/lib/api";
+import { PrivateKeyPrompt } from "@/components/backup/EncryptionKeyCard";
 import { useWsChannel } from "@/lib/ws";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -67,6 +68,54 @@ export function Restore() {
   const [apps, setApps] = useState<Application[] | null>(null);
   const [appRuns, setAppRuns] = useState<AppBackupRun[] | null>(null);
   const [migrationManifests, setMigrationManifests] = useState<MigrationManifest[] | null>(null);
+  const [usbKeyPrompt, setUsbKeyPrompt] = useState<UsbBackupArchive | null>(null);
+  const [usbKeyError, setUsbKeyError] = useState<string | null>(null);
+  const [usbKeyBusy, setUsbKeyBusy] = useState(false);
+
+  async function importUsbArchive(archive: UsbBackupArchive, privateKey?: string) {
+    setError(null);
+    setUsbKeyError(null);
+    setUsbKeyBusy(true);
+    try {
+      const { runId } = await apiJson<{ runId: string }>("/backups/usb/archives/import", {
+        method: "POST",
+        body: JSON.stringify({ fullPath: archive.fullPath, privateKey }),
+      });
+      setUsbKeyPrompt(null);
+      const sourceType = archive.category === "volumes" ? "volume" : archive.category === "db" ? "db" : "path";
+      setSelected({
+        kind: "generic",
+        run: {
+          runId,
+          jobId: null,
+          type: "backup",
+          sourceType,
+          sourceRef: archive.sourceRef,
+          target: "usb",
+          driveFileId: null,
+          usbPath: archive.fullPath,
+          status: "success",
+          sizeBytes: archive.sizeBytes,
+          checksumSha256: null,
+          durationMs: null,
+          error: null,
+          startedAt: archive.modifiedAt,
+          finishedAt: archive.modifiedAt,
+        },
+      });
+      setStep(3);
+    } catch (err) {
+      const message = (err as Error).message;
+      if (message === "private_key_required" || message === "wrong_private_key" || message === "invalid_private_key_format") {
+        setUsbKeyPrompt(archive);
+        setUsbKeyError(message);
+      } else {
+        setError(message);
+      }
+    } finally {
+      setUsbKeyBusy(false);
+    }
+  }
 
   useEffect(() => {
     apiJson<BackupHistoryEntry[]>("/backups/history?limit=100&offset=0").then(setHistory).catch(() => setHistory([]));
@@ -221,43 +270,18 @@ export function Restore() {
         />
       )}
 
-      {step === 2 && source === "usb" && (
-        <StepUsb
-          archives={usbArchives}
-          onSelect={async (archive) => {
-            setError(null);
-            try {
-              const { runId } = await apiJson<{ runId: string }>("/backups/usb/archives/import", {
-                method: "POST",
-                body: JSON.stringify({ fullPath: archive.fullPath }),
-              });
-              const sourceType = archive.category === "volumes" ? "volume" : archive.category === "db" ? "db" : "path";
-              setSelected({
-                kind: "generic",
-                run: {
-                  runId,
-                  jobId: null,
-                  type: "backup",
-                  sourceType,
-                  sourceRef: archive.sourceRef,
-                  target: "usb",
-                  driveFileId: null,
-                  usbPath: archive.fullPath,
-                  status: "success",
-                  sizeBytes: archive.sizeBytes,
-                  checksumSha256: null,
-                  durationMs: null,
-                  error: null,
-                  startedAt: archive.modifiedAt,
-                  finishedAt: archive.modifiedAt,
-                },
-              });
-              setStep(3);
-            } catch (err) {
-              setError((err as Error).message);
-            }
-          }}
+      {step === 2 && source === "usb" && usbKeyPrompt && (
+        <PrivateKeyPrompt
+          fileName={usbKeyPrompt.fileName}
+          busy={usbKeyBusy}
+          error={usbKeyError}
+          onSubmit={(key) => importUsbArchive(usbKeyPrompt, key)}
+          onCancel={() => setUsbKeyPrompt(null)}
         />
+      )}
+
+      {step === 2 && source === "usb" && !usbKeyPrompt && (
+        <StepUsb archives={usbArchives} onSelect={(archive) => importUsbArchive(archive)} />
       )}
 
       {step === 2 && source === "gdrive" && (
@@ -784,6 +808,8 @@ function StepGDrive({
   const { t } = useTranslation("restore");
   const [comparison, setComparison] = useState<GDriveComparisonResult | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [keyPrompt, setKeyPrompt] = useState<{ fileId: string; category: string; sourceRef: string; fileName: string } | null>(null);
+  const [keyError, setKeyError] = useState<string | null>(null);
 
   useEffect(() => {
     apiJson<GDriveComparisonResult>("/backups/gdrive/compare")
@@ -796,12 +822,21 @@ function StepGDrive({
   // by the plain local-file restore path this wizard uses.
   const downloadableGroups = (comparison?.orphanGroups ?? []).filter((g) => g.category !== "apps");
 
-  async function downloadAndSelect(fileId: string, category: string, sourceRef: string) {
+  async function downloadAndSelect(
+    fileId: string,
+    category: string,
+    sourceRef: string,
+    fileName: string,
+    privateKey?: string
+  ) {
     setDownloadingId(fileId);
+    setKeyError(null);
     try {
       const { runId } = await apiJson<{ runId: string }>(`/backups/gdrive/files/${fileId}/download`, {
         method: "POST",
+        body: JSON.stringify({ privateKey }),
       });
+      setKeyPrompt(null);
       const sourceType: BackupHistoryEntry["sourceType"] =
         category === "volumes" ? "volume" : category === "db" ? "db" : "path";
       onSelect({
@@ -825,10 +860,30 @@ function StepGDrive({
         },
       });
     } catch (err) {
-      onError((err as Error).message);
+      const message = (err as Error).message;
+      if (message === "private_key_required" || message === "wrong_private_key" || message === "invalid_private_key_format") {
+        setKeyPrompt({ fileId, category, sourceRef, fileName });
+        setKeyError(message);
+      } else {
+        onError(message);
+      }
     } finally {
       setDownloadingId(null);
     }
+  }
+
+  if (keyPrompt) {
+    return (
+      <PrivateKeyPrompt
+        fileName={keyPrompt.fileName}
+        busy={downloadingId !== null}
+        error={keyError}
+        onSubmit={(key) =>
+          downloadAndSelect(keyPrompt.fileId, keyPrompt.category, keyPrompt.sourceRef, keyPrompt.fileName, key)
+        }
+        onCancel={() => setKeyPrompt(null)}
+      />
+    );
   }
 
   return (
@@ -878,7 +933,7 @@ function StepGDrive({
                   variant="outline"
                   className="mt-2"
                   disabled={downloadingId === f.fileId}
-                  onClick={() => downloadAndSelect(f.fileId, group.category, group.sourceRef)}
+                  onClick={() => downloadAndSelect(f.fileId, group.category, group.sourceRef, f.fileName)}
                 >
                   {downloadingId === f.fileId ? t("stepGDrive.downloading") : t("stepGDrive.downloadAndRestore")}
                 </Button>

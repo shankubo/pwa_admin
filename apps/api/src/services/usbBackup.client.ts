@@ -2,6 +2,7 @@ import { hostname } from "node:os";
 import { mkdir, stat, readdir, copyFile, unlink, statfs } from "node:fs/promises";
 import { join, resolve, sep, dirname, basename } from "node:path";
 import { runCommand } from "../utils/exec.js";
+import { BackupCrypto, ENCRYPTED_SUFFIX, ENCRYPTION_OVERHEAD } from "./backupCrypto.js";
 import type { UsbDriveInfo, UsbStatus, UsbBackupArchive } from "@pwa-admin/shared";
 
 interface LsblkDevice {
@@ -151,11 +152,13 @@ export const UsbBackupService = {
     mountpoint: string,
     category: "volumes" | "paths" | "db",
     sourceRef: string,
-    fileName: string
+    fileName: string,
+    encrypted = false
   ): string {
     const hostSlug = currentHostnameSlug();
     const safeSourceRef = sanitizeSegment(sourceRef);
-    const safeFileName = sanitizeSegment(fileName.replace(/\.tar\.gz$/, "")) + ".tar.gz";
+    const safeFileName =
+      sanitizeSegment(fileName.replace(/\.tar\.gz$/, "")) + ".tar.gz" + (encrypted ? ENCRYPTED_SUFFIX : "");
     const backupRoot = resolve(mountpoint, BACKUP_ROOT_SEGMENT, hostSlug);
     const candidate = resolve(backupRoot, category, safeSourceRef, safeFileName);
     if (!candidate.startsWith(backupRoot + sep)) throw new Error("path_traversal_rejected");
@@ -165,16 +168,22 @@ export const UsbBackupService = {
   async copyBackupFile(
     localPath: string,
     category: "volumes" | "paths" | "db",
-    sourceRef: string
+    sourceRef: string,
+    // `plain` is only for flows that must read the USB copy back themselves
+    // without an admin present to supply the private key (migration capture).
+    opts: { plain?: boolean } = {}
   ): Promise<{ usbPath: string; mountpoint: string }> {
     const drives = (await this.detectDrives()).filter((d) => d.isBackupConfigured);
     if (drives.length === 0) throw new Error("no_usb_drive_detected");
     const drive = drives[0]; // single-drive write support this iteration
     const fileName = basename(localPath);
-    const destPath = this.buildArchivePath(drive.mountpoint, category, sourceRef, fileName);
+    const encrypt = !opts.plain && (await BackupCrypto.isEnabled());
+    const destPath = this.buildArchivePath(drive.mountpoint, category, sourceRef, fileName, encrypt);
     await mkdir(dirname(destPath), { recursive: true });
-    const expectedSize = (await stat(localPath)).size;
-    await copyFile(localPath, destPath);
+    const plainSize = (await stat(localPath)).size;
+    const expectedSize = encrypt ? plainSize + ENCRYPTION_OVERHEAD : plainSize;
+    if (encrypt) await BackupCrypto.encryptFile(localPath, destPath);
+    else await copyFile(localPath, destPath);
     const actualSize = (await stat(destPath)).size;
     if (actualSize !== expectedSize) {
       await unlink(destPath).catch(() => {});
@@ -208,10 +217,11 @@ export const UsbBackupService = {
           } catch {
             continue;
           }
-          for (const fileName of files.filter((f) => f.endsWith(".tar.gz"))) {
+          for (const fileName of files.filter((f) => f.endsWith(".tar.gz") || f.endsWith(".tar.gz" + ENCRYPTED_SUFFIX))) {
             const fullPath = join(sourceDir, fileName);
             const s = await stat(fullPath);
             archives.push({
+              encrypted: fileName.endsWith(ENCRYPTED_SUFFIX),
               mountpoint: drive.mountpoint,
               category,
               sourceRef,

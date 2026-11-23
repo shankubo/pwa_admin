@@ -15,6 +15,7 @@ import type {
 } from "@pwa-admin/shared";
 import { useTranslation } from "react-i18next";
 import { apiJson } from "@/lib/api";
+import { EncryptionKeyCard } from "@/components/backup/EncryptionKeyCard";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -175,6 +176,8 @@ export function Backups() {
         onCompare={runComparison}
         onDeletedFile={runComparison}
       />
+
+      <EncryptionKeyCard />
 
       <UsbConnection />
 

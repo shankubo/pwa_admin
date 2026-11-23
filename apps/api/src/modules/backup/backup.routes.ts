@@ -12,6 +12,7 @@ import { withAudit } from "../../middleware/auditLog.js";
 import { SchedulerService } from "../../services/scheduler.js";
 import { GDriveAuthService, GDriveService } from "../../services/gdrive.client.js";
 import { UsbBackupService, sanitizeSegment } from "../../services/usbBackup.client.js";
+import { BackupCrypto } from "../../services/backupCrypto.js";
 import { env } from "../../config/env.js";
 import { updateEnvKeys } from "../../config/envFile.js";
 import type { BackupSourceType, BackupTarget, BackupUploadSourceKind } from "@pwa-admin/shared";
@@ -23,6 +24,59 @@ async function sha256OfFile(path: string): Promise<string> {
 
 export default async function backupRoutes(app: FastifyInstance) {
   const auth = { preHandler: (app as any).requireAuth };
+
+  // Encryption of the USB/Drive copies. The private key stays on the server so
+  // in-app restores work unattended; "reveal" lets the admin keep their own copy,
+  // "confirm" records that they did, and only then may "remove-server-key" drop
+  // the server copy (restores then ask for the key).
+  app.get("/backups/encryption", auth, async (_req, reply) => {
+    reply.send(await BackupCrypto.status());
+  });
+
+  app.post(
+    "/backups/encryption/reveal",
+    { preHandler: [(app as any).requireAuth, withAudit("backup.encryption.reveal")] },
+    async (_req, reply) => {
+      try {
+        reply.header("Cache-Control", "no-store");
+        reply.send({ privateKey: await BackupCrypto.revealPrivateKey() });
+      } catch (err) {
+        reply.code(409).send({ error: (err as Error).message });
+      }
+    }
+  );
+
+  app.post(
+    "/backups/encryption/confirm",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("backup.encryption.confirm")],
+      schema: {
+        body: { type: "object", required: ["confirm"], properties: { confirm: { type: "boolean", const: true } } },
+      },
+    },
+    async (_req, reply) => {
+      await BackupCrypto.confirmPrivateKeySaved();
+      reply.send({ ok: true });
+    }
+  );
+
+  app.post(
+    "/backups/encryption/remove-server-key",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("backup.encryption.remove-server-key")],
+      schema: {
+        body: { type: "object", required: ["confirm"], properties: { confirm: { type: "boolean", const: true } } },
+      },
+    },
+    async (_req, reply) => {
+      try {
+        await BackupCrypto.removeServerPrivateKey();
+        reply.send({ ok: true });
+      } catch (err) {
+        reply.code(409).send({ error: (err as Error).message });
+      }
+    }
+  );
 
   app.get("/backups/jobs", auth, async (_req, reply) => {
     reply.send(BackupJobModel.list().map(backupJobToApiShape));
@@ -434,11 +488,15 @@ export default async function backupRoutes(app: FastifyInstance) {
     {
       preHandler: [(app as any).requireAuth, withAudit("backup.usb-archive.import")],
       schema: {
-        body: { type: "object", required: ["fullPath"], properties: { fullPath: { type: "string" } } },
+        body: {
+          type: "object",
+          required: ["fullPath"],
+          properties: { fullPath: { type: "string" }, privateKey: { type: "string", maxLength: 200 } },
+        },
       },
     },
     async (req, reply) => {
-      const { fullPath } = req.body as { fullPath: string };
+      const { fullPath, privateKey } = req.body as { fullPath: string; privateKey?: string };
       const valid = await UsbBackupService.validateArchivePath(fullPath);
       if (!valid) return reply.code(400).send({ error: "path_outside_usb_backup_root" });
 
@@ -460,7 +518,24 @@ export default async function backupRoutes(app: FastifyInstance) {
             ? "image"
             : "path";
       const sourceRef = isImageExport ? archive.sourceRef.slice("image-".length) : archive.sourceRef;
-      const stats = await stat(fullPath);
+
+      // An encrypted archive is decrypted into the local backup root so the
+      // unchanged restore code path keeps working on a plain .tar.gz.
+      let restorablePath = fullPath;
+      if (archive.encrypted) {
+        if (!privateKey && !(await BackupCrypto.hasServerPrivateKey())) {
+          return reply.code(400).send({ error: "private_key_required" });
+        }
+        const decryptedDir = join(env.BACKUP_LOCAL_ROOT, "decrypted-import", randomUUID());
+        await mkdir(decryptedDir, { recursive: true });
+        restorablePath = join(decryptedDir, sanitizeSegment(archive.fileName.replace(/\.tar\.gz\.enc$/, "")) + ".tar.gz");
+        try {
+          await BackupCrypto.decryptFile(fullPath, restorablePath, privateKey);
+        } catch (err) {
+          return reply.code(400).send({ error: (err as Error).message });
+        }
+      }
+      const stats = await stat(restorablePath);
 
       const runId = BackupHistoryModel.createRun({
         jobId: null,
@@ -471,7 +546,7 @@ export default async function backupRoutes(app: FastifyInstance) {
       });
       BackupHistoryModel.complete(runId, {
         status: "success",
-        filePath: fullPath,
+        filePath: restorablePath,
         sizeBytes: stats.size,
         usbPath: fullPath,
       });
@@ -553,8 +628,9 @@ export default async function backupRoutes(app: FastifyInstance) {
     },
     async (req, reply) => {
       const { fileId } = req.params as { fileId: string };
+      const { privateKey } = (req.body ?? {}) as { privateKey?: string };
       try {
-        reply.send(await BackupService.importGDriveFile(fileId));
+        reply.send(await BackupService.importGDriveFile(fileId, privateKey));
       } catch (err) {
         reply.code(400).send({ error: (err as Error).message });
       }

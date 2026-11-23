@@ -110,6 +110,20 @@ export interface UsbBackupArchive {
   fullPath: string;
   sizeBytes: number;
   modifiedAt: string;
+  /** True for `.tar.gz.enc` — restoring it requires the admin's private key. */
+  encrypted: boolean;
+}
+
+/** State of the USB/Drive copy encryption (see BackupCrypto). The private key
+ * itself is never part of this — only the explicit reveal endpoint returns it.
+ * `privateKeyOnServer`: in-app restores use it automatically; when false they
+ * ask the admin for the key. `savedConfirmed`: the admin says they hold their
+ * own copy outside the server. */
+export interface BackupEncryptionStatus {
+  enabled: boolean;
+  fingerprint: string | null;
+  privateKeyOnServer: boolean;
+  savedConfirmed: boolean;
 }
 
 /** One entry (file or folder) inside the "Disque externe USB" file explorer —
