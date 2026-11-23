@@ -25,5 +25,44 @@
     "cancel": "Annuler",
     "wrongKey": "Cette clé ne correspond pas à cette archive.",
     "invalidFormat": "Format de clé invalide : elle doit commencer par « pwa-admin-key-v1: »."
+  },
+  "luks": {
+    "badge": "Disque chiffré (LUKS)",
+    "passphrase": "Passphrase du disque",
+    "locked": {
+      "title": "Disque USB chiffré verrouillé",
+      "description": "{{label}} ({{device}}) est chiffré. Saisissez la passphrase pour le déverrouiller.",
+      "unlock": "Déverrouiller"
+    },
+    "encrypt": {
+      "button": "Chiffrer ce disque (LUKS)",
+      "warning": "Cette opération EFFACE TOUT le contenu de {{device}} ({{label}}), sauvegardes comprises. Elle est irréversible.",
+      "passphraseConfirm": "Confirmer la passphrase",
+      "tooShort": "8 caractères minimum.",
+      "mismatch": "Les deux passphrases ne correspondent pas.",
+      "passphraseWarning": "Notez cette passphrase hors de ce serveur : sans elle (et sans le fichier clé), le disque est définitivement illisible.",
+      "keyfile": "Déverrouillage automatique au branchement (fichier clé stocké sur ce serveur)",
+      "keyfileHint": "Sans cette option, il faudra saisir la passphrase à chaque branchement, et les sauvegardes planifiées échouent tant que le disque est verrouillé.",
+      "confirmType": "Pour confirmer l'effacement, tapez « {{partition}} » :",
+      "submit": "Effacer et chiffrer",
+      "cancel": "Annuler",
+      "working": "Chiffrement en cours, cela peut durer plusieurs minutes…"
+    },
+    "keyfile": {
+      "on": "déverrouillage automatique activé",
+      "off": "déverrouillage automatique désactivé",
+      "enable": "Activer le déverrouillage automatique",
+      "disable": "Désactiver le déverrouillage automatique",
+      "apply": "Valider"
+    },
+    "errors": {
+      "wrong_passphrase": "Passphrase incorrecte.",
+      "confirmation_mismatch": "La confirmation ne correspond pas au nom de la partition.",
+      "usb_partition_not_found": "Partition USB introuvable (débranchée ou déjà utilisée).",
+      "partition_still_mounted": "La partition est encore montée : éjectez-la d'abord.",
+      "mapper_busy": "Le volume chiffré est utilisé par un autre processus.",
+      "invalid_passphrase_length": "La passphrase doit faire entre 8 et 256 caractères.",
+      "not_a_luks_partition": "Cette partition n'est pas chiffrée en LUKS."
+    }
   }
 }

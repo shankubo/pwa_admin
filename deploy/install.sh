@@ -115,6 +115,12 @@ BACKUP_GID="$(id -g "${SERVICE_USER}")"
 sed "s#__PWA_ADMIN_UID__#${BACKUP_UID}#g; s#__PWA_ADMIN_GID__#${BACKUP_GID}#g" \
   "${DEPLOY_DIR}/usb-backup/backup-usb-mount.sh" | sudo tee /usr/local/bin/backup-usb-mount.sh > /dev/null
 sudo chmod 755 /usr/local/bin/backup-usb-mount.sh
+# LUKS support (encrypt the USB backup drive from the Backups screen): the
+# root helper, plus the cryptsetup/mkfs tools it drives. Harmless if unused.
+sed "s#__PWA_ADMIN_UID__#${BACKUP_UID}#g; s#__PWA_ADMIN_GID__#${BACKUP_GID}#g" \
+  "${DEPLOY_DIR}/usb-backup/backup-usb-luks.sh" | sudo tee /usr/local/bin/backup-usb-luks.sh > /dev/null
+sudo chmod 755 /usr/local/bin/backup-usb-luks.sh
+sudo apt-get install -y cryptsetup e2fsprogs > /dev/null
 sudo cp "${DEPLOY_DIR}/usb-backup/backup-usb-mount@.service" /etc/systemd/system/backup-usb-mount@.service
 sudo cp "${DEPLOY_DIR}/usb-backup/99-backup-usb.rules" /etc/udev/rules.d/99-backup-usb.rules
 sudo systemctl daemon-reload

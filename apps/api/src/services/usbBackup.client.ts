@@ -10,6 +10,8 @@ interface LsblkDevice {
   mountpoint: string | null;
   fstype: string | null;
   label: string | null;
+  type?: string;
+  size?: number | string | null;
   tran: string | null;
   rm: boolean;
   hotplug: boolean;
@@ -43,34 +45,37 @@ export function currentHostnameSlug(): string {
  * parent disk but tran=null on its own partitions. Partitions inherit their
  * parent's USB-ness when their own fields are empty.
  */
-function collectUsbMountedPartitions(devices: LsblkDevice[]): LsblkDevice[] {
-  const result: LsblkDevice[] = [];
-  for (const dev of devices) {
-    const devIsUsb = dev.tran === "usb" || dev.rm === true;
-    if (devIsUsb && dev.mountpoint && !SYSTEM_MOUNTPOINTS.has(dev.mountpoint)) result.push(dev);
-    for (const child of dev.children ?? []) {
-      const childIsUsb = devIsUsb || child.tran === "usb" || child.rm === true;
-      if (childIsUsb && child.mountpoint && !SYSTEM_MOUNTPOINTS.has(child.mountpoint)) result.push(child);
-    }
-  }
-  return result;
+interface UsbScan {
+  /** Mounted, non-system USB filesystems; `partition` is the underlying
+   * partition (the LUKS one when `encrypted`). */
+  mounted: { dev: LsblkDevice; partition: string; encrypted: boolean }[];
+  /** USB-attached mountpoints dropped because they're this machine's own
+   * system mounts (see SYSTEM_MOUNTPOINTS) — surfaced so the UI can warn
+   * "this server's rootfs lives on external USB/SSD storage". */
+  systemMountpoints: string[];
+  /** LUKS partitions with no unlocked mapper child yet. */
+  locked: LsblkDevice[];
 }
 
-/** The counterpart exclusion collectUsbMountedPartitions applies — mountpoints
- * that ARE USB-attached but were dropped because they're this machine's own
- * system mounts (see SYSTEM_MOUNTPOINTS). Surfaced so the UI can warn "this
- * server's rootfs lives on external USB/SSD storage" instead of staying silent. */
-function collectSystemMountpointsOnUsb(devices: LsblkDevice[]): string[] {
-  const result: string[] = [];
-  for (const dev of devices) {
-    const devIsUsb = dev.tran === "usb" || dev.rm === true;
-    if (devIsUsb && dev.mountpoint && SYSTEM_MOUNTPOINTS.has(dev.mountpoint)) result.push(dev.mountpoint);
-    for (const child of dev.children ?? []) {
-      const childIsUsb = devIsUsb || child.tran === "usb" || child.rm === true;
-      if (childIsUsb && child.mountpoint && SYSTEM_MOUNTPOINTS.has(child.mountpoint)) result.push(child.mountpoint);
+/** Walks the whole lsblk tree: an unlocked LUKS drive is a grandchild
+ * (disk > partition > crypt mapper), so a fixed two-level loop would miss it. */
+function scanUsb(devices: LsblkDevice[]): UsbScan {
+  const scan: UsbScan = { mounted: [], systemMountpoints: [], locked: [] };
+
+  function visit(dev: LsblkDevice, parentIsUsb: boolean, parentPartition: string | null): void {
+    const isUsb = parentIsUsb || dev.tran === "usb" || dev.rm === true;
+    const isCrypt = dev.type === "crypt";
+    if (isUsb && dev.mountpoint) {
+      if (SYSTEM_MOUNTPOINTS.has(dev.mountpoint)) scan.systemMountpoints.push(dev.mountpoint);
+      else scan.mounted.push({ dev, partition: isCrypt && parentPartition ? parentPartition : dev.name, encrypted: isCrypt });
     }
+    const children = dev.children ?? [];
+    if (isUsb && dev.fstype === "crypto_LUKS" && !children.some((c) => c.type === "crypt")) scan.locked.push(dev);
+    for (const child of children) visit(child, isUsb, dev.name);
   }
-  return result;
+
+  for (const dev of devices) visit(dev, false, null);
+  return scan;
 }
 
 async function freeSpace(mountpoint: string): Promise<{ totalBytes: number | null; freeBytes: number | null }> {
@@ -86,7 +91,7 @@ async function lsblkDevices(): Promise<LsblkDevice[]> {
   try {
     const { stdout } = await runCommand(
       "lsblk",
-      ["-J", "-o", "NAME,MOUNTPOINT,FSTYPE,LABEL,TRAN,RM,HOTPLUG"],
+      ["-J", "-b", "-o", "NAME,MOUNTPOINT,FSTYPE,LABEL,TYPE,SIZE,TRAN,RM,HOTPLUG"],
       { timeoutMs: 5000 }
     );
     return (JSON.parse(stdout) as LsblkOutput).blockdevices ?? [];
@@ -98,10 +103,9 @@ async function lsblkDevices(): Promise<LsblkDevice[]> {
 export const UsbBackupService = {
   async detectDrives(): Promise<UsbDriveInfo[]> {
     const devices = await lsblkDevices();
-    const mounted = collectUsbMountedPartitions(devices);
     const hostSlug = currentHostnameSlug();
     const drives: UsbDriveInfo[] = [];
-    for (const dev of mounted) {
+    for (const { dev, partition, encrypted } of scanUsb(devices).mounted) {
       const mountpoint = dev.mountpoint!;
       const { totalBytes, freeBytes } = await freeSpace(mountpoint);
       const backupRoot = join(mountpoint, BACKUP_ROOT_SEGMENT, hostSlug);
@@ -111,11 +115,13 @@ export const UsbBackupService = {
       drives.push({
         mountpoint,
         label: dev.label || dev.name,
-        device: `/dev/${dev.name}`,
+        device: encrypted ? `/dev/mapper/${dev.name}` : `/dev/${dev.name}`,
         filesystem: dev.fstype,
         totalBytes,
         freeBytes,
         backupRoot,
+        partition,
+        encrypted,
         isBackupConfigured,
       });
     }
@@ -136,11 +142,18 @@ export const UsbBackupService = {
 
   async status(): Promise<UsbStatus> {
     const [drives, devices] = await Promise.all([this.detectDrives(), lsblkDevices()]);
+    const scan = scanUsb(devices);
     return {
       available: drives.length > 0,
       hostname: currentHostnameSlug(),
       drives,
-      systemMountpointsOnUsb: collectSystemMountpointsOnUsb(devices),
+      lockedDrives: scan.locked.map((d) => ({
+        partition: d.name,
+        device: `/dev/${d.name}`,
+        label: d.label || d.name,
+        sizeBytes: d.size != null ? Number(d.size) : null,
+      })),
+      systemMountpointsOnUsb: scan.systemMountpoints,
     };
   },
 

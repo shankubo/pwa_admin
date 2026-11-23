@@ -199,6 +199,13 @@ __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/chown __PWA_ADMIN_USER__ __PWA_
 # unit be stopped, scoped to that one unit template.
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /bin/systemctl stop backup-usb-mount@*.service
 
+# --- Backups module: LUKS encryption of the USB backup drive ---
+# One root helper does unlock/format/keyfile work. The argument list can't be
+# narrowed further in sudoers (the partition name varies), so the script itself
+# refuses anything that isn't a USB-attached, non-system partition; passphrases
+# are passed on stdin, never as arguments.
+__PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/local/bin/backup-usb-luks.sh *
+
 # --- Services module: status/update for Tailscale, Docker, PM2 ---
 __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/tailscale update
 # Weekly cert-renew timer (renew-tailscale-cert.sh) runs non-interactively,
@@ -296,4 +303,4 @@ __PWA_ADMIN_USER__ ALL=(root) NOPASSWD: /usr/bin/mkdir -p /home/*
 # an allocated pseudo-terminal — fine for interactive SSH use, but the
 # pwa-admin service invokes sudo via execFile with no TTY at all, so every
 # scoped command here needs both `!requiretty` and `!use_pty` to run non-interactively.
-Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/usr/sbin/apache2ctl,/usr/sbin/a2ensite,/usr/sbin/a2dissite,/usr/sbin/a2enmod,/bin/systemctl,/usr/bin/fail2ban-client,/usr/bin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/pg_dump,/usr/bin/pg_restore,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat,/usr/sbin/ufw,/usr/bin/tail,/usr/bin/tailscale,/usr/sbin/useradd,/usr/bin/mkdir,/usr/bin/test,/usr/bin/kill !requiretty,!use_pty
+Defaults!/usr/bin/apt-get,/usr/bin/apt-mark,/usr/sbin/nginx,/usr/sbin/apache2ctl,/usr/sbin/a2ensite,/usr/sbin/a2dissite,/usr/sbin/a2enmod,/bin/systemctl,/usr/bin/fail2ban-client,/usr/bin/ss,/usr/bin/mysql,/usr/bin/mysqldump,/usr/bin/psql,/usr/bin/pg_dumpall,/usr/bin/pg_dump,/usr/bin/pg_restore,/usr/bin/tar,/usr/bin/rsync,/usr/bin/rm,/usr/bin/chown,/usr/bin/openssl,/usr/bin/nmcli,/usr/bin/cat,/usr/sbin/ufw,/usr/bin/tail,/usr/bin/tailscale,/usr/sbin/useradd,/usr/bin/mkdir,/usr/bin/test,/usr/bin/kill,/usr/local/bin/backup-usb-luks.sh !requiretty,!use_pty

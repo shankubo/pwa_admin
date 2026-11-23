@@ -16,6 +16,7 @@ import type {
 import { useTranslation } from "react-i18next";
 import { apiJson } from "@/lib/api";
 import { EncryptionKeyCard } from "@/components/backup/EncryptionKeyCard";
+import { EncryptDriveForm, KeyfileControl, LockedDriveCard } from "@/components/backup/UsbLuksControls";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -939,6 +940,10 @@ function UsbConnection() {
         </p>
       )}
 
+      {status?.lockedDrives.map((d) => (
+        <LockedDriveCard key={d.partition} drive={d} onDone={loadStatus} />
+      ))}
+
       {!status ? (
         <p className="text-sm text-muted-foreground">{t("usb.loading")}</p>
       ) : !status.available ? (
@@ -958,6 +963,7 @@ function UsbConnection() {
                   {d.totalBytes != null ? t("usb.freeSpaceTotal", { total: formatBytes(d.totalBytes) }) : ""}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">{d.backupRoot}</p>
+                {d.encrypted ? <KeyfileControl partition={d.partition} /> : <EncryptDriveForm drive={d} onDone={loadStatus} />}
                 <ConfirmDialog
                   trigger={
                     <Button size="sm" variant="outline" className="mt-2" disabled={ejecting === d.mountpoint}>
@@ -988,6 +994,7 @@ function UsbConnection() {
                 >
                   {enabling === d.mountpoint ? t("usb.activating") : t("usb.activate")}
                 </Button>
+                {d.encrypted ? <KeyfileControl partition={d.partition} /> : <EncryptDriveForm drive={d} onDone={loadStatus} />}
               </div>
             )
           )}

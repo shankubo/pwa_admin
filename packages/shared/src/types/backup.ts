@@ -81,16 +81,30 @@ export interface UsbDriveInfo {
   totalBytes: number | null;
   freeBytes: number | null;
   backupRoot: string;
+  /** Partition name backing this drive (e.g. "sda1") — for an encrypted drive,
+   * the LUKS partition underneath the unlocked mapper device. */
+  partition: string;
+  /** True when this drive is the unlocked view of a LUKS partition. */
+  encrypted: boolean;
   /** Whether BACKUP/<hostname> already exists on this drive — false means
    * it's a USB/SSD drive that hasn't been designated as a backup target yet
    * (e.g. just plugged in), distinct from one actively holding backups. */
   isBackupConfigured: boolean;
 }
 
+/** A LUKS-encrypted USB partition that is plugged in but not unlocked yet. */
+export interface UsbLockedDriveInfo {
+  partition: string;
+  device: string;
+  label: string;
+  sizeBytes: number | null;
+}
+
 export interface UsbStatus {
   available: boolean;
   hostname: string;
   drives: UsbDriveInfo[];
+  lockedDrives: UsbLockedDriveInfo[];
   /** Mountpoints lsblk reports as USB-attached (tran=usb/rm) but excluded
    * from `drives` because they're the machine's own system mounts — e.g. a
    * server booting its rootfs off an external USB/SSD once the SD card is

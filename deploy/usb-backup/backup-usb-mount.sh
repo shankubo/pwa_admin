@@ -6,9 +6,20 @@ set -euo pipefail
 # by /etc/udev/rules.d/99-backup-usb.rules on hotplug (works headless — no
 # desktop session/polkit agent required, unlike udisks2 auto-mount).
 
+MOUNTPOINT="/media/backup-usb"
+MAPPER="backup-usb-crypt"
+KEYFILE="/etc/pwa-admin/usb-luks.key"
+
+# ExecStop path: unmount, then close the LUKS mapping if there is one so an
+# ejected encrypted drive is really locked again, not just unmounted.
+if [ "${1:-}" = "--stop" ]; then
+  umount "$MOUNTPOINT" 2>/dev/null || true
+  if [ -e "/dev/mapper/${MAPPER}" ]; then cryptsetup close "$MAPPER" || true; fi
+  exit 0
+fi
+
 DEVNAME="$1"  # e.g. sda1, from udev's %k
 DEVPATH="/dev/${DEVNAME}"
-MOUNTPOINT="/media/backup-usb"
 # Substituted by install.sh at install time with the pwa-admin service
 # account's real uid/gid (`id -u`/`id -g`) — a dedicated system account does
 # NOT get uid/gid 1000 (that's the conventional first-human-user id on
@@ -34,6 +45,24 @@ case "$FSTYPE" in
   ext4|ext3|ext2|xfs|btrfs)
     mount "$DEVPATH" "$MOUNTPOINT"
     chown "${BACKUP_UID}:${BACKUP_GID}" "$MOUNTPOINT"
+    ;;
+  crypto_LUKS)
+    if mountpoint -q "$MOUNTPOINT"; then exit 0; fi
+    # Auto-unlock only when the admin enabled the keyfile; otherwise the unit
+    # stays active with the drive locked until the passphrase is entered in the
+    # app (backup-usb-luks.sh unlock) — exiting non-zero here would make udev
+    # retry/log failures for a perfectly normal state.
+    if [ ! -e "/dev/mapper/${MAPPER}" ]; then
+      if [ -r "$KEYFILE" ]; then
+        cryptsetup open --type luks --key-file "$KEYFILE" "$DEVPATH" "$MAPPER" || true
+      fi
+    fi
+    if [ -e "/dev/mapper/${MAPPER}" ]; then
+      mount "/dev/mapper/${MAPPER}" "$MOUNTPOINT"
+      chown "${BACKUP_UID}:${BACKUP_GID}" "$MOUNTPOINT"
+    else
+      echo "backup-usb-mount: ${DEVPATH} is LUKS-encrypted and locked, waiting for the passphrase" >&2
+    fi
     ;;
   *)
     echo "backup-usb-mount: unsupported or unknown filesystem '${FSTYPE}' on ${DEVPATH}" >&2

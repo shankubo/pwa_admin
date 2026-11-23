@@ -25,5 +25,44 @@
     "cancel": "Cancel",
     "wrongKey": "This key does not match this archive.",
     "invalidFormat": "Invalid key format: it must start with \"pwa-admin-key-v1:\"."
+  },
+  "luks": {
+    "badge": "Encrypted drive (LUKS)",
+    "passphrase": "Drive passphrase",
+    "locked": {
+      "title": "Encrypted USB drive is locked",
+      "description": "{{label}} ({{device}}) is encrypted. Enter the passphrase to unlock it.",
+      "unlock": "Unlock"
+    },
+    "encrypt": {
+      "button": "Encrypt this drive (LUKS)",
+      "warning": "This ERASES EVERYTHING on {{device}} ({{label}}), backups included. It cannot be undone.",
+      "passphraseConfirm": "Confirm passphrase",
+      "tooShort": "At least 8 characters.",
+      "mismatch": "The two passphrases do not match.",
+      "passphraseWarning": "Write this passphrase down outside this server: without it (and without the keyfile) the drive is permanently unreadable.",
+      "keyfile": "Unlock automatically when plugged in (keyfile stored on this server)",
+      "keyfileHint": "Without this, the passphrase must be entered every time the drive is plugged in, and scheduled backups fail while it is locked.",
+      "confirmType": "To confirm the erase, type \"{{partition}}\":",
+      "submit": "Erase and encrypt",
+      "cancel": "Cancel",
+      "working": "Encrypting, this can take several minutes…"
+    },
+    "keyfile": {
+      "on": "automatic unlock enabled",
+      "off": "automatic unlock disabled",
+      "enable": "Enable automatic unlock",
+      "disable": "Disable automatic unlock",
+      "apply": "Confirm"
+    },
+    "errors": {
+      "wrong_passphrase": "Wrong passphrase.",
+      "confirmation_mismatch": "The confirmation does not match the partition name.",
+      "usb_partition_not_found": "USB partition not found (unplugged or already in use).",
+      "partition_still_mounted": "The partition is still mounted: eject it first.",
+      "mapper_busy": "The encrypted volume is in use by another process.",
+      "invalid_passphrase_length": "The passphrase must be 8 to 256 characters.",
+      "not_a_luks_partition": "This partition is not LUKS-encrypted."
+    }
   }
 }

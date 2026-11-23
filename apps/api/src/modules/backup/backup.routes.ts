@@ -13,6 +13,7 @@ import { SchedulerService } from "../../services/scheduler.js";
 import { GDriveAuthService, GDriveService } from "../../services/gdrive.client.js";
 import { UsbBackupService, sanitizeSegment } from "../../services/usbBackup.client.js";
 import { BackupCrypto } from "../../services/backupCrypto.js";
+import { UsbLuksService } from "../../services/usbLuks.client.js";
 import { env } from "../../config/env.js";
 import { updateEnvKeys } from "../../config/envFile.js";
 import type { BackupSourceType, BackupTarget, BackupUploadSourceKind } from "@pwa-admin/shared";
@@ -74,6 +75,104 @@ export default async function backupRoutes(app: FastifyInstance) {
         reply.send({ ok: true });
       } catch (err) {
         reply.code(409).send({ error: (err as Error).message });
+      }
+    }
+  );
+
+  // LUKS encryption of the USB backup drive itself. Bodies carry a passphrase,
+  // so withAudit's target only ever returns the partition name — never the body.
+  const partitionBody = { type: "string", pattern: "^(sd[a-z]+[0-9]+|nvme[0-9]+n[0-9]+p[0-9]+|mmcblk[0-9]+p[0-9]+)$" };
+  const passphraseBody = { type: "string", minLength: 8, maxLength: 256 };
+  const luksTarget = (r: { body?: unknown }) => String((r.body as { partition?: string } | undefined)?.partition ?? "");
+
+  app.post(
+    "/backups/usb/luks/unlock",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("backup.usb.luks.unlock", luksTarget)],
+      schema: { body: { type: "object", required: ["partition", "passphrase"], properties: { partition: partitionBody, passphrase: passphraseBody } } },
+    },
+    async (req, reply) => {
+      const { partition, passphrase } = req.body as { partition: string; passphrase: string };
+      try {
+        await UsbLuksService.unlock(partition, passphrase);
+        reply.send({ ok: true });
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      }
+    }
+  );
+
+  // Destroys everything on the partition — typed confirmation of the partition
+  // name plus an explicit flag, checked here AND by the root helper's own rules.
+  app.post(
+    "/backups/usb/luks/format",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("backup.usb.luks.format", luksTarget)],
+      schema: {
+        body: {
+          type: "object",
+          required: ["partition", "passphrase", "confirmPartition", "confirmErase"],
+          properties: {
+            partition: partitionBody,
+            passphrase: passphraseBody,
+            confirmPartition: { type: "string" },
+            confirmErase: { type: "boolean", const: true },
+            withKeyfile: { type: "boolean" },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { partition, passphrase, confirmPartition, withKeyfile } = req.body as {
+        partition: string;
+        passphrase: string;
+        confirmPartition: string;
+        withKeyfile?: boolean;
+      };
+      if (confirmPartition !== partition) return reply.code(400).send({ error: "confirmation_mismatch" });
+      try {
+        await UsbLuksService.format(partition, passphrase, withKeyfile === true);
+        reply.send({ ok: true });
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      }
+    }
+  );
+
+  app.post(
+    "/backups/usb/luks/keyfile",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("backup.usb.luks.keyfile", luksTarget)],
+      schema: {
+        body: {
+          type: "object",
+          required: ["partition", "passphrase", "enabled"],
+          properties: { partition: partitionBody, passphrase: passphraseBody, enabled: { type: "boolean" } },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { partition, passphrase, enabled } = req.body as { partition: string; passphrase: string; enabled: boolean };
+      try {
+        await UsbLuksService.setKeyfile(partition, passphrase, enabled);
+        reply.send({ ok: true });
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      }
+    }
+  );
+
+  app.get(
+    "/backups/usb/luks/keyfile-status",
+    {
+      preHandler: [(app as any).requireAuth],
+      schema: { querystring: { type: "object", required: ["partition"], properties: { partition: partitionBody } } },
+    },
+    async (req, reply) => {
+      try {
+        reply.send(await UsbLuksService.keyfileStatus((req.query as { partition: string }).partition));
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
       }
     }
   );
