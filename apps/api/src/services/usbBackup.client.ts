@@ -244,7 +244,7 @@ export const UsbBackupService = {
     if (drives.length === 0) throw new Error("no_usb_drive_detected");
     const drive = drives[0]; // single-drive write support this iteration
     const fileName = basename(localPath);
-    const encrypt = !opts.plain && (await BackupCrypto.isEnabled());
+    const encrypt = !opts.plain && (await BackupCrypto.isEnabledFor("usb"));
     const destPath = this.buildArchivePath(drive.mountpoint, category, sourceRef, fileName, encrypt);
     await mkdir(dirname(destPath), { recursive: true });
     const plainSize = (await stat(localPath)).size;

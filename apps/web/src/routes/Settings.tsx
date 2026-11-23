@@ -12,6 +12,7 @@ import { useAuthStore } from "@/stores/auth.store";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { BackupEncryptionSettingsCard } from "@/components/backup/BackupEncryptionSettingsCard";
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 import {
   ShieldCheck,
@@ -96,6 +97,8 @@ export function Settings() {
       <GDriveConfigCard />
 
       <GDriveConnectionCard />
+
+      <BackupEncryptionSettingsCard />
 
       <AuditLogCard />
 

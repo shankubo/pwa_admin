@@ -101,6 +101,12 @@ export function EncryptionKeyCard() {
             {t("active.fingerprint")} <code>{status.fingerprint}</code>
           </p>
         )}
+        <p className="mt-1 text-xs text-muted-foreground">
+          {t("active.targets", {
+            usb: status.encryptUsbCopies ? t("active.on") : t("active.off"),
+            drive: status.encryptDriveCopies ? t("active.on") : t("active.off"),
+          })}
+        </p>
         {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
         {status.privateKeyOnServer && (
           <Button className="mt-3" size="sm" variant="outline" disabled={busy !== null} onClick={removeServerKey}>

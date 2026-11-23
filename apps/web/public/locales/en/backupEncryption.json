@@ -4,6 +4,9 @@
     "descriptionOnServer": "Every archive copied to the USB drive or Google Drive is encrypted and unreadable without the private key. The key is kept on this server: restores from this app use it automatically.",
     "descriptionOffServer": "Every archive copied to the USB drive or Google Drive is encrypted. The private key is no longer on this server: restore will ask you for it.",
     "fingerprint": "Key fingerprint:",
+    "targets": "Encryption of new copies — USB drive: {{usb}} · Google Drive: {{drive}} (change it in Settings).",
+    "on": "on",
+    "off": "off",
     "remove": "Remove the key from this server",
     "removeConfirm": "Remove the private key from this server? Restoring USB/Drive copies will then require pasting it. Without your own copy, those backups would be permanently unreadable."
   },
@@ -25,6 +28,17 @@
     "cancel": "Cancel",
     "wrongKey": "This key does not match this archive.",
     "invalidFormat": "Invalid key format: it must start with \"pwa-admin-key-v1:\"."
+  },
+  "settings": {
+    "title": "Backup copy encryption",
+    "description": "Each archive copied to the USB drive or uploaded to Google Drive can be encrypted with the app's key. Choose, per destination, whether new copies are.",
+    "usb": "Encrypt copies on the USB drive",
+    "usbHintLuks": "Your USB drive is already encrypted (LUKS): you can untick this without exposing its data.",
+    "usbOffLuks": "New copies will be plain files on the drive, protected by the drive's encryption while it is locked.",
+    "usbOffNoLuks": "No encrypted USB drive detected: new copies would be readable by anyone who plugs the drive in.",
+    "drive": "Encrypt copies uploaded to Google Drive",
+    "driveOff": "Unencrypted copies can be read by Google and anyone with access to your Drive account.",
+    "note": "Only affects NEW copies: already-encrypted ones stay restorable with the key, and local copies on this server are never encrypted."
   },
   "luks": {
     "badge": "Encrypted drive (LUKS)",

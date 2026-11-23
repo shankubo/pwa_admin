@@ -131,7 +131,7 @@ export const GDriveService = {
     // Drive is a third-party host: encrypt first so what it stores is opaque.
     // The ciphertext is staged next to the local backups (needs free space equal
     // to the file) and removed right after the upload.
-    const encrypt = await BackupCrypto.isEnabled();
+    const encrypt = await BackupCrypto.isEnabledFor("drive");
     let uploadPath = localPath;
     let fileName = basename(localPath);
     let stagedPath: string | null = null;

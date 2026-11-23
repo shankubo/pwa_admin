@@ -15,7 +15,11 @@ import { chmod, mkdir, open, readFile, stat, unlink, writeFile } from "node:fs/p
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { env } from "../config/env.js";
+import { AppSettingsModel } from "../db/models/appSettings.js";
 import type { BackupEncryptionStatus } from "@pwa-admin/shared";
+
+const SETTING_USB = "backup.encrypt_usb_copies";
+const SETTING_DRIVE = "backup.encrypt_drive_copies";
 
 // File layout: MAGIC(8) | keyId(8) | ephemeralPublicKey(32) | iv(12) | AES-256-GCM ciphertext | tag(16)
 // Hybrid scheme: each file gets its own throwaway X25519 key, so the server only
@@ -107,6 +111,8 @@ export const BackupCrypto = {
     const pub = await readPublicRaw();
     return {
       enabled: pub !== null,
+      encryptUsbCopies: AppSettingsModel.getBoolean(SETTING_USB, true),
+      encryptDriveCopies: AppSettingsModel.getBoolean(SETTING_DRIVE, true),
       fingerprint: pub ? fingerprintOf(pub) : null,
       privateKeyOnServer: existsSync(privatePath()),
       savedConfirmed: existsSync(savedMarkerPath()),
@@ -119,6 +125,18 @@ export const BackupCrypto = {
 
   async isEnabled(): Promise<boolean> {
     return (await readPublicRaw()) !== null;
+  },
+
+  /** Whether a NEW copy to this target must be encrypted: the keypair exists AND
+   * the admin hasn't switched that target off in Settings (default: on). */
+  async isEnabledFor(target: "usb" | "drive"): Promise<boolean> {
+    if ((await readPublicRaw()) === null) return false;
+    return AppSettingsModel.getBoolean(target === "usb" ? SETTING_USB : SETTING_DRIVE, true);
+  },
+
+  setPreferences(prefs: { encryptUsbCopies: boolean; encryptDriveCopies: boolean }): void {
+    AppSettingsModel.setBoolean(SETTING_USB, prefs.encryptUsbCopies);
+    AppSettingsModel.setBoolean(SETTING_DRIVE, prefs.encryptDriveCopies);
   },
 
   async revealPrivateKey(): Promise<string> {

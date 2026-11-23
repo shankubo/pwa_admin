@@ -4,6 +4,9 @@
     "descriptionOnServer": "Chaque archive copiée sur le disque USB ou sur Google Drive est chiffrée et illisible sans la clé privée. La clé est conservée sur ce serveur : les restaurations depuis cette application l'utilisent automatiquement.",
     "descriptionOffServer": "Chaque archive copiée sur le disque USB ou sur Google Drive est chiffrée. La clé privée n'est plus sur ce serveur : la restauration vous la demandera.",
     "fingerprint": "Empreinte de la clé :",
+    "targets": "Chiffrement des nouvelles copies — disque USB : {{usb}} · Google Drive : {{drive}} (réglable dans Réglages).",
+    "on": "activé",
+    "off": "désactivé",
     "remove": "Supprimer la clé de ce serveur",
     "removeConfirm": "Supprimer la clé privée de ce serveur ? La restauration des copies USB/Drive vous demandera désormais de la coller. Sans votre copie personnelle, ces sauvegardes seraient définitivement illisibles."
   },
@@ -25,6 +28,17 @@
     "cancel": "Annuler",
     "wrongKey": "Cette clé ne correspond pas à cette archive.",
     "invalidFormat": "Format de clé invalide : elle doit commencer par « pwa-admin-key-v1: »."
+  },
+  "settings": {
+    "title": "Chiffrement des copies de sauvegarde",
+    "description": "Chaque archive copiée sur le disque USB ou envoyée sur Google Drive peut être chiffrée avec la clé de l'application. Choisissez, pour chaque destination, si les nouvelles copies le sont.",
+    "usb": "Chiffrer les copies sur le disque USB",
+    "usbHintLuks": "Votre disque USB est déjà chiffré (LUKS) : vous pouvez décocher cette option sans exposer ses données.",
+    "usbOffLuks": "Les nouvelles copies seront en clair sur le disque, protégées par le chiffrement du disque tant qu'il est verrouillé.",
+    "usbOffNoLuks": "Aucun disque USB chiffré détecté : les nouvelles copies seraient lisibles par quiconque branche le disque.",
+    "drive": "Chiffrer les copies envoyées sur Google Drive",
+    "driveOff": "Des copies non chiffrées sont lisibles par Google et par toute personne ayant accès à votre compte Drive.",
+    "note": "Ne change que les NOUVELLES copies : celles déjà chiffrées restent restaurables avec la clé, et les copies locales sur ce serveur ne sont jamais chiffrées."
   },
   "luks": {
     "badge": "Disque chiffré (LUKS)",

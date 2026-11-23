@@ -34,6 +34,26 @@ export default async function backupRoutes(app: FastifyInstance) {
     reply.send(await BackupCrypto.status());
   });
 
+  // Per-target switches for NEW copies (Settings). Existing encrypted copies stay
+  // restorable regardless, since decryption doesn't depend on these.
+  app.post(
+    "/backups/encryption/settings",
+    {
+      preHandler: [(app as any).requireAuth, withAudit("backup.encryption.settings")],
+      schema: {
+        body: {
+          type: "object",
+          required: ["encryptUsbCopies", "encryptDriveCopies"],
+          properties: { encryptUsbCopies: { type: "boolean" }, encryptDriveCopies: { type: "boolean" } },
+        },
+      },
+    },
+    async (req, reply) => {
+      BackupCrypto.setPreferences(req.body as { encryptUsbCopies: boolean; encryptDriveCopies: boolean });
+      reply.send(await BackupCrypto.status());
+    }
+  );
+
   app.post(
     "/backups/encryption/reveal",
     { preHandler: [(app as any).requireAuth, withAudit("backup.encryption.reveal")] },

@@ -146,6 +146,10 @@ export interface UsbBackupArchive {
  * own copy outside the server. */
 export interface BackupEncryptionStatus {
   enabled: boolean;
+  /** Per-target switches (Settings): whether NEW copies to that target are
+   * encrypted. Existing encrypted copies stay restorable either way. */
+  encryptUsbCopies: boolean;
+  encryptDriveCopies: boolean;
   fingerprint: string | null;
   privateKeyOnServer: boolean;
   savedConfirmed: boolean;
