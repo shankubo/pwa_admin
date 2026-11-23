@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, Loader2, Lock, LockOpen, ShieldCheck, ShieldOff } from "lucide-react";
+import { AlertTriangle, Loader2, Lock, LockOpen, Plug, ShieldCheck, ShieldOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { UsbDriveInfo, UsbLockedDriveInfo } from "@pwa-admin/shared";
+import type { UsbDriveInfo, UsbLockedDriveInfo, UsbUnmountedDriveInfo } from "@pwa-admin/shared";
 import { apiJson } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 
@@ -34,7 +34,7 @@ export function useLuksError() {
   const { t } = useTranslation("backupEncryption");
   return (code: string) => {
     const known = [
-      "eject_failed_still_mounted", "unmount_failed",
+      "eject_failed_still_mounted", "unmount_failed", "keyfile_not_available", "mount_failed", "reconnect_failed",
       "wrong_passphrase", "confirmation_mismatch", "usb_partition_not_found", "partition_still_mounted",
       "mapper_busy", "invalid_passphrase_length", "not_a_luks_partition", "device_disconnected",
       "luks_format_failed", "luks_open_failed", "mkfs_failed", "unsupported_inner_filesystem",
@@ -45,6 +45,57 @@ export function useLuksError() {
   };
 }
 
+/** Mounts a still-plugged-in drive again (after an eject) without unplugging it.
+ * A LUKS drive reopens through its keyfile only; there is no passphrase here. */
+export function ReconnectButton({ partition, onDone }: { partition: string; onDone: () => void }) {
+  const { t } = useTranslation("backupEncryption");
+  const explain = useLuksError();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function reconnect() {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiJson("/backups/usb/reconnect", { method: "POST", body: JSON.stringify({ partition }) });
+      onDone();
+    } catch (err) {
+      setError(explain((err as Error).message));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-2">
+      <Button size="sm" variant="outline" disabled={busy} onClick={reconnect}>
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plug className="h-3.5 w-3.5" />}
+        {t("luks.reconnect.button")}
+      </Button>
+      {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+/** A plain (unencrypted) USB drive that is plugged in but not mounted, e.g. right after an eject. */
+export function UnmountedDriveCard({ drive, onDone }: { drive: UsbUnmountedDriveInfo; onDone: () => void }) {
+  const { t } = useTranslation("backupEncryption");
+  return (
+    <div className="rounded-md border border-border p-2 text-sm">
+      <p className="flex flex-wrap items-center gap-2">
+        <span className="flex items-center gap-1">
+          <Plug className="h-4 w-4" /> {t("luks.unmounted.title")}
+        </span>
+        <UsbDriveStateBadge state="plain" />
+      </p>
+      <p className="text-xs text-muted-foreground">
+        {t("luks.unmounted.description", { label: drive.label, device: drive.device })}
+      </p>
+      <ReconnectButton partition={drive.partition} onDone={onDone} />
+    </div>
+  );
+}
+
 /** A plugged-in LUKS drive waiting for its passphrase. */
 export function LockedDriveCard({ drive, onDone }: { drive: UsbLockedDriveInfo; onDone: () => void }) {
   const { t } = useTranslation("backupEncryption");
@@ -52,6 +103,13 @@ export function LockedDriveCard({ drive, onDone }: { drive: UsbLockedDriveInfo; 
   const [passphrase, setPassphrase] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasKeyfile, setHasKeyfile] = useState(false);
+
+  useEffect(() => {
+    apiJson<{ keyfile: boolean }>(`/backups/usb/luks/keyfile-status?partition=${encodeURIComponent(drive.partition)}`)
+      .then((s) => setHasKeyfile(s.keyfile))
+      .catch(() => setHasKeyfile(false));
+  }, [drive.partition]);
 
   async function unlock() {
     setBusy(true);
@@ -92,6 +150,7 @@ export function LockedDriveCard({ drive, onDone }: { drive: UsbLockedDriveInfo; 
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LockOpen className="h-3.5 w-3.5" />}
         {t("luks.locked.unlock")}
       </Button>
+      {hasKeyfile && <ReconnectButton partition={drive.partition} onDone={onDone} />}
       <EncryptDriveForm drive={drive} onDone={onDone} reformat />
     </div>
   );

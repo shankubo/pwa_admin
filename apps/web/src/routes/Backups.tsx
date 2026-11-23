@@ -16,7 +16,14 @@ import type {
 import { useTranslation } from "react-i18next";
 import { apiJson } from "@/lib/api";
 import { EncryptionKeyCard } from "@/components/backup/EncryptionKeyCard";
-import { EncryptDriveForm, KeyfileControl, LockedDriveCard, UsbDriveStateBadge, useLuksError } from "@/components/backup/UsbLuksControls";
+import {
+  EncryptDriveForm,
+  KeyfileControl,
+  LockedDriveCard,
+  UnmountedDriveCard,
+  UsbDriveStateBadge,
+  useLuksError,
+} from "@/components/backup/UsbLuksControls";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -954,6 +961,10 @@ function UsbConnection() {
 
       {status?.lockedDrives.map((d) => (
         <LockedDriveCard key={d.partition} drive={d} onDone={loadStatus} />
+      ))}
+
+      {status?.unmountedDrives.map((d) => (
+        <UnmountedDriveCard key={d.partition} drive={d} onDone={loadStatus} />
       ))}
 
       {!status ? (

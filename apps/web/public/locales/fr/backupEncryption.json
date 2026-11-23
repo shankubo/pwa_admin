@@ -28,6 +28,13 @@
   },
   "luks": {
     "badge": "Disque chiffré (LUKS)",
+    "reconnect": {
+      "button": "Reconnecter (sans débrancher)"
+    },
+    "unmounted": {
+      "title": "Disque USB non monté",
+      "description": "{{label}} ({{device}}) est branché mais pas monté. Reconnectez-le sans le débrancher."
+    },
     "state": {
       "plain": "Non chiffré",
       "plainHint": "Disque non chiffré : quiconque le branche peut lire son contenu.",
@@ -72,6 +79,9 @@
       "mapper_busy": "Le volume chiffré est utilisé par un autre processus.",
       "invalid_passphrase_length": "La passphrase doit faire entre 8 et 256 caractères.",
       "not_a_luks_partition": "Cette partition n'est pas chiffrée en LUKS.",
+      "keyfile_not_available": "Pas de déverrouillage automatique pour ce disque : saisissez la passphrase pour le déverrouiller.",
+      "mount_failed": "Le montage du disque a échoué.",
+      "reconnect_failed": "La reconnexion a échoué : le disque n'a pas pu être monté.",
       "eject_failed_still_mounted": "L'éjection a échoué : le disque est toujours monté, ne le débranchez pas.",
       "unmount_failed": "Impossible de démonter le disque (fichiers encore utilisés ?).",
       "device_disconnected": "Le disque USB s'est déconnecté pendant l'opération : vérifiez le câble et le port, puis réessayez.",

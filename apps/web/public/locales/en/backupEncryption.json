@@ -28,6 +28,13 @@
   },
   "luks": {
     "badge": "Encrypted drive (LUKS)",
+    "reconnect": {
+      "button": "Reconnect (without unplugging)"
+    },
+    "unmounted": {
+      "title": "USB drive not mounted",
+      "description": "{{label}} ({{device}}) is plugged in but not mounted. Reconnect it without unplugging."
+    },
     "state": {
       "plain": "Not encrypted",
       "plainHint": "Unencrypted drive: anyone who plugs it in can read its contents.",
@@ -72,6 +79,9 @@
       "mapper_busy": "The encrypted volume is in use by another process.",
       "invalid_passphrase_length": "The passphrase must be 8 to 256 characters.",
       "not_a_luks_partition": "This partition is not LUKS-encrypted.",
+      "keyfile_not_available": "No automatic unlock for this drive: enter the passphrase to unlock it.",
+      "mount_failed": "Mounting the drive failed.",
+      "reconnect_failed": "Reconnect failed: the drive could not be mounted.",
       "eject_failed_still_mounted": "Eject failed: the drive is still mounted, do not unplug it.",
       "unmount_failed": "Could not unmount the drive (files still in use?).",
       "device_disconnected": "The USB drive disconnected during the operation: check the cable and port, then try again.",

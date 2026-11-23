@@ -28,6 +28,26 @@ fi
 
 DEVNAME="$1"  # e.g. sda1, from udev's %k
 DEVPATH="/dev/${DEVNAME}"
+
+# The server may boot from this very USB/SSD (e.g. a Raspberry Pi whose rootfs
+# lives on an external SSD). The udev rule matches every USB partition, so
+# without this guard it would also mount the system disk's partitions here —
+# making them look like an ordinary backup drive to the app (lsblk then reports
+# only this last mountpoint) and offering to format/encrypt the running system.
+disk_hosts_system() {
+  local parent part
+  parent="$(lsblk -no PKNAME "$DEVPATH" 2>/dev/null | head -1)"
+  [ -n "$parent" ] || parent="$DEVNAME"
+  for part in $(lsblk -nrpo NAME "/dev/${parent}" 2>/dev/null); do
+    if findmnt -rn -S "$part" -o TARGET 2>/dev/null | grep -qxE '/|/boot|/boot/firmware'; then return 0; fi
+  done
+  return 1
+}
+if disk_hosts_system; then
+  echo "backup-usb-mount: ${DEVPATH} is on a disk hosting a system mount, leaving it alone" >&2
+  exit 0
+fi
+
 # Substituted by install.sh at install time with the pwa-admin service
 # account's real uid/gid (`id -u`/`id -g`) — a dedicated system account does
 # NOT get uid/gid 1000 (that's the conventional first-human-user id on

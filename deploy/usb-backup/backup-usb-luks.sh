@@ -51,6 +51,13 @@ for sys in / /boot /boot/firmware; do
   if findmnt -rn -S "$DEV" -o TARGET | grep -qx "$sys"; then die "system_partition_refused"; fi
 done
 
+# Also refuse every OTHER partition of a disk that hosts a system mount: a server
+# booting from this USB/SSD must never have any of its disk formatted or encrypted.
+PARENT_DISK="$(lsblk -no PKNAME "$DEV" 2>/dev/null | head -1)"
+for p in $(lsblk -nrpo NAME "/dev/${PARENT_DISK:-$PART}" 2>/dev/null); do
+  if findmnt -rn -S "$p" -o TARGET 2>/dev/null | grep -qxE '/|/boot|/boot/firmware'; then die "system_disk_refused"; fi
+done
+
 PASS=""
 read_passphrase() {
   # --key-file=- reads stdin to EOF without stripping a newline, so the
@@ -114,6 +121,19 @@ case "$ACTION" in
     with_pass cryptsetup open --type luks --key-file=- "$DEV" "$MAPPER" || die "wrong_passphrase"
     mount_mapper
     align_unit
+    ;;
+
+  reconnect)
+    # Mount a drive that is still plugged in (typically right after an eject)
+    # again, without unplugging it: re-run its mount unit. A LUKS drive is only
+    # reopened if its keyfile is enabled; otherwise the caller must unlock it
+    # with the passphrase.
+    clear_stale_mapper
+    systemctl restart "backup-usb-mount@${PART}.service" || true
+    if ! mountpoint -q "$MOUNTPOINT"; then
+      if cryptsetup isLuks "$DEV" 2>/dev/null; then die "keyfile_not_available"; fi
+      die "mount_failed"
+    fi
     ;;
 
   eject)

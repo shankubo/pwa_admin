@@ -12,6 +12,10 @@ interface LsblkDevice {
   label: string | null;
   type?: string;
   size?: number | string | null;
+  /** All mountpoints (util-linux >= 2.37). `mountpoint` alone reports only the
+   * LAST one, which hides a system mount when the same partition is also
+   * mounted elsewhere. */
+  mountpoints?: (string | null)[];
   tran: string | null;
   rm: boolean;
   hotplug: boolean;
@@ -58,12 +62,27 @@ interface UsbScan {
   systemMountpoints: string[];
   /** LUKS partitions with no unlocked mapper child yet. */
   locked: LsblkDevice[];
+  /** Plain USB partitions with a mountable filesystem that aren't mounted. */
+  unmounted: LsblkDevice[];
+}
+
+const MOUNTABLE_FSTYPES = new Set(["exfat", "vfat", "ntfs", "ext2", "ext3", "ext4", "xfs", "btrfs"]);
+
+function mountpointsOf(dev: LsblkDevice): string[] {
+  const list = dev.mountpoints && dev.mountpoints.length > 0 ? dev.mountpoints : [dev.mountpoint];
+  return list.filter((m): m is string => typeof m === "string" && m.length > 0);
+}
+
+/** System mountpoints (/, /boot, /boot/firmware) anywhere under this device. */
+function systemMountsIn(dev: LsblkDevice): string[] {
+  const own = mountpointsOf(dev).filter((m) => SYSTEM_MOUNTPOINTS.has(m));
+  return [...own, ...(dev.children ?? []).flatMap(systemMountsIn)];
 }
 
 /** Walks the whole lsblk tree: an unlocked LUKS drive is a grandchild
  * (disk > partition > crypt mapper), so a fixed two-level loop would miss it. */
-function scanUsb(devices: LsblkDevice[]): UsbScan {
-  const scan: UsbScan = { mounted: [], systemMountpoints: [], locked: [] };
+export function scanUsb(devices: LsblkDevice[]): UsbScan {
+  const scan: UsbScan = { mounted: [], systemMountpoints: [], locked: [], unmounted: [] };
 
   function visit(dev: LsblkDevice, parentIsUsb: boolean, parentPartition: string | null): void {
     const isUsb = parentIsUsb || dev.tran === "usb" || dev.rm === true;
@@ -74,10 +93,25 @@ function scanUsb(devices: LsblkDevice[]): UsbScan {
     }
     const children = dev.children ?? [];
     if (isUsb && dev.fstype === "crypto_LUKS" && !children.some((c) => c.type === "crypt")) scan.locked.push(dev);
+    if (isUsb && dev.type === "part" && !dev.mountpoint && dev.fstype && MOUNTABLE_FSTYPES.has(dev.fstype)) {
+      scan.unmounted.push(dev);
+    }
     for (const child of children) visit(child, isUsb, dev.name);
   }
 
-  for (const dev of devices) visit(dev, false, null);
+  for (const dev of devices) {
+    // A disk that hosts any system mount (a server booting from an external
+    // USB/SSD) is never a backup, format or encryption candidate — not even for
+    // its other partitions, and not when the udev rule also mounted its
+    // partitions under /media/backup-usb (lsblk then reports only that last
+    // mountpoint, hiding the real one).
+    const system = systemMountsIn(dev);
+    if (system.length > 0) {
+      if (dev.tran === "usb" || dev.rm === true) scan.systemMountpoints.push(...system);
+      continue;
+    }
+    visit(dev, false, null);
+  }
   return scan;
 }
 
@@ -94,12 +128,22 @@ async function lsblkDevices(): Promise<LsblkDevice[]> {
   try {
     const { stdout } = await runCommand(
       "lsblk",
-      ["-J", "-b", "-o", "NAME,MOUNTPOINT,FSTYPE,LABEL,TYPE,SIZE,TRAN,RM,HOTPLUG"],
+      ["-J", "-b", "-o", "NAME,MOUNTPOINT,MOUNTPOINTS,FSTYPE,LABEL,TYPE,SIZE,TRAN,RM,HOTPLUG"],
       { timeoutMs: 5000 }
     );
     return (JSON.parse(stdout) as LsblkOutput).blockdevices ?? [];
   } catch {
-    return [];
+    // util-linux older than 2.37 has no MOUNTPOINTS column.
+    try {
+      const { stdout } = await runCommand(
+        "lsblk",
+        ["-J", "-b", "-o", "NAME,MOUNTPOINT,FSTYPE,LABEL,TYPE,SIZE,TRAN,RM,HOTPLUG"],
+        { timeoutMs: 5000 }
+      );
+      return (JSON.parse(stdout) as LsblkOutput).blockdevices ?? [];
+    } catch {
+      return [];
+    }
   }
 }
 
@@ -154,6 +198,13 @@ export const UsbBackupService = {
         partition: d.name,
         device: `/dev/${d.name}`,
         label: d.label || d.name,
+        sizeBytes: d.size != null ? Number(d.size) : null,
+      })),
+      unmountedDrives: scan.unmounted.map((d) => ({
+        partition: d.name,
+        device: `/dev/${d.name}`,
+        label: d.label || d.name,
+        filesystem: d.fstype,
         sizeBytes: d.size != null ? Number(d.size) : null,
       })),
       systemMountpointsOnUsb: scan.systemMountpoints,
@@ -289,5 +340,32 @@ export const UsbBackupService = {
     // unit succeeds silently while leaving the drive mounted.
     const stillMounted = (await this.detectDrives()).some((d) => d.mountpoint === mountpoint);
     if (stillMounted) throw new Error("eject_failed_still_mounted");
+  },
+
+  /** Mounts again a drive that is still plugged in (typically right after an
+   * eject) without unplugging it: re-runs its mount unit through the root
+   * helper, which auto-unlocks a LUKS drive only if its keyfile is enabled.
+   * The partition must be one lsblk currently reports as an unmounted or locked
+   * USB partition, so this can't be aimed at a system disk. */
+  async reconnect(partition: string): Promise<void> {
+    if (!/^(sd[a-z]+[0-9]+|nvme[0-9]+n[0-9]+p[0-9]+|mmcblk[0-9]+p[0-9]+)$/.test(partition)) {
+      throw new Error("invalid_partition_name");
+    }
+    const status = await this.status();
+    const known =
+      status.unmountedDrives.some((d) => d.partition === partition) ||
+      status.lockedDrives.some((d) => d.partition === partition);
+    if (!known) throw new Error("usb_partition_not_found");
+
+    try {
+      await runCommand("sudo", [LUKS_HELPER, "reconnect", partition], { timeoutMs: 60000 });
+    } catch (err) {
+      // The helper prints "backup-usb-luks: <machine_code>" on failure.
+      const match = ((err as { stderr?: string }).stderr ?? "").match(/backup-usb-luks: ([a-z_:]+)/);
+      throw new Error(match ? match[1] : "reconnect_failed");
+    }
+
+    const mounted = (await this.detectDrives()).some((d) => d.partition === partition);
+    if (!mounted) throw new Error("reconnect_failed");
   },
 };

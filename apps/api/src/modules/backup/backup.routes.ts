@@ -526,6 +526,36 @@ export default async function backupRoutes(app: FastifyInstance) {
     }
   );
 
+  // Mounts again a USB drive that is still plugged in (e.g. after an eject)
+  // without unplugging it. A LUKS drive reopens only if its keyfile is enabled;
+  // otherwise this fails with keyfile_not_available and the UI asks for the
+  // passphrase through /backups/usb/luks/unlock.
+  app.post(
+    "/backups/usb/reconnect",
+    {
+      preHandler: [
+        (app as any).requireAuth,
+        withAudit("backup.usb-drive.reconnect", (r) => String((r.body as { partition?: string } | undefined)?.partition ?? "")),
+      ],
+      schema: {
+        body: {
+          type: "object",
+          required: ["partition"],
+          properties: { partition: { type: "string", pattern: "^(sd[a-z]+[0-9]+|nvme[0-9]+n[0-9]+p[0-9]+|mmcblk[0-9]+p[0-9]+)$" } },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { partition } = req.body as { partition: string };
+      try {
+        await UsbBackupService.reconnect(partition);
+        reply.send({ ok: true });
+      } catch (err) {
+        reply.code(400).send({ error: (err as Error).message });
+      }
+    }
+  );
+
   // Uploads an archive from the admin's PC and registers it as a real
   // backup_history row (status "success", target "local") so it becomes
   // restorable through the existing /backups/restore and
