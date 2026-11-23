@@ -34,6 +34,14 @@ export interface BackupHistoryEntry {
   error: string | null;
   startedAt: string;
   finishedAt: string | null;
+  /** Set by the history API: whether the local archive file still exists on disk
+   * (retention deletes files but keeps rows). */
+  localExists?: boolean;
+  /** Set by the history API when usbPath is set: whether that copy is encrypted. */
+  usbEncrypted?: boolean | null;
+  /** Set by the history API when driveFileId is set: encrypted, plain, or null if
+   * unknown (uploaded before this was tracked). */
+  driveEncrypted?: boolean | null;
 }
 
 export type DriveVerificationStatus = "verified" | "missing" | "size-mismatch" | "not-uploaded";

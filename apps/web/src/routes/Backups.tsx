@@ -16,6 +16,7 @@ import type {
 import { useTranslation } from "react-i18next";
 import { apiJson } from "@/lib/api";
 import { EncryptionKeyCard } from "@/components/backup/EncryptionKeyCard";
+import { BackupHistory } from "@/components/backup/BackupHistory";
 import {
   EncryptDriveForm,
   KeyfileControl,
@@ -47,24 +48,10 @@ import {
   HardDriveUpload,
 } from "lucide-react";
 
-const STATUS_FILTERS: { key: "all" | BackupRunStatus; labelKey: string }[] = [
-  { key: "all", labelKey: "statusFilters.all" },
-  { key: "success", labelKey: "statusFilters.success" },
-  { key: "failed", labelKey: "statusFilters.failed" },
-  { key: "running", labelKey: "statusFilters.running" },
-];
-
-function historyCardClass(status: BackupRunStatus): string | undefined {
-  if (status === "success") return "border-primary/40 bg-primary/5";
-  if (status === "failed") return "border-destructive/50 bg-destructive/5";
-  return undefined; // pending/running — no verdict yet
-}
-
 export function Backups() {
   const { t } = useTranslation("backups");
   const [jobs, setJobs] = useState<BackupJob[] | null>(null);
   const [history, setHistory] = useState<BackupHistoryEntry[] | null>(null);
-  const [statusFilter, setStatusFilter] = useState<"all" | BackupRunStatus>("all");
   const [storage, setStorage] = useState<{ localUsedBytes: number } | null>(null);
   const [detected, setDetected] = useState<DetectedDatabase[] | null>(null);
   const [showNewJob, setShowNewJob] = useState(false);
@@ -98,7 +85,7 @@ export function Backups() {
     setJobs(await apiJson<BackupJob[]>("/backups/jobs"));
   }
   async function loadHistory() {
-    setHistory(await apiJson<BackupHistoryEntry[]>("/backups/history?limit=100&offset=0"));
+    setHistory(await apiJson<BackupHistoryEntry[]>("/backups/history?limit=500&offset=0"));
   }
 
   useEffect(() => {
@@ -149,6 +136,19 @@ export function Backups() {
     }
   }
 
+  async function deleteRuns(runIds: string[]) {
+    setError(null);
+    try {
+      for (const runId of runIds) {
+        await apiJson(`/backups/history/${runId}`, { method: "DELETE" });
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      await loadHistory();
+    }
+  }
+
   async function deleteRun(runId: string) {
     setDeletingRunId(runId);
     try {
@@ -160,12 +160,6 @@ export function Backups() {
       setDeletingRunId(null);
     }
   }
-
-  const filteredHistory = useMemo(() => {
-    if (!history) return [];
-    if (statusFilter === "all") return history;
-    return history.filter((h) => h.status === statusFilter);
-  }, [history, statusFilter]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -295,93 +289,16 @@ export function Backups() {
         )}
       </Card>
 
-      <div>
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-muted-foreground">{t("history.title")}</h2>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as "all" | BackupRunStatus)}
-            className="rounded-md border border-border bg-background px-2 py-1 text-xs outline-none"
-          >
-            {STATUS_FILTERS.map((f) => (
-              <option key={f.key} value={f.key}>
-                {t(f.labelKey)}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <p className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
-          {t("history.restorePrompt")}{" "}
-          <Link to="/restore" className="inline-flex items-center gap-0.5 text-primary underline">
-            {t("history.restoreLink")} <ArrowRight className="h-3 w-3" />
-          </Link>
-        </p>
-
-        <div className="flex flex-col gap-2">
-          {filteredHistory.length === 0 && (
-            <Card className="text-sm text-muted-foreground">{t("history.empty")}</Card>
-          )}
-          {filteredHistory.map((h) => {
-            const driveStatus = driveStatusByRunId.get(h.runId);
-            return (
-              <Card key={h.runId} className={historyCardClass(h.status)}>
-                <div className="flex items-center justify-between text-sm">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">
-                      {h.type} · {h.sourceType}:{h.sourceRef}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {h.target}
-                      {h.driveFileId ? " + gdrive" : ""}
-                      {h.usbPath ? " + usb" : ""} · {new Date(h.startedAt).toLocaleString()}
-                      {h.durationMs != null ? ` · ${(h.durationMs / 1000).toFixed(1)}s` : ""}
-                    </p>
-                  </div>
-                  <span
-                    className={
-                      "shrink-0 rounded-full px-2 py-0.5 text-xs font-medium " +
-                      (h.status === "success"
-                        ? "bg-primary/15 text-primary"
-                        : h.status === "failed"
-                          ? "bg-destructive/15 text-destructive"
-                          : "bg-warning/15 text-warning")
-                    }
-                  >
-                    {h.status}
-                  </span>
-                </div>
-                <div className="mt-1 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {h.sizeBytes != null && (
-                      <p className="text-xs text-muted-foreground">{formatBytes(h.sizeBytes)}</p>
-                    )}
-                    {driveStatus && <DriveStatusBadge status={driveStatus} />}
-                  </div>
-                  <div className="flex gap-1">
-                    {h.status === "success" && h.target === "local" && (
-                      <Button size="sm" variant="outline" onClick={() => triggerBackupDownload(h.runId)} title={t("history.downloadTitle")}>
-                        <Download className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                    <ConfirmDialog
-                      trigger={
-                        <Button size="sm" variant="destructive" disabled={deletingRunId === h.runId}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      }
-                      title={t("history.deleteConfirm.title")}
-                      description={t("history.deleteConfirm.description")}
-                      confirmLabel={t("history.deleteConfirm.confirmLabel")}
-                      onConfirm={() => deleteRun(h.runId)}
-                    />
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
+      <BackupHistory
+        history={history}
+        renderDriveStatus={(runId) => {
+          const status = driveStatusByRunId.get(runId);
+          return status ? <DriveStatusBadge status={status} /> : null;
+        }}
+        deletingRunId={deletingRunId}
+        onDelete={deleteRun}
+        onDeleteMany={deleteRuns}
+      />
     </div>
   );
 }

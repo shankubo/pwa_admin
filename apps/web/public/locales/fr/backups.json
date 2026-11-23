@@ -127,5 +127,57 @@
     "startSnapshot": "Prendre un instantané de migration",
     "siteLabel": "Site: {{name}}",
     "fullServer": "Serveur complet"
+  },
+  "historyView": {
+    "searchPlaceholder": "Rechercher par nom (volume, dossier, base de données…)",
+    "type": {
+      "all": "Tous",
+      "volume": "Volumes",
+      "path": "Dossiers",
+      "db": "Bases de données",
+      "image": "Images"
+    },
+    "location": {
+      "all": "Tous les emplacements",
+      "local": "Local (ce serveur)",
+      "usb": "USB",
+      "drive": "Google Drive"
+    },
+    "encryption": {
+      "all": "Chiffrement : tous",
+      "encrypted": "Copies externes chiffrées",
+      "plain": "Copies externes non chiffrées"
+    },
+    "reset": "Réinitialiser les filtres",
+    "legend": "Pastilles : « Local » = sur ce serveur (jamais chiffré) · « USB » et « Drive » = copie externe · cadenas fermé vert = chiffrée · cadenas ouvert orange = non chiffrée (lisible) · ? gris = inconnu. La dernière sauvegarde réussie de chaque source est mise en couleur.",
+    "noMatch": "Aucune sauvegarde ne correspond aux filtres.",
+    "count": "{{count}} sauvegarde(s)",
+    "lastBackup": "Dernière : {{when}}",
+    "noSuccess": "Aucune sauvegarde réussie",
+    "latest": "Dernière",
+    "keepOnlyLatest": "Garder seulement la dernière",
+    "keepOnlyLatestConfirm": {
+      "title": "Supprimer {{count}} sauvegarde(s) plus ancienne(s) ?",
+      "description": "Seule la dernière sauvegarde réussie de « {{name}} » est conservée. Les {{count}} autres sont retirées de l'historique et leurs copies locales effacées ; les copies déjà présentes sur l'USB ou sur Google Drive ne sont pas touchées.",
+      "confirmLabel": "Supprimer"
+    },
+    "badges": {
+      "local": "Local",
+      "usb": "USB",
+      "drive": "Drive"
+    },
+    "hints": {
+      "local": "Copie sur ce serveur (jamais chiffrée).",
+      "usbEncrypted": "Copie USB chiffrée avec la clé de l'application.",
+      "usbPlain": "Copie USB non chiffrée : lisible par quiconque branche le disque (sauf si le disque est chiffré en LUKS).",
+      "usbUnknown": "Copie USB : chiffrement inconnu.",
+      "driveEncrypted": "Copie Google Drive chiffrée avec la clé de l'application.",
+      "drivePlain": "Copie Google Drive non chiffrée : lisible par Google et par toute personne ayant accès au compte.",
+      "driveUnknown": "Copie Google Drive : chiffrement inconnu (envoyée avant que ce suivi existe)."
+    },
+    "runType": {
+      "restore": "Restauration",
+      "pre-restore-snapshot": "Instantané avant restauration"
+    }
   }
 }

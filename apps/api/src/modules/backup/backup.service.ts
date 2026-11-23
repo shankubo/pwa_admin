@@ -5,6 +5,7 @@ import { join, resolve, basename } from "node:path";
 import { docker } from "../../services/docker.client.js";
 import { env } from "../../config/env.js";
 import { BackupHistoryModel, BackupJobModel } from "../../db/models/backup.js";
+import { DriveFileMetaModel } from "../../db/models/driveFileMeta.js";
 import { GDriveService } from "../../services/gdrive.client.js";
 import { UsbBackupService, sanitizeSegment } from "../../services/usbBackup.client.js";
 import { BackupCrypto, ENCRYPTED_SUFFIX } from "../../services/backupCrypto.js";
@@ -419,6 +420,7 @@ export const BackupService = {
       }
     }
     const sizeBytes = (await stat(destPath)).size;
+    DriveFileMetaModel.set(fileId, encrypted);
 
     const runId = BackupHistoryModel.createRun({
       jobId: null,

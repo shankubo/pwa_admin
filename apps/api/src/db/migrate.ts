@@ -330,6 +330,22 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    id: 16,
+    name: "drive_file_meta",
+    up: (db) => {
+      // Whether each Drive upload was encrypted. Kept apart from backup_history so
+      // every code path that uploads to Drive records it in one place (the upload
+      // itself), and the history view can tell encrypted copies from plain ones.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS drive_file_meta (
+          file_id TEXT PRIMARY KEY,
+          encrypted INTEGER NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

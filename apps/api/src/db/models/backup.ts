@@ -1,5 +1,7 @@
 import { db } from "../index.js";
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { DriveFileMetaModel } from "./driveFileMeta.js";
 import type {
   BackupSourceType,
   BackupTarget,
@@ -70,6 +72,12 @@ export function backupHistoryToApiShape(row: BackupHistoryRow): BackupHistoryEnt
     error: row.error,
     startedAt: row.started_at,
     finishedAt: row.finished_at,
+    // Retention deletes local files but keeps their history rows, so "has a local
+    // copy" must be checked on disk rather than inferred from file_path.
+    localExists: row.file_path ? existsSync(row.file_path) : false,
+    // USB copies carry the .enc suffix when encrypted (see UsbBackupService.buildArchivePath).
+    usbEncrypted: row.usb_path ? row.usb_path.endsWith(".enc") : null,
+    driveEncrypted: row.drive_file_id ? DriveFileMetaModel.get(row.drive_file_id) : null,
   };
 }
 

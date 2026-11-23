@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { dirname, basename, join } from "node:path";
 import { env } from "../config/env.js";
 import { BackupCrypto, ENCRYPTED_SUFFIX } from "./backupCrypto.js";
+import { DriveFileMetaModel } from "../db/models/driveFileMeta.js";
 
 // Full drive scope (not the narrower drive.file) is required because
 // GDRIVE_ROOT_FOLDER_ID points at a folder the admin created manually in
@@ -158,6 +159,14 @@ export const GDriveService = {
             }
           : undefined
       );
+
+      // Remember whether this copy is encrypted, in the one place every Drive
+      // upload goes through; never let bookkeeping fail a completed upload.
+      try {
+        DriveFileMetaModel.set(res.data.id!, encrypt);
+      } catch {
+        // the history view then shows "unknown" for this copy
+      }
 
       return { fileId: res.data.id!, size: Number(res.data.size ?? 0) };
     } finally {

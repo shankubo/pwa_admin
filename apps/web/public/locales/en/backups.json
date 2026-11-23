@@ -127,5 +127,57 @@
     "startSnapshot": "Take a migration snapshot",
     "siteLabel": "Site: {{name}}",
     "fullServer": "Full server"
+  },
+  "historyView": {
+    "searchPlaceholder": "Search by name (volume, folder, database…)",
+    "type": {
+      "all": "All",
+      "volume": "Volumes",
+      "path": "Folders",
+      "db": "Databases",
+      "image": "Images"
+    },
+    "location": {
+      "all": "All locations",
+      "local": "Local (this server)",
+      "usb": "USB",
+      "drive": "Google Drive"
+    },
+    "encryption": {
+      "all": "Encryption: all",
+      "encrypted": "Encrypted external copies",
+      "plain": "Unencrypted external copies"
+    },
+    "reset": "Reset filters",
+    "legend": "Badges: \"Local\" = on this server (never encrypted) · \"USB\" and \"Drive\" = external copy · green closed padlock = encrypted · orange open padlock = not encrypted (readable) · grey ? = unknown. The latest successful backup of each source is highlighted.",
+    "noMatch": "No backup matches the filters.",
+    "count": "{{count}} backup(s)",
+    "lastBackup": "Latest: {{when}}",
+    "noSuccess": "No successful backup",
+    "latest": "Latest",
+    "keepOnlyLatest": "Keep only the latest",
+    "keepOnlyLatestConfirm": {
+      "title": "Delete {{count}} older backup(s)?",
+      "description": "Only the latest successful backup of \"{{name}}\" is kept. The other {{count}} are removed from the history and their local copies deleted; copies already on the USB drive or Google Drive are not touched.",
+      "confirmLabel": "Delete"
+    },
+    "badges": {
+      "local": "Local",
+      "usb": "USB",
+      "drive": "Drive"
+    },
+    "hints": {
+      "local": "Copy on this server (never encrypted).",
+      "usbEncrypted": "USB copy encrypted with the application key.",
+      "usbPlain": "Unencrypted USB copy: readable by anyone who plugs the drive in (unless the drive is LUKS-encrypted).",
+      "usbUnknown": "USB copy: encryption unknown.",
+      "driveEncrypted": "Google Drive copy encrypted with the application key.",
+      "drivePlain": "Unencrypted Google Drive copy: readable by Google and anyone with access to the account.",
+      "driveUnknown": "Google Drive copy: encryption unknown (uploaded before this was tracked)."
+    },
+    "runType": {
+      "restore": "Restore",
+      "pre-restore-snapshot": "Pre-restore snapshot"
+    }
   }
 }
