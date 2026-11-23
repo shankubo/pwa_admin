@@ -62,6 +62,19 @@ with_pass() { printf '%s' "$PASS" | "$@"; }
 
 mapper_open() { [ -e "/dev/mapper/${MAPPER}" ]; }
 
+# A mapping left behind by a drive that was unplugged without eject still
+# "exists" but its backing disk is gone: treating it as open would make unlock
+# mount a dead device. Drop it so the next open starts from a clean state.
+clear_stale_mapper() {
+  mapper_open || return 0
+  local backing
+  backing="$(cryptsetup status "$MAPPER" 2>/dev/null | awk '/^ *device:/{print $2}' || true)"
+  if [ -z "$backing" ] || [ ! -b "$backing" ]; then
+    umount -l "$MOUNTPOINT" 2>/dev/null || true
+    cryptsetup close "$MAPPER" 2>/dev/null || dmsetup remove --force "$MAPPER" 2>/dev/null || true
+  fi
+}
+
 mount_mapper() {
   mkdir -p "$MOUNTPOINT"
   mountpoint -q "$MOUNTPOINT" && return 0
@@ -87,6 +100,7 @@ case "$ACTION" in
   unlock)
     require_luks
     read_passphrase
+    clear_stale_mapper
     if mapper_open; then
       mount_mapper
       exit 0
@@ -100,6 +114,7 @@ case "$ACTION" in
     # Never format something still in use: release it through the same unit the
     # app uses for ejecting, then make sure nothing is left mounted.
     systemctl stop "backup-usb-mount@${PART}.service" 2>/dev/null || true
+    clear_stale_mapper
     if mapper_open; then umount "$MOUNTPOINT" 2>/dev/null || true; cryptsetup close "$MAPPER" || die "mapper_busy"; fi
     if findmnt -rn -S "$DEV" >/dev/null; then die "partition_still_mounted"; fi
     if lsblk -rno MOUNTPOINT "$DEV" | grep -q .; then die "partition_still_mounted"; fi

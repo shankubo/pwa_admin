@@ -12,9 +12,17 @@ KEYFILE="/etc/pwa-admin/usb-luks.key"
 
 # ExecStop path: unmount, then close the LUKS mapping if there is one so an
 # ejected encrypted drive is really locked again, not just unmounted.
+#
+# This also runs when the drive is yanked without ejecting (udev "remove"), where
+# a plain umount/close can fail on a device that no longer exists. Fall back to
+# a lazy unmount and a forced dm removal so nothing stale is left behind.
 if [ "${1:-}" = "--stop" ]; then
-  umount "$MOUNTPOINT" 2>/dev/null || true
-  if [ -e "/dev/mapper/${MAPPER}" ]; then cryptsetup close "$MAPPER" || true; fi
+  if mountpoint -q "$MOUNTPOINT"; then
+    umount "$MOUNTPOINT" 2>/dev/null || umount -l "$MOUNTPOINT" 2>/dev/null || true
+  fi
+  if [ -e "/dev/mapper/${MAPPER}" ]; then
+    cryptsetup close "$MAPPER" 2>/dev/null || dmsetup remove --force "$MAPPER" 2>/dev/null || true
+  fi
   exit 0
 fi
 
@@ -29,6 +37,26 @@ BACKUP_UID=__PWA_ADMIN_UID__
 BACKUP_GID=__PWA_ADMIN_GID__
 
 mkdir -p "$MOUNTPOINT"
+
+# After an unplug without eject, a dead mount and/or a dm-crypt mapping whose
+# backing disk is gone can linger and block the next mount ("already mounted",
+# stale mapper). Clear them before mounting anything.
+clear_stale() {
+  local src backing
+  if mountpoint -q "$MOUNTPOINT"; then
+    src="$(findmnt -n -o SOURCE "$MOUNTPOINT" 2>/dev/null || true)"
+    if [ -z "$src" ] || [ ! -e "$src" ] || ! timeout 5 ls "$MOUNTPOINT" >/dev/null 2>&1; then
+      umount -l "$MOUNTPOINT" 2>/dev/null || true
+    fi
+  fi
+  if [ -e "/dev/mapper/${MAPPER}" ] && ! mountpoint -q "$MOUNTPOINT"; then
+    backing="$(cryptsetup status "$MAPPER" 2>/dev/null | awk '/^ *device:/{print $2}' || true)"
+    if [ -z "$backing" ] || [ ! -b "$backing" ]; then
+      cryptsetup close "$MAPPER" 2>/dev/null || dmsetup remove --force "$MAPPER" 2>/dev/null || true
+    fi
+  fi
+}
+clear_stale
 
 FSTYPE="$(lsblk -no FSTYPE "$DEVPATH")"
 
